@@ -65,7 +65,7 @@ export default function MapaPage() {
           .select(`
             id,
             predio:predios!id_predio(id, nombre_predio, municipio, vereda, latitud, longitud, area_total, area_cultivada),
-            beneficiario:beneficiarios!id_beneficiario(primer_nombre, primer_apellido),
+            beneficiario:beneficiarios!id_beneficiario(nombres, apellidos),
             caracterizacion_predio:caracterizacion_predio(temperatura_celsius)
           `)
           .eq('asesor_id', user.id)
@@ -87,7 +87,7 @@ export default function MapaPage() {
           seenPredios.add(predio.id)
 
           const benefNombre = c.beneficiario
-            ? `${c.beneficiario.primer_nombre || ''} ${c.beneficiario.primer_apellido || ''}`.trim()
+            ? `${c.beneficiario.nombres || ''} ${c.beneficiario.apellidos || ''}`.trim()
             : 'Sin nombre'
 
           const temp = c.caracterizacion_predio?.temperatura_celsius
