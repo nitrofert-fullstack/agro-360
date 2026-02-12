@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { User, Session } from '@supabase/supabase-js'
+import type { User, Session, AuthChangeEvent } from '@supabase/supabase-js'
 
 interface AuthState {
   user: User | null
@@ -28,31 +28,16 @@ export function useAuth() {
     error: null,
   })
   const [profile, setProfile] = useState<Profile | null>(null)
-  
-  const supabase = createClient()
 
-  // Si Supabase no está configurado, retornar estado inicial
-  if (!supabase) {
-    return {
-      user: null,
-      session: null,
-      profile: null,
-      loading: false,
-      error: 'Supabase not configured',
-      isAuthenticated: false,
-      isAdmin: false,
-      signIn: async () => ({ data: null, error: 'Supabase not configured' }),
-      signUp: async () => ({ data: null, error: 'Supabase not configured' }),
-      signOut: async () => ({ error: 'Supabase not configured' }),
-      resetPassword: async () => ({ error: 'Supabase not configured' }),
-    }
-  }
+  const supabase = useMemo(() => createClient(), [])
 
   const fetchProfile = useCallback(async (userId: string) => {
+    if (!supabase) return
+
     try {
       // Primero intentar obtener del Auth
       const { data: { user: authUser } } = await supabase.auth.getUser()
-      
+
       if (!authUser?.email) {
         console.warn('[Auth] No auth user found')
         return
@@ -60,19 +45,18 @@ export function useAuth() {
 
       // Intentar obtener del tabla profiles
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
           .single()
-        
+
         if (data) {
           setProfile(data as Profile)
           return
         }
       } catch (profileErr) {
         console.warn('[Auth] Could not fetch profile from table:', profileErr)
-        // Continuar usando datos de Auth si profiles falla
       }
 
       // Si no hay datos en profiles, crear un perfil mínimo desde Auth
@@ -90,20 +74,25 @@ export function useAuth() {
   }, [supabase])
 
   useEffect(() => {
+    if (!supabase) {
+      setState(prev => ({ ...prev, loading: false, error: 'Supabase not configured' }))
+      return
+    }
+
     // Get initial session
     const getInitialSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
-        
+
         if (error) throw error
-        
+
         setState(prev => ({
           ...prev,
           user: session?.user ?? null,
           session,
           loading: false,
         }))
-        
+
         if (session?.user) {
           await fetchProfile(session.user.id)
         }
@@ -120,14 +109,14 @@ export function useAuth() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event: AuthChangeEvent, session: Session | null) => {
         setState(prev => ({
           ...prev,
           user: session?.user ?? null,
           session,
           loading: false,
         }))
-        
+
         if (session?.user) {
           await fetchProfile(session.user.id)
         } else {
@@ -141,32 +130,36 @@ export function useAuth() {
     }
   }, [supabase, fetchProfile])
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
+    if (!supabase) return { data: null, error: 'Supabase not configured' }
+
     setState(prev => ({ ...prev, loading: true, error: null }))
-    
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
-      
+
       if (error) throw error
-      
+
       return { data, error: null }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error signing in'
       setState(prev => ({ ...prev, error: errorMessage, loading: false }))
       return { data: null, error: errorMessage }
     }
-  }
+  }, [supabase])
 
-  const signUp = async (
-    email: string, 
-    password: string, 
+  const signUp = useCallback(async (
+    email: string,
+    password: string,
     metadata: { nombre_completo: string; telefono?: string }
   ) => {
+    if (!supabase) return { data: null, error: 'Supabase not configured' }
+
     setState(prev => ({ ...prev, loading: true, error: null }))
-    
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -181,55 +174,59 @@ export function useAuth() {
           },
         },
       })
-      
+
       if (error) throw error
-      
+
       return { data, error: null }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error signing up'
       setState(prev => ({ ...prev, error: errorMessage, loading: false }))
       return { data: null, error: errorMessage }
     }
-  }
+  }, [supabase])
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
+    if (!supabase) return { error: 'Supabase not configured' }
+
     setState(prev => ({ ...prev, loading: true }))
-    
+
     try {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
-      
+
       // Limpiar perfil
       setProfile(null)
-      
+
       // Limpiar datos locales de sesión
       try {
         localStorage.removeItem('auth_session_backup')
-      } catch (e) {
+      } catch {
         // Ignorar errores de localStorage
       }
-      
+
       return { error: null }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error signing out'
       setState(prev => ({ ...prev, error: errorMessage, loading: false }))
       return { error: errorMessage }
     }
-  }
+  }, [supabase])
 
-  const resetPassword = async (email: string) => {
+  const resetPassword = useCallback(async (email: string) => {
+    if (!supabase) return { error: 'Supabase not configured' }
+
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/reset-password`,
       })
-      
+
       if (error) throw error
-      
+
       return { error: null }
     } catch (err) {
       return { error: err instanceof Error ? err.message : 'Error sending reset email' }
     }
-  }
+  }, [supabase])
 
   return {
     user: state.user,

@@ -1,13 +1,13 @@
 "use client"
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useOnlineStatus } from './use-online-status'
 import { useAuth } from './use-auth'
 import { createClient } from '@/lib/supabase/client'
 
 /**
  * Hook para validar y refrescar la sesión cuando la conexión se restaura
- * Esto asegura que si el token expiró mientras estabas offline, 
+ * Esto asegura que si el token expiró mientras estabas offline,
  * se pida login nuevamente al conectarte
  */
 export function useSessionValidation() {
@@ -15,16 +15,7 @@ export function useSessionValidation() {
   const { user, session, signOut } = useAuth()
   const [isValidating, setIsValidating] = useState(false)
   const [sessionValid, setSessionValid] = useState(true)
-  const supabase = createClient()
-
-  // Si Supabase no está configurado, retornar valores por defecto
-  if (!supabase) {
-    return {
-      sessionValid: true,
-      isValidating: false,
-      validateSession: async () => {},
-    }
-  }
+  const supabase = useMemo(() => createClient(), [])
 
   const validateSession = useCallback(async () => {
     if (!isOnline || !session || !supabase) return
@@ -33,9 +24,9 @@ export function useSessionValidation() {
     try {
       // Intentar obtener sesión actual
       const { data: { session: currentSession }, error } = await supabase.auth.getSession()
-      
+
       if (error || !currentSession) {
-        console.log('[v0] Sesión inválida o expirada')
+        console.log('[SessionValidation] Sesión inválida o expirada')
         setSessionValid(false)
         // Forzar logout
         await signOut()
@@ -46,21 +37,22 @@ export function useSessionValidation() {
       if (currentSession.expires_at) {
         const expiresIn = currentSession.expires_at * 1000 - Date.now()
         if (expiresIn < 5 * 60 * 1000) {
-          console.log('[v0] Token próximo a expirar, renovando...')
+          console.log('[SessionValidation] Token próximo a expirar, renovando...')
           // Supabase renovará automáticamente si hay refresh token
-          const { data: { session: refreshedSession }, error: refreshError } = 
+          const { data: { session: refreshedSession }, error: refreshError } =
             await supabase.auth.refreshSession()
-          
+
           if (refreshError || !refreshedSession) {
             setSessionValid(false)
             await signOut()
+            return
           }
         }
       }
 
       setSessionValid(true)
     } catch (error) {
-      console.error('[v0] Error validating session:', error)
+      console.error('[SessionValidation] Error validating session:', error)
       setSessionValid(false)
     } finally {
       setIsValidating(false)

@@ -14,6 +14,16 @@ export function useAutoSync() {
   const { isAuthenticated, user, loading } = useAuth()
   const { syncAll, isSyncing } = useSync()
   const syncAttemptedRef = useRef(false)
+  const lastUserIdRef = useRef<string | null>(null)
+
+  // Reset sync flag when user changes (logout/login with different user)
+  useEffect(() => {
+    const currentUserId = user?.id ?? null
+    if (currentUserId !== lastUserIdRef.current) {
+      syncAttemptedRef.current = false
+      lastUserIdRef.current = currentUserId
+    }
+  }, [user?.id])
 
   useEffect(() => {
     const attemptAutoSync = async () => {
