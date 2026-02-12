@@ -3,11 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-<<<<<<< HEAD
-import { Search, FileText, User, MapPin, Calendar, Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Leaf, LogOut, Download, FileSpreadsheet, Printer } from "lucide-react"
-=======
 import { Search, FileText, User, MapPin, Calendar, Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Leaf, LogOut, Download, Image, PenTool, Paperclip, Eye } from "lucide-react"
->>>>>>> 72364074bbe5a10bc7adb3c8496f46446e5530ae
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -124,43 +120,7 @@ export default function ConsultarPage() {
         if (results.length === 0) {
           setError("No se encontraron caracterizaciones para ese documento")
         } else {
-<<<<<<< HEAD
-          if (results.length === 0) {
-            setError("No se encontro ningun registro con ese radicado. Si acaba de registrarlo, asegurese de sincronizar primero.")
-          } else {
-            setResultados(results)
-          }
-        }
-      } else if (documento) {
-        // Buscar por documento en beneficiarios
-        const { data: beneficiarios, error: benefErr } = await supabase
-          .from('beneficiarios')
-          .select('id')
-          .eq('numero_documento', documento)
-
-        if (benefErr) throw benefErr
-
-        if (!beneficiarios || beneficiarios.length === 0) {
-          setError("No se encontraron registros con ese documento. Si acaba de registrarlo, asegurese de sincronizar primero.")
-        } else {
-          const benefIds = beneficiarios.map((b: any) => b.id)
-          const { data, error: queryErr } = await supabase
-            .from('caracterizaciones')
-            .select(selectQuery)
-            .in('beneficiario_id', benefIds)
-            .order('created_at', { ascending: false })
-
-          if (queryErr) throw queryErr
-
-          const results = (data || []) as unknown as ServerCaracterizacion[]
-          if (results.length === 0) {
-            setError("No se encontraron caracterizaciones para ese documento")
-          } else {
-            setResultados(results)
-          }
-=======
           setResultados(results)
->>>>>>> 4bb2e0015a4ead7b7d7af87d34c57990e7f183e6
         }
       }
     } catch (err) {
@@ -193,41 +153,6 @@ export default function ConsultarPage() {
     return desc[estado] || 'Estado en proceso.'
   }
 
-<<<<<<< HEAD
-  const exportToCSV = () => {
-    if (resultados.length === 0) return
-    const headers = ["Radicado", "Estado", "Nombre", "Documento", "Predio", "Municipio", "Vereda", "Fecha Registro", "Tecnico"]
-    const rows = resultados.map((r) => {
-      const nombre = r.beneficiario
-        ? [r.beneficiario.primer_nombre, r.beneficiario.segundo_nombre, r.beneficiario.primer_apellido, r.beneficiario.segundo_apellido].filter(Boolean).join(" ")
-        : ""
-      return [
-        r.radicado_oficial || r.radicado_local,
-        r.estado,
-        nombre,
-        r.beneficiario?.numero_documento || "",
-        r.predio?.nombre_predio || "",
-        r.predio?.municipio || "",
-        r.predio?.vereda || "",
-        new Date(r.created_at).toLocaleDateString("es-CO"),
-        r.visita?.nombre_tecnico || "",
-      ]
-    })
-    const csv = [headers, ...rows].map((row) => row.map((v) => `"${v}"`).join(",")).join("\n")
-    const BOM = "\uFEFF"
-    const blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `consulta-agrosantander-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.success("Archivo Excel (CSV) descargado")
-  }
-
-  const exportToPDF = () => {
-    window.print()
-=======
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const handleDownloadAttachment = async (url: string, filename: string) => {
@@ -252,7 +177,6 @@ export default function ConsultarPage() {
         toast.error("Error al descargar el archivo")
       }
     }
->>>>>>> 72364074bbe5a10bc7adb3c8496f46446e5530ae
   }
 
   const renderResultado = (res: ServerCaracterizacion) => {
