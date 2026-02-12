@@ -1,0 +1,216 @@
+# 🎯 TUS PRÓXIMOS PASOS - AgroSantander360
+
+## PROBLEMA ACTUAL
+❌ Página en blanco  
+❌ No sabes qué credenciales usar  
+❌ No sabes si Supabase está configurado  
+
+## SOLUCIÓN EN 3 PASOS
+
+### PASO 1️⃣: AGREGAR VARIABLES DE SUPABASE (2 minutos)
+
+**En el sidebar izquierdo de v0:**
+1. Haz clic en **"Vars"** (ícono de engranaje)
+2. Agrega **EXACTAMENTE** estas 2 variables:
+
+```
+NEXT_PUBLIC_SUPABASE_URL = https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY = eyJhbGc...
+```
+
+**¿Dónde consigues estos valores?**
+- Ve a [supabase.com](https://supabase.com)
+- Accede a tu proyecto
+- Ve a **Settings → API**
+- Copia **Project URL** en NEXT_PUBLIC_SUPABASE_URL
+- Copia **Anon Key (public)** en NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+⚠️ **IMPORTANTE:** Sin estas 2 variables, NADA funciona.
+
+---
+
+### PASO 2️⃣: CREAR TABLAS EN SUPABASE (5 minutos)
+
+1. **En Supabase**, ve a **SQL Editor** (lado izquierdo)
+2. Haz clic en **"New Query"**
+3. **Copia todo** el contenido de:  
+   `/scripts/001_create_schema.sql`
+4. **Pégalo** en el editor
+5. Haz clic en **"Run"** ▶️
+
+✅ Si no hay error rojo = **¡Funciona!**
+
+---
+
+### PASO 3️⃣: CREAR USUARIO DE PRUEBA (3 minutos)
+
+**Opción A: Registrarse en la app (Recomendado)**
+1. Ve a `/registro` en tu app
+2. Usa:
+   - Email: `asesor@test.com`
+   - Password: `AsesorTest123!`
+3. Completa el formulario
+
+**Opción B: Crear en Supabase manualmente**
+1. Ve a Supabase → **Authentication → Users**
+2. Haz clic en **"Add New User"**
+3. Email: `asesor@test.com`
+4. Password: `AsesorTest123!`
+5. Marca **"Confirm email"**
+6. Haz clic en **"Create user"**
+
+---
+
+## ✅ VERIFICAR QUE TODO FUNCIONA
+
+### Test 1: ¿Se carga la página principal?
+- Ve a `/`
+- Deberías ver el logo + "AgroSantander360"
+- Si está en blanco: revisa F12 Console
+
+### Test 2: ¿Funciona registro sin login?
+1. Haz clic en **"Iniciar Caracterización"**
+2. Llena unos cuantos campos (cualquier dato)
+3. Haz clic en **"Enviar"**
+4. Deberías ver: **"RADICADO-LOCAL-{números}"**
+
+✅ **Si ves eso = IndexedDB funciona**
+
+### Test 3: ¿Funciona la consulta?
+1. Ve a `/consultar`
+2. Documento: `1234567890`
+3. Radicado: usa el del Test 2 (RADICADO-LOCAL-...)
+4. Presiona **"Consultar"**
+5. Deberías ver los datos que guardaste
+
+✅ **Si aparecen datos = Offline funciona**
+
+### Test 4: ¿Funciona la sincronización?
+1. Loguéate en `/login` con: `asesor@test.com` / `AsesorTest123!`
+2. Ve a `/formulario`
+3. Completa el formulario
+4. Haz clic en **"Enviar"**
+5. Deberías ver botón **"Sincronizar"** (arriba a la derecha)
+6. Haz clic
+7. Deberías ver **"¡Sincronización exitosa!"**
+
+✅ **Si sincroniza = Backend funciona**
+
+---
+
+## 🔑 CREDENCIALES DE PRUEBA
+
+```
+Email: asesor@test.com
+Password: AsesorTest123!
+```
+
+---
+
+## 📍 RUTAS PRINCIPALES
+
+| Ruta | Descripción | Requiere Login |
+|------|-----------|------------------|
+| `/` | Página principal | ❌ No |
+| `/formulario` | Registrar caracterización | ❌ No |
+| `/consultar` | Buscar predio por campesino | ❌ No |
+| `/login` | Iniciar sesión | ❌ No |
+| `/registro` | Crear cuenta | ❌ No |
+| `/admin` | Panel administrativo | ✅ Sí |
+| `/status` | Verificar configuración | ❌ No |
+| `/exito` | Confirmación de registro | ❌ No |
+
+---
+
+## 🐛 SI ALGO NO FUNCIONA
+
+### "Página en blanco"
+1. Abre **F12** (DevTools)
+2. Ve a **Console**
+3. Busca errores sobre:
+   - `SUPABASE_URL`
+   - `ANON_KEY`
+   - `Cannot read properties`
+4. Verifica que las variables estén en **Vars**
+
+### "No me deja registrar"
+- ¿Está el usuario creado en Supabase Auth?
+- ¿Está marcado "Confirm email"?
+- ¿Hay errores en F12 Console?
+
+### "No se guardan los formularios"
+1. Abre **F12 → Storage → IndexedDB**
+2. Busca base de datos **"agrosantander360"**
+3. Si no existe: limpia sitio y recarga
+4. Si existe: verifica que tenga tablas
+
+### "El botón de sincronizar no aparece"
+- ¿Estás loguead? (revisa navbar)
+- ¿Estás online? (revisa indicador de conexión)
+- ¿El navegador tiene permisos de almacenamiento?
+
+---
+
+## 📱 CARACTERÍSTICAS PRINCIPALES
+
+### ✅ Funciona OFFLINE
+- Registra formularios sin internet
+- Guarda en IndexedDB (local)
+- Genera radicado local automático
+- Puedes descargar como JSON
+
+### ✅ Funciona ONLINE
+- Sincroniza al servidor
+- Genera radicado oficial
+- Actualiza estado en tiempo real
+- Consultas desde otros navegadores
+
+### ✅ PWA (App Nativa)
+- Se instala en teléfono/tablet
+- Funciona sin conectividad
+- Notificaciones push (opcional)
+- Acceso desde pantalla de inicio
+
+---
+
+## 📚 DOCUMENTACIÓN
+
+Hay 3 documentos de ayuda:
+
+1. **README_QUICK_START.md** ← 👈 LEE ESTO PRIMERO
+   - Pasos rápidos de configuración
+   - Troubleshooting
+
+2. **SETUP.md**
+   - Configuración técnica detallada
+   - SQL completo
+   - Credenciales
+
+3. **IMPLEMENTATION_SUMMARY.md**
+   - Qué se implementó
+   - Archivos clave
+   - Arquitectura
+
+---
+
+## ✨ CUANDO TODO FUNCIONE
+
+Podrás:
+- ✅ Registrar formularios sin internet
+- ✅ Ver datos guardados localmente
+- ✅ Sincronizar cuando haya conexión
+- ✅ Campesinos consulten sin login
+- ✅ Admin revise solicitudes
+- ✅ Usar como app nativa en teléfono
+
+---
+
+## 🚀 LISTO PARA COMENZAR
+
+1. ✅ Agrega variables de Supabase (Paso 1)
+2. ✅ Crea tablas en Supabase (Paso 2)
+3. ✅ Crea usuario de prueba (Paso 3)
+4. ✅ Verifica que funciona (Tests arriba)
+
+**¿Preguntas?** Lee README_QUICK_START.md
+
