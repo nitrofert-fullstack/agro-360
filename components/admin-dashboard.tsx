@@ -213,6 +213,11 @@ export function AdminDashboard() {
   const [usuarios, setUsuarios] = useState<UserProfile[]>([])
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
+  const [showInviteForm, setShowInviteForm] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRol, setInviteRol] = useState("asesor")
+  const [isCreatingInvite, setIsCreatingInvite] = useState(false)
+  const [lastCreatedToken, setLastCreatedToken] = useState<string | null>(null)
 
   const supabase = createClient()
 
@@ -310,6 +315,65 @@ export function AdminDashboard() {
 
   const getInvitationForEmail = (email: string) => {
     return invitations.find(inv => inv.email === email)
+  }
+
+  const generateToken = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    let token = 'INV-'
+    for (let i = 0; i < 6; i++) {
+      token += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    return token
+  }
+
+  const handleCreateInvitation = async () => {
+    if (!inviteEmail.trim()) {
+      toast.error('Ingresa un correo electronico')
+      return
+    }
+
+    // Verificar que el email no tenga ya un usuario registrado
+    const existingUser = usuarios.find(u => u.email === inviteEmail.trim())
+    if (existingUser) {
+      toast.error('Ya existe un usuario registrado con ese correo')
+      return
+    }
+
+    // Verificar que no tenga una invitacion pendiente
+    const existingInvite = invitations.find(i => i.email === inviteEmail.trim() && !i.usado)
+    if (existingInvite) {
+      toast.error('Ya existe una invitacion pendiente para ese correo')
+      return
+    }
+
+    setIsCreatingInvite(true)
+    try {
+      const token = generateToken()
+      const expiraEn = new Date()
+      expiraEn.setDate(expiraEn.getDate() + 7) // Expira en 7 dias
+
+      const { error } = await supabase
+        .from('invitations')
+        .insert({
+          email: inviteEmail.trim(),
+          rol: inviteRol,
+          token,
+          usado: false,
+          expira_en: expiraEn.toISOString(),
+        })
+
+      if (error) throw error
+
+      setLastCreatedToken(token)
+      toast.success('Invitacion creada exitosamente')
+      setInviteEmail('')
+      await loadUsers()
+    } catch (err) {
+      console.error('Error creating invitation:', err)
+      toast.error('Error al crear la invitacion')
+    } finally {
+      setIsCreatingInvite(false)
+    }
   }
 
   useEffect(() => {
@@ -672,11 +736,86 @@ export function AdminDashboard() {
                   <h2 className="text-lg font-semibold">Gestion de Usuarios</h2>
                   <p className="text-sm text-muted-foreground">Administra las cuentas de asesores y sus permisos de acceso</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={loadUsers} className="gap-2">
-                  <RefreshCw className="h-4 w-4" />
-                  Actualizar
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={loadUsers} className="gap-2">
+                    <RefreshCw className="h-4 w-4" />
+                    <span className="hidden sm:inline">Actualizar</span>
+                  </Button>
+                  <Button size="sm" onClick={() => { setShowInviteForm(!showInviteForm); setLastCreatedToken(null) }} className="gap-2">
+                    <Mail className="h-4 w-4" />
+                    Invitar Asesor
+                  </Button>
+                </div>
               </div>
+
+              {/* Formulario de invitacion */}
+              {showInviteForm && (
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Mail className="h-4 w-4 text-primary" />
+                      Crear Invitacion
+                    </CardTitle>
+                    <CardDescription>
+                      Genera un codigo de invitacion para que un nuevo asesor pueda registrarse
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <Input
+                        placeholder="Correo electronico del asesor"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        className="flex-1"
+                        type="email"
+                      />
+                      <Select value={inviteRol} onValueChange={setInviteRol}>
+                        <SelectTrigger className="w-full sm:w-36">
+                          <SelectValue placeholder="Rol" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="asesor">Asesor</SelectItem>
+                          <SelectItem value="campesino">Campesino</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        onClick={handleCreateInvitation}
+                        disabled={isCreatingInvite || !inviteEmail.trim()}
+                        className="gap-2"
+                      >
+                        {isCreatingInvite ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Mail className="h-4 w-4" />
+                        )}
+                        Generar Codigo
+                      </Button>
+                    </div>
+
+                    {lastCreatedToken && (
+                      <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+                        <p className="mb-2 text-sm font-medium text-green-700 dark:text-green-400">Invitacion creada exitosamente</p>
+                        <div className="flex items-center gap-3">
+                          <code className="rounded bg-card px-3 py-2 text-lg font-bold tracking-widest">{lastCreatedToken}</code>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              navigator.clipboard.writeText(lastCreatedToken)
+                              toast.success('Codigo copiado al portapapeles')
+                            }}
+                          >
+                            Copiar
+                          </Button>
+                        </div>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Comparte este codigo con el asesor. Debe ir a la pagina de invitacion e ingresar este codigo para crear su cuenta. Expira en 7 dias.
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {isLoadingUsers ? (
                 <div className="flex items-center justify-center py-20">
