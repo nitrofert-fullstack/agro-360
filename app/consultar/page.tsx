@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, FileText, User, MapPin, Calendar, Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Leaf, LogOut } from "lucide-react"
+import { Search, FileText, User, MapPin, Calendar, Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Leaf, LogOut, Download, Image, PenTool, Paperclip, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,6 +24,9 @@ interface ServerCaracterizacion {
   created_at: string
   fecha_sincronizacion: string | null
   observaciones: string | null
+  foto_1_url: string | null
+  foto_2_url: string | null
+  firma_productor_url: string | null
   beneficiario: {
     primer_nombre: string
     segundo_nombre: string | null
@@ -56,6 +59,7 @@ export default function ConsultarPage() {
 
   const selectQuery = `
     id, radicado_local, radicado_oficial, estado, created_at, fecha_sincronizacion, observaciones,
+    foto_1_url, foto_2_url, firma_productor_url,
     beneficiario:beneficiarios!beneficiario_id(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, numero_documento, tipo_documento),
     predio:predios!predio_id(nombre_predio, municipio, vereda),
     visita:visitas!visita_id(fecha_visita, nombre_tecnico)
@@ -165,6 +169,32 @@ export default function ConsultarPage() {
       'rechazado': 'Su solicitud fue rechazada. Contacte a su asesor para mas informacion.',
     }
     return desc[estado] || 'Estado en proceso.'
+  }
+
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  const handleDownloadAttachment = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(blobUrl)
+      toast.success(`Descargando ${filename}`)
+    } catch {
+      // Fallback: open in new tab if fetch fails (e.g. CORS)
+      if (!url.startsWith('data:')) {
+        window.open(url, '_blank')
+        toast.success("Abriendo archivo en nueva ventana")
+      } else {
+        toast.error("Error al descargar el archivo")
+      }
+    }
   }
 
   const renderResultado = (res: ServerCaracterizacion) => {
@@ -288,6 +318,140 @@ export default function ConsultarPage() {
               </div>
             )}
           </div>
+
+          {/* Anexos / Archivos adjuntos */}
+          {(res.foto_1_url || res.foto_2_url || res.firma_productor_url) && (
+            <>
+              <Separator className="my-6" />
+              <div className="space-y-4">
+                <h4 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                  <Paperclip className="h-4 w-4" />
+                  Anexos
+                </h4>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {res.foto_1_url && (
+                    <div className="group relative overflow-hidden rounded-lg border border-border bg-muted/30 p-3">
+                      <div className="mb-3 flex items-center gap-2">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-blue-500/10">
+                          <Image className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">Foto 1 del Predio</p>
+                          <p className="text-xs text-muted-foreground">Imagen</p>
+                        </div>
+                      </div>
+                      <div className="mb-3 overflow-hidden rounded-md">
+                        <img
+                          src={res.foto_1_url}
+                          alt="Foto 1 del Predio"
+                          className="h-32 w-full object-cover transition-transform group-hover:scale-105"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 gap-1.5"
+                          onClick={() => handleDownloadAttachment(res.foto_1_url!, `foto-1-predio-${res.radicado_oficial || res.radicado_local}.jpg`)}
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Descargar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => setPreviewUrl(res.foto_1_url)}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {res.foto_2_url && (
+                    <div className="group relative overflow-hidden rounded-lg border border-border bg-muted/30 p-3">
+                      <div className="mb-3 flex items-center gap-2">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-blue-500/10">
+                          <Image className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">Foto 2 del Predio</p>
+                          <p className="text-xs text-muted-foreground">Imagen</p>
+                        </div>
+                      </div>
+                      <div className="mb-3 overflow-hidden rounded-md">
+                        <img
+                          src={res.foto_2_url}
+                          alt="Foto 2 del Predio"
+                          className="h-32 w-full object-cover transition-transform group-hover:scale-105"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 gap-1.5"
+                          onClick={() => handleDownloadAttachment(res.foto_2_url!, `foto-2-predio-${res.radicado_oficial || res.radicado_local}.jpg`)}
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Descargar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => setPreviewUrl(res.foto_2_url)}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {res.firma_productor_url && (
+                    <div className="group relative overflow-hidden rounded-lg border border-border bg-muted/30 p-3">
+                      <div className="mb-3 flex items-center gap-2">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-green-500/10">
+                          <PenTool className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">Firma del Productor</p>
+                          <p className="text-xs text-muted-foreground">Firma digital</p>
+                        </div>
+                      </div>
+                      <div className="mb-3 overflow-hidden rounded-md bg-white p-2">
+                        <img
+                          src={res.firma_productor_url}
+                          alt="Firma del Productor"
+                          className="h-24 w-full object-contain"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 gap-1.5"
+                          onClick={() => handleDownloadAttachment(res.firma_productor_url!, `firma-productor-${res.radicado_oficial || res.radicado_local}.png`)}
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Descargar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => setPreviewUrl(res.firma_productor_url)}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     )
@@ -415,6 +579,30 @@ export default function ConsultarPage() {
           </div>
         )}
       </main>
+
+      {/* Modal de vista previa */}
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          onClick={() => setPreviewUrl(null)}
+        >
+          <div className="relative max-h-[90vh] max-w-[90vw] overflow-auto rounded-lg bg-white p-2 shadow-2xl dark:bg-zinc-900" onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-2 top-2 z-10 h-8 w-8 rounded-full bg-black/50 p-0 text-white hover:bg-black/70"
+              onClick={() => setPreviewUrl(null)}
+            >
+              &times;
+            </Button>
+            <img
+              src={previewUrl}
+              alt="Vista previa"
+              className="max-h-[85vh] max-w-full rounded object-contain"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
