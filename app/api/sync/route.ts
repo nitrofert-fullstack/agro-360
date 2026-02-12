@@ -1,5 +1,50 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { SupabaseClient } from '@supabase/supabase-js'
+
+/**
+ * Sube un base64 data URL a Supabase Storage y retorna la URL pública.
+ * Si el valor ya es una URL normal (no base64), lo retorna tal cual.
+ * Si es null/undefined/vacío, retorna null.
+ */
+async function uploadBase64ToStorage(
+  supabase: SupabaseClient,
+  dataUrl: string | null | undefined,
+  bucket: string,
+  filePath: string,
+  contentType: string
+): Promise<string | null> {
+  if (!dataUrl) return null
+
+  // Si no es base64, ya es una URL válida
+  if (!dataUrl.startsWith('data:')) return dataUrl
+
+  // Extraer el contenido base64
+  const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+  if (!matches) return null
+
+  const base64Data = matches[2]
+  const buffer = Buffer.from(base64Data, 'base64')
+
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from(bucket)
+    .upload(filePath, buffer, {
+      contentType,
+      cacheControl: '3600',
+      upsert: true,
+    })
+
+  if (uploadError) {
+    console.error(`[Sync] Error subiendo archivo a ${bucket}/${filePath}:`, uploadError.message)
+    return null
+  }
+
+  const { data: publicData } = supabase.storage
+    .from(bucket)
+    .getPublicUrl(uploadData.path)
+
+  return publicData.publicUrl
+}
 
 function generateRadicadoOficial(): string {
   const now = new Date()
@@ -256,6 +301,18 @@ export async function POST(request: Request) {
           .eq('id', beneficiarioId)
 
         // === 10. CARACTERIZACIONES (tabla: caracterizaciones - relacional principal) ===
+        // Subir fotos y firma a Storage si son base64 (data URLs exceden VARCHAR(500))
+        const timestamp = Date.now()
+        const foto1Raw = c.archivos?.foto1Url || null
+        const foto2Raw = c.archivos?.foto2Url || null
+        const firmaRaw = c.archivos?.firmaProductorUrl || c.autorizacion?.firmaDigital || null
+
+        const [foto1Url, foto2Url, firmaUrl] = await Promise.all([
+          uploadBase64ToStorage(supabase, foto1Raw, 'fotos-productores', `${c.radicadoLocal}/foto-1-${timestamp}.jpg`, 'image/jpeg'),
+          uploadBase64ToStorage(supabase, foto2Raw, 'fotos-productores', `${c.radicadoLocal}/foto-2-${timestamp}.jpg`, 'image/jpeg'),
+          uploadBase64ToStorage(supabase, firmaRaw, 'firmas', `${c.radicadoLocal}/firma-${timestamp}.png`, 'image/png'),
+        ])
+
         const { error: caracMainErr } = await supabase
           .from('caracterizaciones')
           .insert({
@@ -263,9 +320,9 @@ export async function POST(request: Request) {
             id_beneficiario: beneficiarioId,
             id_predio: predioId,
             observaciones: c.observaciones || null,
-            foto_1_url: c.archivos?.foto1Url || null,
-            foto_2_url: c.archivos?.foto2Url || null,
-            firma_productor_url: c.archivos?.firmaProductorUrl || c.autorizacion?.firmaDigital || null,
+            foto_1_url: foto1Url,
+            foto_2_url: foto2Url,
+            firma_productor_url: firmaUrl,
             autorizacion_datos_personales: c.autorizacion?.autorizaTratamientoDatos ?? false,
             autorizacion_consulta_crediticia: c.autorizacion?.autorizaConsultaCrediticia ?? false,
           })
