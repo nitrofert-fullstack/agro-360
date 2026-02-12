@@ -50,19 +50,40 @@ export function useAuth() {
 
   const fetchProfile = useCallback(async (userId: string) => {
     try {
-      // Obtener email del usuario de Supabase Auth
+      // Primero intentar obtener del Auth
       const { data: { user: authUser } } = await supabase.auth.getUser()
       
-      if (authUser?.email) {
-        setProfile({
-          id: userId,
-          email: authUser.email,
-          nombre_completo: authUser.user_metadata?.nombre_completo || 'Asesor',
-          telefono: authUser.user_metadata?.telefono || null,
-          rol: 'asesor',
-          activo: true
-        } as Profile)
+      if (!authUser?.email) {
+        console.warn('[Auth] No auth user found')
+        return
       }
+
+      // Intentar obtener del tabla profiles
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single()
+        
+        if (data) {
+          setProfile(data as Profile)
+          return
+        }
+      } catch (profileErr) {
+        console.warn('[Auth] Could not fetch profile from table:', profileErr)
+        // Continuar usando datos de Auth si profiles falla
+      }
+
+      // Si no hay datos en profiles, crear un perfil mínimo desde Auth
+      setProfile({
+        id: userId,
+        email: authUser.email,
+        nombre_completo: authUser.user_metadata?.nombre_completo || 'Usuario',
+        telefono: authUser.user_metadata?.telefono || null,
+        rol: authUser.user_metadata?.rol || 'asesor',
+        activo: true
+      } as Profile)
     } catch (err) {
       console.error('[Auth] Error fetching profile:', err)
     }
