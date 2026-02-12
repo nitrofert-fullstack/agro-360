@@ -413,16 +413,67 @@ export function CharacterizationFormComplete() {
     setErrors({})
     if (currentStep < steps.length) setCurrentStep(currentStep + 1)
   }
-  
+
   const prevStep = () => {
     setShowErrors(false)
     if (currentStep > 1) setCurrentStep(currentStep - 1)
   }
 
+  // Navegar a un paso específico (desde la barra de progreso)
+  const goToStep = (targetStep: number) => {
+    // Siempre permite ir hacia atrás
+    if (targetStep <= currentStep) {
+      setShowErrors(false)
+      setErrors({})
+      setCurrentStep(targetStep)
+      return
+    }
+    // Para ir adelante, validar todos los pasos intermedios
+    for (let s = currentStep; s < targetStep; s++) {
+      const stepErrors = validateStep(s)
+      if (Object.keys(stepErrors).length > 0) {
+        setErrors(stepErrors)
+        setShowErrors(true)
+        setCurrentStep(s)
+        toast.error(`Completa el paso ${s}: ${steps[s - 1].title}`, {
+          description: 'Debes llenar los campos requeridos antes de avanzar',
+        })
+        return
+      }
+    }
+    setShowErrors(false)
+    setErrors({})
+    setCurrentStep(targetStep)
+  }
+
+  // Validar TODOS los pasos del formulario
+  const validateAllSteps = (): { valid: boolean; firstErrorStep: number; errors: ValidationErrors } => {
+    const allErrors: ValidationErrors = {}
+    let firstErrorStep = 0
+    for (let s = 1; s <= steps.length; s++) {
+      const stepErrors = validateStep(s)
+      if (Object.keys(stepErrors).length > 0 && firstErrorStep === 0) {
+        firstErrorStep = s
+      }
+      Object.assign(allErrors, stepErrors)
+    }
+    return { valid: Object.keys(allErrors).length === 0, firstErrorStep, errors: allErrors }
+  }
+
   // Enviar formulario
   const handleSubmit = async () => {
-    if (!formData.autorizaciones.autorizacionDatosPersonales) {
-      toast.error("Debe autorizar el tratamiento de datos personales para continuar")
+    // Validar TODOS los pasos antes de guardar
+    const validation = validateAllSteps()
+    if (!validation.valid) {
+      setErrors(validation.errors)
+      setShowErrors(true)
+      if (validation.firstErrorStep > 0) {
+        setCurrentStep(validation.firstErrorStep)
+        toast.error(`Hay campos sin completar en el paso ${validation.firstErrorStep}: ${steps[validation.firstErrorStep - 1].title}`, {
+          description: 'Completa todos los campos requeridos antes de enviar',
+          duration: 5000,
+        })
+      }
       return
     }
 
@@ -1786,7 +1837,7 @@ export function CharacterizationFormComplete() {
               return (
                 <button
                   key={step.id}
-                  onClick={() => setCurrentStep(step.id)}
+                  onClick={() => goToStep(step.id)}
                   className={`flex flex-col items-center gap-1 min-w-[60px] p-2 rounded-lg transition-colors ${
                     isActive ? "bg-primary/10" : isCompleted ? "bg-muted" : ""
                   }`}

@@ -65,26 +65,27 @@ export default function DashboardPage() {
         return
       }
 
-      // Cargar CON filtro por asesor_id
+      // Cargar registros sincronizados del servidor
       if (user?.id) {
-        const { data: serverCaracterizaciones, error } = await supabase
-          .from('caracterizaciones')
+        const { data: serverVisitas, error } = await supabase
+          .from('visitas')
           .select(`
             id,
             radicado_local,
+            radicado_oficial,
             estado,
-            created_at,
-            asesor_id,
-            beneficiario_id
+            fecha_visita,
+            nombre_tecnico,
+            created_at
           `)
           .eq('asesor_id', user.id)
           .order('created_at', { ascending: false })
           .limit(5)
 
-        if (!error && serverCaracterizaciones) {
+        if (!error && serverVisitas) {
           setServerStats({
-            total: serverCaracterizaciones.length,
-            registros: serverCaracterizaciones
+            total: serverVisitas.length,
+            registros: serverVisitas
           })
         } else if (error) {
           console.log("[v0] Error loading server stats:", error)
@@ -337,12 +338,14 @@ export default function DashboardPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <p className="truncate font-medium">
-                              {item.beneficiarios ? `${item.beneficiarios.nombres} ${item.beneficiarios.apellidos}` : 'Sin nombre'}
+                              {item.nombre_tecnico || 'Sin tecnico'}
                             </p>
-                            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">Sincronizado</Badge>
+                            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                              {item.estado === 'SINCRONIZADO' ? 'Sincronizado' : item.estado}
+                            </Badge>
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                            <span className="font-mono text-xs">{item.radicado_local}</span>
+                            <span className="font-mono text-xs">{item.radicado_oficial || item.radicado_local}</span>
                             <span>{new Date(item.created_at).toLocaleDateString()}</span>
                           </div>
                         </div>
