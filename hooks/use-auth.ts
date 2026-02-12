@@ -16,7 +16,7 @@ interface Profile {
   email: string
   nombre_completo: string
   telefono: string | null
-  rol: 'admin' | 'asesor'
+  rol: 'admin' | 'asesor' | 'campesino'
   activo: boolean
 }
 

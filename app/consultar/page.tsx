@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, FileText, User, MapPin, Calendar, Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Leaf, LogOut } from "lucide-react"
+import { Search, FileText, User, MapPin, Calendar, Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Leaf, LogOut, Download, FileSpreadsheet, Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -120,7 +120,7 @@ export default function ConsultarPage() {
         if (!beneficiarios || beneficiarios.length === 0) {
           setError("No se encontraron registros con ese documento. Si acaba de registrarlo, asegurese de sincronizar primero.")
         } else {
-          const benefIds = beneficiarios.map(b => b.id)
+          const benefIds = beneficiarios.map((b: any) => b.id)
           const { data, error: queryErr } = await supabase
             .from('caracterizaciones')
             .select(selectQuery)
@@ -165,6 +165,41 @@ export default function ConsultarPage() {
       'rechazado': 'Su solicitud fue rechazada. Contacte a su asesor para mas informacion.',
     }
     return desc[estado] || 'Estado en proceso.'
+  }
+
+  const exportToCSV = () => {
+    if (resultados.length === 0) return
+    const headers = ["Radicado", "Estado", "Nombre", "Documento", "Predio", "Municipio", "Vereda", "Fecha Registro", "Tecnico"]
+    const rows = resultados.map((r) => {
+      const nombre = r.beneficiario
+        ? [r.beneficiario.primer_nombre, r.beneficiario.segundo_nombre, r.beneficiario.primer_apellido, r.beneficiario.segundo_apellido].filter(Boolean).join(" ")
+        : ""
+      return [
+        r.radicado_oficial || r.radicado_local,
+        r.estado,
+        nombre,
+        r.beneficiario?.numero_documento || "",
+        r.predio?.nombre_predio || "",
+        r.predio?.municipio || "",
+        r.predio?.vereda || "",
+        new Date(r.created_at).toLocaleDateString("es-CO"),
+        r.visita?.nombre_tecnico || "",
+      ]
+    })
+    const csv = [headers, ...rows].map((row) => row.map((v) => `"${v}"`).join(",")).join("\n")
+    const BOM = "\uFEFF"
+    const blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `consulta-agrosantander-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success("Archivo Excel (CSV) descargado")
+  }
+
+  const exportToPDF = () => {
+    window.print()
   }
 
   const renderResultado = (res: ServerCaracterizacion) => {
@@ -394,13 +429,28 @@ export default function ConsultarPage() {
           </CardContent>
         </Card>
 
+        {resultados.length > 0 && (
+          <div className="mb-4 flex items-center justify-between print:hidden">
+            <h3 className="text-lg font-semibold">
+              {resultados.length === 1 ? "1 resultado encontrado" : `${resultados.length} resultados encontrados`}
+            </h3>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={exportToCSV} className="gap-2">
+                <FileSpreadsheet className="h-4 w-4" />
+                Excel
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportToPDF} className="gap-2">
+                <Printer className="h-4 w-4" />
+                PDF
+              </Button>
+            </div>
+          </div>
+        )}
+
         {resultados.length === 1 && renderResultado(resultados[0])}
 
         {resultados.length > 1 && (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">
-              Se encontraron {resultados.length} registros
-            </h3>
             {resultados.map((r) => renderResultado(r))}
           </div>
         )}
