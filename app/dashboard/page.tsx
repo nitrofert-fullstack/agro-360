@@ -13,6 +13,7 @@ import { SyncErrorDisplay } from "@/components/sync-error-display"
 import { useAuth } from "@/hooks/use-auth"
 import { createClient } from "@/lib/supabase/client"
 import { getStats, getAllCaracterizaciones, type CaracterizacionLocal } from "@/lib/db/indexed-db"
+import { CampesinoDashboard } from "@/components/campesino-dashboard"
 import { toast } from "sonner"
 import {
   Leaf,
@@ -147,6 +148,14 @@ export default function DashboardPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-6">
+        {/* Si es campesino, mostrar su dashboard especial */}
+        {profile?.rol === 'campesino' ? (
+          <CampesinoDashboard
+            userEmail={user?.email || ''}
+            userName={profile?.nombre_completo || 'Productor'}
+          />
+        ) : (
+        <>
         {/* Welcome */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-foreground">
@@ -396,6 +405,8 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+        </>
+        )}
       </main>
     </div>
   )
