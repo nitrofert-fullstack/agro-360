@@ -25,10 +25,8 @@ interface ServerCaracterizacion {
   fecha_sincronizacion: string | null
   observaciones: string | null
   beneficiario: {
-    primer_nombre: string
-    segundo_nombre: string | null
-    primer_apellido: string
-    segundo_apellido: string | null
+    nombres: string
+    apellidos: string
     numero_documento: string
     tipo_documento: string
   } | null
@@ -56,7 +54,7 @@ export default function ConsultarPage() {
 
   const selectQuery = `
     id, radicado_local, radicado_oficial, estado, created_at, fecha_sincronizacion, observaciones,
-    beneficiario:beneficiarios!beneficiario_id(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, numero_documento, tipo_documento),
+    beneficiario:beneficiarios!beneficiario_id(nombres, apellidos, numero_documento, tipo_documento),
     predio:predios!predio_id(nombre_predio, municipio, vereda),
     visita:visitas!visita_id(fecha_visita, nombre_tecnico)
   `
@@ -169,7 +167,7 @@ export default function ConsultarPage() {
 
   const renderResultado = (res: ServerCaracterizacion) => {
     const nombre = res.beneficiario
-      ? [res.beneficiario.primer_nombre, res.beneficiario.segundo_nombre, res.beneficiario.primer_apellido, res.beneficiario.segundo_apellido].filter(Boolean).join(' ')
+      ? [res.beneficiario.nombres, res.beneficiario.apellidos].filter(Boolean).join(' ')
       : 'Sin nombre'
 
     return (
