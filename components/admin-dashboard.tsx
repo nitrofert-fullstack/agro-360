@@ -48,6 +48,10 @@ import {
   Home,
   LogOut,
   Loader2,
+  UserX,
+  UserCheck,
+  Mail,
+  Shield,
 } from "lucide-react"
 import { ThemeToggle } from "./theme-toggle"
 import Link from "next/link"
@@ -175,6 +179,25 @@ const estadoConfig: Record<EstadoKey, { label: string; color: string; icon: type
   rechazado: { label: "Rechazado", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: XCircle },
 }
 
+interface UserProfile {
+  id: string
+  email: string
+  nombre_completo: string
+  telefono: string | null
+  rol: string
+  activo: boolean
+  created_at?: string
+}
+
+interface Invitation {
+  id: string
+  email: string
+  rol: string
+  usado: boolean
+  expira_en: string
+  created_at: string
+}
+
 export function AdminDashboard() {
   const [caracterizaciones, setCaracterizaciones] = useState<CaracterizacionDB[]>([])
   const [estadisticas, setEstadisticas] = useState({ total: 0, pendientes: 0, sincronizados: 0, aprobados: 0, rechazados: 0 })
@@ -186,6 +209,10 @@ export function AdminDashboard() {
   const [observaciones, setObservaciones] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [activeSection, setActiveSection] = useState<"caracterizaciones" | "usuarios">("caracterizaciones")
+  const [usuarios, setUsuarios] = useState<UserProfile[]>([])
+  const [invitations, setInvitations] = useState<Invitation[]>([])
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false)
 
   const supabase = createClient()
 
@@ -235,9 +262,65 @@ export function AdminDashboard() {
     }
   }, [supabase])
 
+  const loadUsers = useCallback(async () => {
+    setIsLoadingUsers(true)
+    try {
+      // Cargar perfiles de usuarios
+      const { data: profiles, error: profilesErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (profilesErr) throw profilesErr
+      setUsuarios((profiles || []) as UserProfile[])
+
+      // Cargar invitaciones
+      const { data: invs, error: invsErr } = await supabase
+        .from('invitations')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (!invsErr) {
+        setInvitations((invs || []) as Invitation[])
+      }
+    } catch (err) {
+      console.error('Error loading users:', err)
+      toast.error('Error al cargar usuarios')
+    } finally {
+      setIsLoadingUsers(false)
+    }
+  }, [supabase])
+
+  const toggleUserActive = async (userId: string, currentActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ activo: !currentActive })
+        .eq('id', userId)
+
+      if (error) throw error
+
+      toast.success(currentActive ? 'Cuenta inhabilitada' : 'Cuenta habilitada')
+      await loadUsers()
+    } catch (err) {
+      console.error('Error toggling user:', err)
+      toast.error('Error al actualizar el estado de la cuenta')
+    }
+  }
+
+  const getInvitationForEmail = (email: string) => {
+    return invitations.find(inv => inv.email === email)
+  }
+
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  useEffect(() => {
+    if (activeSection === 'usuarios') {
+      loadUsers()
+    }
+  }, [activeSection, loadUsers])
 
   const filteredCaracterizaciones = caracterizaciones.filter((c) => {
     const matchesEstado = filterEstado === "todos" || c.estado === filterEstado
@@ -322,7 +405,7 @@ export function AdminDashboard() {
                 <span className="hidden sm:inline">Dashboard</span>
               </Link>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => { loadData(); toast.info('Actualizando datos...') }} className="h-9 gap-2 bg-transparent px-2 md:px-3">
+            <Button variant="outline" size="sm" onClick={() => { loadData(); if (activeSection === 'usuarios') loadUsers(); toast.info('Actualizando datos...') }} className="h-9 gap-2 bg-transparent px-2 md:px-3">
               <RefreshCw className="h-4 w-4" />
               <span className="hidden md:inline">Actualizar</span>
             </Button>
@@ -418,11 +501,61 @@ export function AdminDashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Section navigation */}
+            <div className="mt-6 space-y-2">
+              <div className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <LayoutDashboard className="h-4 w-4" />
+                Secciones
+              </div>
+              <Button
+                variant={activeSection === 'caracterizaciones' ? 'default' : 'ghost'}
+                size="sm"
+                className="w-full justify-start gap-2"
+                onClick={() => setActiveSection('caracterizaciones')}
+              >
+                <FileText className="h-4 w-4" />
+                Caracterizaciones
+              </Button>
+              <Button
+                variant={activeSection === 'usuarios' ? 'default' : 'ghost'}
+                size="sm"
+                className="w-full justify-start gap-2"
+                onClick={() => setActiveSection('usuarios')}
+              >
+                <Users className="h-4 w-4" />
+                Usuarios
+              </Button>
+            </div>
           </div>
         </aside>
 
         {/* Main Content */}
         <main className="flex-1 p-6">
+          {/* Mobile section tabs */}
+          <div className="mb-4 flex gap-2 lg:hidden">
+            <Button
+              variant={activeSection === 'caracterizaciones' ? 'default' : 'outline'}
+              size="sm"
+              className="gap-2"
+              onClick={() => setActiveSection('caracterizaciones')}
+            >
+              <FileText className="h-4 w-4" />
+              Caracterizaciones
+            </Button>
+            <Button
+              variant={activeSection === 'usuarios' ? 'default' : 'outline'}
+              size="sm"
+              className="gap-2"
+              onClick={() => setActiveSection('usuarios')}
+            >
+              <Users className="h-4 w-4" />
+              Usuarios
+            </Button>
+          </div>
+
+          {activeSection === 'caracterizaciones' && (
+          <>
           {/* Filters */}
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
@@ -526,6 +659,159 @@ export function AdminDashboard() {
                   </Card>
                 )
               })}
+            </div>
+          )}
+          </>
+          )}
+
+          {/* Seccion Usuarios */}
+          {activeSection === 'usuarios' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold">Gestion de Usuarios</h2>
+                  <p className="text-sm text-muted-foreground">Administra las cuentas de asesores y sus permisos de acceso</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={loadUsers} className="gap-2">
+                  <RefreshCw className="h-4 w-4" />
+                  Actualizar
+                </Button>
+              </div>
+
+              {isLoadingUsers ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <span className="text-sm text-muted-foreground">Cargando usuarios...</span>
+                  </div>
+                </div>
+              ) : usuarios.length === 0 ? (
+                <Card className="py-12 text-center">
+                  <CardContent>
+                    <Users className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
+                    <h3 className="mb-2 text-lg font-medium">No hay usuarios registrados</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Los asesores se registran usando codigos de invitacion
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {usuarios.map((u) => {
+                    const invitation = getInvitationForEmail(u.email)
+                    return (
+                      <Card key={u.id} className={`transition-colors ${!u.activo ? 'opacity-60 border-red-500/20' : ''}`}>
+                        <CardContent className="flex items-center gap-4 p-4">
+                          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${u.activo ? 'bg-primary/10' : 'bg-red-500/10'}`}>
+                            {u.activo ? (
+                              <User className="h-6 w-6 text-primary" />
+                            ) : (
+                              <UserX className="h-6 w-6 text-red-500" />
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="truncate font-medium">{u.nombre_completo || 'Sin nombre'}</h3>
+                              <Badge variant="outline" className={
+                                u.rol === 'admin'
+                                  ? 'bg-orange-500/10 text-orange-500 border-orange-500/20'
+                                  : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                              }>
+                                {u.rol === 'admin' ? (
+                                  <><Shield className="mr-1 h-3 w-3" />Admin</>
+                                ) : (
+                                  <><User className="mr-1 h-3 w-3" />Asesor</>
+                                )}
+                              </Badge>
+                              {!u.activo && (
+                                <Badge variant="destructive" className="gap-1">
+                                  <XCircle className="h-3 w-3" />
+                                  Inhabilitado
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Mail className="h-3 w-3" />
+                                {u.email}
+                              </span>
+                              {u.telefono && (
+                                <span className="flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  {u.telefono}
+                                </span>
+                              )}
+                              {u.created_at && (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  Registrado: {new Date(u.created_at).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex shrink-0 items-center gap-2">
+                            {u.rol !== 'admin' && (
+                              <Button
+                                variant={u.activo ? "outline" : "default"}
+                                size="sm"
+                                onClick={() => toggleUserActive(u.id, u.activo)}
+                                className={`gap-1.5 ${u.activo ? 'hover:bg-red-50 hover:text-red-600 hover:border-red-300 dark:hover:bg-red-950' : 'bg-green-600 hover:bg-green-700'}`}
+                              >
+                                {u.activo ? (
+                                  <>
+                                    <UserX className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Inhabilitar</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserCheck className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Habilitar</span>
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Invitaciones pendientes */}
+              {invitations.filter(i => !i.usado).length > 0 && (
+                <div className="mt-8 space-y-4">
+                  <h3 className="text-base font-semibold text-muted-foreground">Invitaciones Pendientes</h3>
+                  <div className="space-y-2">
+                    {invitations.filter(i => !i.usado).map((inv) => (
+                      <Card key={inv.id} className="border-yellow-500/20 bg-yellow-500/5">
+                        <CardContent className="flex items-center gap-4 p-4">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-yellow-500/10">
+                            <Mail className="h-5 w-5 text-yellow-500" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="truncate font-medium">{inv.email}</p>
+                              <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                                <Clock className="mr-1 h-3 w-3" />
+                                Pendiente
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Rol: {inv.rol} | Expira: {new Date(inv.expira_en).toLocaleDateString()}
+                              {new Date(inv.expira_en) < new Date() && (
+                                <span className="ml-2 text-red-500">(Expirada)</span>
+                              )}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </main>

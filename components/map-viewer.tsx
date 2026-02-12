@@ -32,11 +32,18 @@ interface WeatherData {
   feelsLike: number
 }
 
+export interface MapMarker {
+  position: [number, number]
+  popupContent: string
+  id?: string
+}
+
 interface MapViewerProps {
   initialCenter?: [number, number]
   initialZoom?: number
   markerPosition?: [number, number]
   polygonCoords?: [number, number][]
+  markers?: MapMarker[]
 }
 
 // Santander bounds - these will be created dynamically after Leaflet loads
@@ -194,11 +201,12 @@ function LayerIcon({ type, active }: { type: LayerType; active: boolean }) {
   }
 }
 
-export function MapViewer({ 
-  initialCenter, 
-  initialZoom, 
-  markerPosition, 
-  polygonCoords 
+export function MapViewer({
+  initialCenter,
+  initialZoom,
+  markerPosition,
+  polygonCoords,
+  markers
 }: MapViewerProps = {}) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
@@ -398,6 +406,23 @@ export function MapViewer({
         predioMarkerRef.current.bindPopup("<strong>Ubicacion del Predio</strong>").openPopup()
       }
       
+      // Add multiple markers if provided
+      if (markers && markers.length > 0) {
+        const markerIcon = L.default.divIcon({
+          html: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#3b82f6" stroke="#1e40af" strokeWidth="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+          <circle cx="12" cy="10" r="3" fill="white"></circle>
+          </svg>`,
+          className: "multi-marker",
+          iconSize: [32, 32],
+          iconAnchor: [16, 32],
+        })
+        markers.forEach((m) => {
+          const marker = L.default.marker(m.position, { icon: markerIcon }).addTo(map)
+          marker.bindPopup(m.popupContent)
+        })
+      }
+
       // Add predio polygon if provided
       if (polygonCoords && polygonCoords.length >= 3) {
         predioPolygonRef.current = L.default.polygon(polygonCoords, {
