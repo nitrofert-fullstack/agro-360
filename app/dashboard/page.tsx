@@ -56,7 +56,9 @@ export default function DashboardPage() {
     const s = await getStats()
     setStats(s)
     const all = await getAllCaracterizaciones()
-    setRecentItems(all.sort((a, b) => new Date(b.fechaRegistro).getTime() - new Date(a.fechaRegistro).getTime()).slice(0, 5))
+    // Solo mostrar registros NO sincronizados en la sección local (los sincronizados aparecen en servidor)
+    const noSincronizados = all.filter(c => c.estado !== 'SINCRONIZADO')
+    setRecentItems(noSincronizados.sort((a, b) => new Date(b.fechaRegistro).getTime() - new Date(a.fechaRegistro).getTime()).slice(0, 5))
     
     // Cargar datos del servidor si está logueado y Supabase está configurado
     try {
@@ -76,7 +78,11 @@ export default function DashboardPage() {
             estado,
             fecha_visita,
             nombre_tecnico,
-            created_at
+            created_at,
+            caracterizaciones!id_visita(
+              id_beneficiario,
+              beneficiarios!id_beneficiario(nombres, apellidos)
+            )
           `)
           .eq('asesor_id', user.id)
           .order('created_at', { ascending: false })
@@ -301,7 +307,11 @@ export default function DashboardPage() {
                     const est = estadoMap[item.estado] || estadoMap['PENDIENTE_SINCRONIZACION']
 
                     return (
-                      <Card key={item.radicadoLocal} className="transition-colors hover:bg-muted/30">
+                      <Card
+                        key={item.radicadoLocal}
+                        className="cursor-pointer transition-colors hover:bg-muted/30"
+                        onClick={() => router.push(`/dashboard/caracterizacion/${encodeURIComponent(item.radicadoLocal)}`)}
+                      >
                         <CardContent className="flex items-center gap-4 p-4">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                             <FileText className="h-5 w-5 text-primary" />
@@ -329,8 +339,17 @@ export default function DashboardPage() {
               <div>
                 <h4 className="mb-3 text-sm font-medium text-muted-foreground">Sincronizados en servidor</h4>
                 <div className="space-y-2">
-                  {serverStats.registros.map((item: any) => (
-                    <Card key={item.id} className="transition-colors hover:bg-muted/30 border-green-500/20 bg-green-500/5">
+                  {serverStats.registros.map((item: any) => {
+                    const carac = item.caracterizaciones?.[0]
+                    const benef = carac?.beneficiarios
+                    const nombreProductor = benef ? `${benef.nombres || ''} ${benef.apellidos || ''}`.trim() : item.nombre_tecnico || 'Sin nombre'
+
+                    return (
+                    <Card
+                      key={item.id}
+                      className="cursor-pointer transition-colors hover:bg-muted/30 border-green-500/20 bg-green-500/5"
+                      onClick={() => router.push(`/dashboard/caracterizacion/${item.id}`)}
+                    >
                       <CardContent className="flex items-center gap-4 p-4">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-500/10">
                           <CheckCircle className="h-5 w-5 text-green-500" />
@@ -338,7 +357,7 @@ export default function DashboardPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <p className="truncate font-medium">
-                              {item.nombre_tecnico || 'Sin tecnico'}
+                              {nombreProductor}
                             </p>
                             <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
                               {item.estado === 'SINCRONIZADO' ? 'Sincronizado' : item.estado}
@@ -351,7 +370,8 @@ export default function DashboardPage() {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
