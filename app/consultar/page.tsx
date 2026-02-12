@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Search, FileText, User, MapPin, Calendar, Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Leaf, LogOut, Download, Image, PenTool, Paperclip, Eye } from "lucide-react"
@@ -50,19 +50,25 @@ export default function ConsultarPage() {
   const router = useRouter()
   const { user, profile, signOut, isAuthenticated, loading: authLoading } = useAuth()
   const [documento, setDocumento] = useState("")
-  const [radicado, setRadicado] = useState("")
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resultados, setResultados] = useState<ServerCaracterizacion[]>([])
 
   const supabase = createClient()
 
+  // Proteger ruta: redirigir si no esta autenticado
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/auth/login')
+    }
+  }, [authLoading, isAuthenticated, router])
+
   const selectQuery = `
     id, radicado_local, radicado_oficial, estado, created_at, fecha_sincronizacion, observaciones,
     foto_1_url, foto_2_url, firma_productor_url,
-    beneficiario:beneficiarios!beneficiario_id(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, numero_documento, tipo_documento),
-    predio:predios!predio_id(nombre_predio, municipio, vereda),
-    visita:visitas!visita_id(fecha_visita, nombre_tecnico)
+    beneficiario:beneficiarios!id_beneficiario(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, numero_documento, tipo_documento),
+    predio:predios!id_predio(nombre_predio, municipio, vereda),
+    visita:visitas!id_visita(fecha_visita, nombre_tecnico)
   `
 
   const handleSignOut = async () => {
@@ -78,67 +84,43 @@ export default function ConsultarPage() {
     setIsSearching(true)
 
     try {
-      // Guard: verificar que Supabase esté configurado
       if (!supabase) {
         setError("Sistema no configurado correctamente. Intente mas tarde.")
         setIsSearching(false)
         return
       }
 
-      // Siempre buscar en el servidor (Supabase)
-      if (radicado) {
+      if (!documento) {
+        setError("Ingresa un numero de documento para buscar")
+        setIsSearching(false)
+        return
+      }
+
+      // Buscar por documento en beneficiarios
+      const { data: beneficiarios, error: benefErr } = await supabase
+        .from('beneficiarios')
+        .select('id')
+        .eq('numero_documento', documento)
+
+      if (benefErr) throw benefErr
+
+      if (!beneficiarios || beneficiarios.length === 0) {
+        setError("No se encontraron registros con ese documento. Si acaba de registrarlo, asegurese de sincronizar primero.")
+      } else {
+        const benefIds = beneficiarios.map((b: { id: string }) => b.id)
         const { data, error: queryErr } = await supabase
           .from('caracterizaciones')
           .select(selectQuery)
-          .or(`radicado_local.eq.${radicado},radicado_oficial.eq.${radicado}`)
+          .in('id_beneficiario', benefIds)
+          .order('created_at', { ascending: false })
 
         if (queryErr) throw queryErr
 
         const results = (data || []) as unknown as ServerCaracterizacion[]
-
-        if (documento) {
-          const filtered = results.filter(r => r.beneficiario?.numero_documento === documento)
-          if (filtered.length === 0 && results.length > 0) {
-            setError("El documento no coincide con el radicado proporcionado")
-          } else if (filtered.length === 0) {
-            setError("No se encontro ningun registro con ese radicado")
-          } else {
-            setResultados(filtered)
-          }
+        if (results.length === 0) {
+          setError("No se encontraron caracterizaciones para ese documento")
         } else {
-          if (results.length === 0) {
-            setError("No se encontro ningun registro con ese radicado. Si acaba de registrarlo, asegurese de sincronizar primero.")
-          } else {
-            setResultados(results)
-          }
-        }
-      } else if (documento) {
-        // Buscar por documento en beneficiarios
-        const { data: beneficiarios, error: benefErr } = await supabase
-          .from('beneficiarios')
-          .select('id')
-          .eq('numero_documento', documento)
-
-        if (benefErr) throw benefErr
-
-        if (!beneficiarios || beneficiarios.length === 0) {
-          setError("No se encontraron registros con ese documento. Si acaba de registrarlo, asegurese de sincronizar primero.")
-        } else {
-          const benefIds = beneficiarios.map(b => b.id)
-          const { data, error: queryErr } = await supabase
-            .from('caracterizaciones')
-            .select(selectQuery)
-            .in('beneficiario_id', benefIds)
-            .order('created_at', { ascending: false })
-
-          if (queryErr) throw queryErr
-
-          const results = (data || []) as unknown as ServerCaracterizacion[]
-          if (results.length === 0) {
-            setError("No se encontraron caracterizaciones para ese documento")
-          } else {
-            setResultados(results)
-          }
+          setResultados(results)
         }
       }
     } catch (err) {
@@ -457,11 +439,24 @@ export default function ConsultarPage() {
     )
   }
 
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Cargando...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) return null
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
-          <Link href={isAuthenticated ? "/dashboard" : "/"} className="flex items-center gap-2 md:gap-3">
+          <Link href="/dashboard" className="flex items-center gap-2 md:gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 md:h-10 md:w-10">
               <Leaf className="h-5 w-5 text-primary md:h-6 md:w-6" />
             </div>
@@ -472,23 +467,19 @@ export default function ConsultarPage() {
           </Link>
 
           <nav className="flex items-center gap-2 md:gap-3">
-            <Button variant="ghost" size="sm" onClick={() => router.back()} className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard')} className="gap-2">
               <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Volver</span>
+              <span className="hidden sm:inline">Dashboard</span>
             </Button>
 
-            {isAuthenticated && (
-              <>
-                <div className="hidden h-6 w-px bg-border md:block" />
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="hidden text-muted-foreground md:inline">{profile?.email}</span>
-                  <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
-                    <LogOut className="h-4 w-4" />
-                    <span className="hidden sm:inline">Salir</span>
-                  </Button>
-                </div>
-              </>
-            )}
+            <div className="hidden h-6 w-px bg-border md:block" />
+            <div className="flex items-center gap-2 text-sm">
+              <span className="hidden text-muted-foreground md:inline">{profile?.email}</span>
+              <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Salir</span>
+              </Button>
+            </div>
 
             <ThemeToggle />
           </nav>
@@ -503,31 +494,20 @@ export default function ConsultarPage() {
               Consultar Caracterizacion
             </CardTitle>
             <CardDescription>
-              Ingresa tu numero de documento y/o radicado para consultar el estado de tu caracterizacion predial.
+              Ingresa el numero de documento del productor para consultar sus caracterizaciones.
               Los registros deben estar sincronizados para poder consultarlos.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSearch} className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="documento">Numero de Documento</Label>
-                  <Input
-                    id="documento"
-                    placeholder="Ej: 1098765432"
-                    value={documento}
-                    onChange={(e) => setDocumento(e.target.value.trim())}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="radicado">Numero de Radicado</Label>
-                  <Input
-                    id="radicado"
-                    placeholder="Ej: RAD-1770319428814-6UGL"
-                    value={radicado}
-                    onChange={(e) => setRadicado(e.target.value.trim())}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="documento">Numero de Documento del Productor</Label>
+                <Input
+                  id="documento"
+                  placeholder="Ej: 1098765432"
+                  value={documento}
+                  onChange={(e) => setDocumento(e.target.value.trim())}
+                />
               </div>
 
               {error && (
@@ -540,7 +520,7 @@ export default function ConsultarPage() {
               <Button
                 type="submit"
                 className="w-full md:w-auto"
-                disabled={isSearching || (!documento && !radicado)}
+                disabled={isSearching || !documento}
               >
                 {isSearching ? (
                   <>
@@ -572,9 +552,9 @@ export default function ConsultarPage() {
         {resultados.length === 0 && !error && (
           <div className="rounded-lg border border-dashed border-border bg-muted/30 p-8 text-center">
             <Search className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
-            <h3 className="mb-2 text-lg font-medium">Busca tu caracterizacion</h3>
+            <h3 className="mb-2 text-lg font-medium">Busca una caracterizacion</h3>
             <p className="text-sm text-muted-foreground">
-              Ingresa tu numero de documento o el numero de radicado que te proporciono el asesor para consultar el estado de tu caracterizacion predial.
+              Ingresa el numero de documento del productor para consultar el estado de sus caracterizaciones.
             </p>
           </div>
         )}

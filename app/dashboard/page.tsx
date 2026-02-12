@@ -38,18 +38,18 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({ total: 0, pendientes: 0, sincronizados: 0, errores: 0 })
   const [recentItems, setRecentItems] = useState<CaracterizacionLocal[]>([])
   const [serverStats, setServerStats] = useState<any>(null)
-  const [isReady, setIsReady] = useState(false)
+  const [statsLoaded, setStatsLoaded] = useState(false)
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.push('/auth/login')
       return
     }
-    if (!loading && isAuthenticated) {
-      setIsReady(true)
+    if (!loading && isAuthenticated && !statsLoaded) {
+      setStatsLoaded(true)
       loadStats()
     }
-  }, [loading, isAuthenticated, router])
+  }, [loading, isAuthenticated, router, statsLoaded])
 
   const loadStats = async () => {
     // Cargar datos locales de IndexedDB
@@ -101,7 +101,7 @@ export default function DashboardPage() {
     router.push('/')
   }
 
-  if (loading || !isReady) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
@@ -245,7 +245,7 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="font-semibold">Consultar</p>
-                  <p className="text-xs text-muted-foreground">Buscar por radicado</p>
+                  <p className="text-xs text-muted-foreground">Buscar por documento</p>
                 </div>
               </CardContent>
             </Card>
