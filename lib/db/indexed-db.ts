@@ -13,6 +13,9 @@ export interface CaracterizacionLocal {
     horaInicio?: string
     horaFin?: string
     nombreTecnico: string
+    codigoFormulario?: string
+    versionFormulario?: string
+    fechaEmisionFormulario?: string
     departamento: string
     municipio: string
     corregimiento?: string
@@ -38,6 +41,9 @@ export interface CaracterizacionLocal {
   // 3. Datos del predio (tabla predios)
   predio: {
     nombrePredio?: string
+    departamento?: string
+    municipio?: string
+    vereda?: string
     tipoTenencia?: string
     tipoTenenciaOtro?: string
     documentoTenencia?: string
@@ -156,7 +162,7 @@ export interface CaracterizacionLocal {
   // 9. Autorización
   autorizacion: {
     autorizaTratamientoDatos: boolean
-    autorizaConsultaCrediticia?: boolean
+    autorizaConsultaCrediticia: boolean
     firmaDigital?: string
     firmaDigitalUrl?: string
     fechaAutorizacion?: string

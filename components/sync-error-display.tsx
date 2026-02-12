@@ -30,6 +30,7 @@ export function SyncErrorDisplay() {
   }
 
   const handleRetry = async (caracterizacion: CaracterizacionLocal) => {
+    if (caracterizacion.id === undefined) return
     // Marcar como pendiente nuevamente
     await markAsError(caracterizacion.id, null)
     toast.success('Formulario marcado para reintentar sincronización')
@@ -72,7 +73,7 @@ export function SyncErrorDisplay() {
               <div key={error.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-lg border border-red-200 dark:border-red-800">
                 <div className="flex-1">
                   <p className="font-medium text-sm">{error.radicadoLocal || 'Sin radicado'}</p>
-                  <p className="text-xs text-red-600 dark:text-red-400">{error.errorMensaje || 'Error desconocido'}</p>
+                  <p className="text-xs text-red-600 dark:text-red-400">{error.ultimoErrorSincronizacion || 'Error desconocido'}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -106,7 +107,7 @@ export function SyncErrorDisplay() {
                   <p className="text-xs text-muted-foreground uppercase tracking-wider">Error</p>
                   <Alert className="border-red-200 dark:border-red-800">
                     <AlertDescription className="text-red-600 dark:text-red-400 text-sm">
-                      {selectedError.errorMensaje || 'Error desconocido'}
+                      {selectedError.ultimoErrorSincronizacion || 'Error desconocido'}
                     </AlertDescription>
                   </Alert>
                 </div>
