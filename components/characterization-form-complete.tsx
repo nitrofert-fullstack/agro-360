@@ -453,10 +453,10 @@ export function CharacterizationFormComplete() {
         beneficiario: {
           tipoDocumento: formData.beneficiario.tipoDocumento,
           numeroDocumento: formData.beneficiario.numeroDocumento,
-          primerNombre: formData.beneficiario.nombres.split(' ')[0] || '',
-          segundoNombre: formData.beneficiario.nombres.split(' ')[1] || '',
-          primerApellido: formData.beneficiario.apellidos.split(' ')[0] || '',
-          segundoApellido: formData.beneficiario.apellidos.split(' ')[1] || '',
+          primerNombre: formData.beneficiario.nombres.split(' ').filter(Boolean)[0] || '',
+          segundoNombre: formData.beneficiario.nombres.split(' ').filter(Boolean)[1] || null,
+          primerApellido: formData.beneficiario.apellidos.split(' ').filter(Boolean)[0] || '',
+          segundoApellido: formData.beneficiario.apellidos.split(' ').filter(Boolean)[1] || null,
           edad: formData.beneficiario.edad,
           telefono: formData.beneficiario.telefono,
           email: formData.beneficiario.correo,
@@ -505,7 +505,7 @@ export function CharacterizationFormComplete() {
         
         // 5. Agua y riesgos (tablas abastecimiento_agua y riesgos_predio)
         aguaRiesgos: {
-          // Fuentes de agua
+          // Abastecimiento agua
           tipoFuenteAgua: [
             formData.abastecimientoAgua.nacimientoManantial && 'Nacimiento/Manantial',
             formData.abastecimientoAgua.rioQuebrada && 'Rio/Quebrada',
@@ -514,10 +514,23 @@ export function CharacterizationFormComplete() {
             formData.abastecimientoAgua.canalDistritoRiego && 'Canal distrito riego',
             formData.abastecimientoAgua.jagueyReservorio && 'Jagüey/Reservorio',
             formData.abastecimientoAgua.aguaLluvia && 'Agua lluvia',
-          ].filter(Boolean).join(', ') || formData.abastecimientoAgua.otraFuente,
+          ].filter(Boolean).join(', ') || formData.abastecimientoAgua.otraFuente || null,
           disponibilidadAgua: 'Permanente',
           tieneConcesion: false,
+          nacimientoManantial: formData.abastecimientoAgua.nacimientoManantial,
+          rioQuebrada: formData.abastecimientoAgua.rioQuebrada,
+          pozo: formData.abastecimientoAgua.pozo,
+          acueductoRural: formData.abastecimientoAgua.acueductoRural,
+          canalDistritoRiego: formData.abastecimientoAgua.canalDistritoRiego,
+          jagueyReservorio: formData.abastecimientoAgua.jagueyReservorio,
+          aguaLluvia: formData.abastecimientoAgua.aguaLluvia,
+          otraFuente: formData.abastecimientoAgua.otraFuente || null,
           // Riesgos
+          inundacion: formData.riesgos.inundacion,
+          sequia: formData.riesgos.sequia,
+          viento: formData.riesgos.viento,
+          helada: formData.riesgos.helada,
+          otrosRiesgos: formData.riesgos.otrosRiesgos || null,
           riesgos: [
             formData.riesgos.inundacion && { tipo: 'Inundacion', nivel: 'Medio' },
             formData.riesgos.sequia && { tipo: 'Sequia', nivel: 'Medio' },

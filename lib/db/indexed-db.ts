@@ -31,9 +31,6 @@ export interface CaracterizacionLocal {
     segundoApellido?: string
     fechaNacimiento?: string
     genero?: string
-    grupoEtnico?: string
-    discapacidad?: string
-    tipoDiscapacidad?: string
     estadoCivil?: string
     nivelEducativo?: string
     telefono?: string

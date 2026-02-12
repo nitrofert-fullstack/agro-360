@@ -180,6 +180,51 @@ export async function POST(request: Request) {
           if (!areaErr && newArea) areaProductivaId = newArea.id
         }
 
+        // === 4b. ABASTECIMIENTO AGUA (tabla separada) ===
+        let abastecimientoAguaId: string | null = null
+        if (c.aguaRiesgos) {
+          const { data: newAbast, error: abastErr } = await supabase
+            .from('abastecimiento_agua')
+            .insert({
+              predio_id: predioId,
+              tipo_fuente_agua: c.aguaRiesgos.tipoFuenteAgua || null,
+              nombre_fuente: c.aguaRiesgos.nombreFuente || null,
+              disponibilidad_agua: c.aguaRiesgos.disponibilidadAgua || 'Permanente',
+              calidad_agua: c.aguaRiesgos.calidadAgua || null,
+              tiene_concesion: c.aguaRiesgos.tieneConcesion || false,
+              nacimiento_manantial: c.aguaRiesgos.nacimientoManantial || false,
+              rio_quebrada: c.aguaRiesgos.rioQuebrada || false,
+              pozo: c.aguaRiesgos.pozo || false,
+              acueducto_rural: c.aguaRiesgos.acueductoRural || false,
+              canal_distrito_riego: c.aguaRiesgos.canalDistritoRiego || false,
+              jagüey_reservorio: c.aguaRiesgos.jagueyReservorio || false,
+              agua_lluvia: c.aguaRiesgos.aguaLluvia || false,
+              otra_fuente: c.aguaRiesgos.otraFuente || null,
+            })
+            .select('id')
+            .single()
+          if (!abastErr && newAbast) abastecimientoAguaId = newAbast.id
+        }
+
+        // === 4c. RIESGOS PREDIO (tabla separada) ===
+        let riesgosPredioId: string | null = null
+        if (c.aguaRiesgos && c.aguaRiesgos.riesgos && c.aguaRiesgos.riesgos.length > 0) {
+          const { data: newRiesgos, error: riesgosErr } = await supabase
+            .from('riesgos_predio')
+            .insert({
+              predio_id: predioId,
+              riesgos: c.aguaRiesgos.riesgos,
+              inundacion: c.aguaRiesgos.inundacion || false,
+              sequia: c.aguaRiesgos.sequia || false,
+              viento: c.aguaRiesgos.viento || false,
+              helada: c.aguaRiesgos.helada || false,
+              otros_riesgos: c.aguaRiesgos.otrosRiesgos || null,
+            })
+            .select('id')
+            .single()
+          if (!riesgosErr && newRiesgos) riesgosPredioId = newRiesgos.id
+        }
+
         // === 5. INFORMACION FINANCIERA ===
         let infoFinancieraId: string | null = null
         if (c.infoFinanciera) {
@@ -236,6 +281,8 @@ export async function POST(request: Request) {
             predio_id: predioId,
             visita_id: visitaId,
             caracterizacion_predio_id: caracPredioId,
+            abastecimiento_agua_id: abastecimientoAguaId,
+            riesgos_predio_id: riesgosPredioId,
             area_productiva_id: areaProductivaId,
             informacion_financiera_id: infoFinancieraId,
             firma_beneficiario_url: c.archivos?.firmaProductorUrl || c.autorizacion?.firmaDigital || null,
@@ -254,6 +301,8 @@ export async function POST(request: Request) {
           if (areaProductivaId) await supabase.from('area_productiva').delete().eq('id', areaProductivaId)
           if (infoFinancieraId) await supabase.from('informacion_financiera').delete().eq('id', infoFinancieraId)
           if (caracPredioId) await supabase.from('caracterizacion_predio').delete().eq('id', caracPredioId)
+          if (abastecimientoAguaId) await supabase.from('abastecimiento_agua').delete().eq('id', abastecimientoAguaId)
+          if (riesgosPredioId) await supabase.from('riesgos_predio').delete().eq('id', riesgosPredioId)
           await supabase.from('predios').delete().eq('id', predioId)
           
           throw new Error(`Error creando caracterizacion: ${insertError.message}`)
