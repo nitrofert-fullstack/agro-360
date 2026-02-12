@@ -267,6 +267,13 @@ export async function getCaracterizacionesPendientes(): Promise<CaracterizacionL
     .toArray()
 }
 
+export async function getCaracterizacionesConError(): Promise<CaracterizacionLocal[]> {
+  return db.caracterizaciones
+    .where('estado')
+    .equals('ERROR_SINCRONIZACION')
+    .toArray()
+}
+
 export async function getCaracterizacionByRadicado(radicado: string): Promise<CaracterizacionLocal | undefined> {
   return db.caracterizaciones
     .where('radicadoLocal')
@@ -300,15 +307,24 @@ export async function markAsSynced(id: number, radicadoOficial: string): Promise
   })
 }
 
-export async function markAsError(id: number, error: string): Promise<void> {
+export async function markAsError(id: number, error: string | null): Promise<void> {
   const current = await db.caracterizaciones.get(id)
   if (current) {
-    await db.caracterizaciones.update(id, {
-      estado: 'ERROR_SINCRONIZACION',
-      intentosSincronizacion: current.intentosSincronizacion + 1,
-      ultimoErrorSincronizacion: error,
-      fechaActualizacion: new Date().toISOString(),
-    })
+    // Si error es null, marcamos como PENDIENTE para reintentar
+    if (error === null) {
+      await db.caracterizaciones.update(id, {
+        estado: 'PENDIENTE_SINCRONIZACION',
+        ultimoErrorSincronizacion: undefined,
+        fechaActualizacion: new Date().toISOString(),
+      })
+    } else {
+      await db.caracterizaciones.update(id, {
+        estado: 'ERROR_SINCRONIZACION',
+        intentosSincronizacion: current.intentosSincronizacion + 1,
+        ultimoErrorSincronizacion: error,
+        fechaActualizacion: new Date().toISOString(),
+      })
+    }
   }
 }
 

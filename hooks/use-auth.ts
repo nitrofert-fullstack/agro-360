@@ -50,14 +50,19 @@ export function useAuth() {
 
   const fetchProfile = useCallback(async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
+      // Obtener email del usuario de Supabase Auth
+      const { data: { user: authUser } } = await supabase.auth.getUser()
       
-      if (error) throw error
-      setProfile(data as Profile)
+      if (authUser?.email) {
+        setProfile({
+          id: userId,
+          email: authUser.email,
+          nombre_completo: authUser.user_metadata?.nombre_completo || 'Asesor',
+          telefono: authUser.user_metadata?.telefono || null,
+          rol: 'asesor',
+          activo: true
+        } as Profile)
+      }
     } catch (err) {
       console.error('[Auth] Error fetching profile:', err)
     }

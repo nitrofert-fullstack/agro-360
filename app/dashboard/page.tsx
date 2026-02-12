@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { ConnectionStatus } from "@/components/connection-status"
 import { SyncButton } from "@/components/sync-button"
+import { SyncErrorDisplay } from "@/components/sync-error-display"
 import { useAuth } from "@/hooks/use-auth"
 import { createClient } from "@/lib/supabase/client"
 import { getStats, getAllCaracterizaciones, type CaracterizacionLocal } from "@/lib/db/indexed-db"
@@ -74,8 +75,7 @@ export default function DashboardPage() {
             estado,
             created_at,
             asesor_id,
-            beneficiario_id,
-            beneficiarios!caracterizaciones_beneficiario_id_fkey(nombres, apellidos)
+            beneficiario_id
           `)
           .eq('asesor_id', user.id)
           .order('created_at', { ascending: false })
@@ -86,6 +86,8 @@ export default function DashboardPage() {
             total: serverCaracterizaciones.length,
             registros: serverCaracterizaciones
           })
+        } else if (error) {
+          console.log("[v0] Error loading server stats:", error)
         }
       }
     } catch (err) {
@@ -153,6 +155,9 @@ export default function DashboardPage() {
             </Badge>
           </div>
         </div>
+
+        {/* Error Display */}
+        <SyncErrorDisplay />
 
         {/* Stats */}
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
