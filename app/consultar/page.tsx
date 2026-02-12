@@ -28,10 +28,8 @@ interface ServerCaracterizacion {
   foto_2_url: string | null
   firma_productor_url: string | null
   beneficiario: {
-    primer_nombre: string
-    segundo_nombre: string | null
-    primer_apellido: string
-    segundo_apellido: string | null
+    nombres: string
+    apellidos: string
     numero_documento: string
     tipo_documento: string
   } | null
@@ -66,7 +64,7 @@ export default function ConsultarPage() {
   const selectQuery = `
     id, radicado_local, radicado_oficial, estado, created_at, fecha_sincronizacion, observaciones,
     foto_1_url, foto_2_url, firma_productor_url,
-    beneficiario:beneficiarios!id_beneficiario(primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, numero_documento, tipo_documento),
+    beneficiario:beneficiarios!id_beneficiario(nombres, apellidos, numero_documento, tipo_documento),
     predio:predios!id_predio(nombre_predio, municipio, vereda),
     visita:visitas!id_visita(fecha_visita, nombre_tecnico)
   `
@@ -181,7 +179,7 @@ export default function ConsultarPage() {
 
   const renderResultado = (res: ServerCaracterizacion) => {
     const nombre = res.beneficiario
-      ? [res.beneficiario.primer_nombre, res.beneficiario.segundo_nombre, res.beneficiario.primer_apellido, res.beneficiario.segundo_apellido].filter(Boolean).join(' ')
+      ? `${res.beneficiario.nombres} ${res.beneficiario.apellidos}`.trim()
       : 'Sin nombre'
 
     return (
