@@ -29,38 +29,27 @@ export interface CaracterizacionLocal {
     segundoNombre?: string
     primerApellido: string
     segundoApellido?: string
-    fechaNacimiento?: string
-    genero?: string
-    estadoCivil?: string
-    nivelEducativo?: string
+    edad?: number
     telefono?: string
     email?: string
-    direccion?: string
-    municipio?: string
-    vereda?: string
-    perteneceAsociacion?: boolean
-    nombreAsociacion?: string
-    numeroPersonasHogar?: number
-    personasMayores60?: number
-    personasMenores18?: number
     ocupacionPrincipal?: string
-    edad?: number
   }
   
   // 3. Datos del predio (tabla predios)
   predio: {
-    nombrePredio: string
+    nombrePredio?: string
     tipoTenencia?: string
-    areaTotal?: number
-    areaCultivada?: number
+    tipoTenenciaOtro?: string
+    documentoTenencia?: string
+    areaTotalHectareas?: number
+    areaProductivaHectareas?: number
     latitud?: number
     longitud?: number
-    altitud?: number
+    altitudMsnm?: number
     direccion?: string
     codigoCatastral?: string
-    fuenteAgua?: string
-    accesoVial?: string
-    distanciaCabecera?: number
+    coordenadaX?: string
+    coordenadaY?: string
     viveEnPredio?: string
     tieneVivienda?: boolean
     cultivosExistentes?: string
