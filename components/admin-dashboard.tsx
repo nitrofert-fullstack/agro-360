@@ -89,18 +89,14 @@ interface CaracterizacionDB {
   // Joined relations
   beneficiario: {
     id: string
-    primer_nombre: string
-    segundo_nombre: string | null
-    primer_apellido: string
-    segundo_apellido: string | null
+    nombres: string
+    apellidos: string
     tipo_documento: string
     numero_documento: string
     telefono: string | null
-    email: string | null
+    correo: string | null
     edad: number | null
     ocupacion_principal: string | null
-    municipio: string | null
-    vereda: string | null
   } | null
   predio: {
     id: string
@@ -388,7 +384,7 @@ export function AdminDashboard() {
 
   const filteredCaracterizaciones = caracterizaciones.filter((c) => {
     const matchesEstado = filterEstado === "todos" || c.estado === filterEstado
-    const nombre = `${c.beneficiario?.primer_nombre || ''} ${c.beneficiario?.primer_apellido || ''}`.toLowerCase()
+    const nombre = `${c.beneficiario?.nombres || ''} ${c.beneficiario?.apellidos || ''}`.toLowerCase()
     const nombrePredio = (c.predio?.nombre_predio || '').toLowerCase()
     const municipio = (c.predio?.municipio || '').toLowerCase()
     const radicado = (c.radicado_oficial || c.radicado_local || '').toLowerCase()
@@ -441,7 +437,7 @@ export function AdminDashboard() {
 
   const getNombreCompleto = (c: CaracterizacionDB) => {
     if (!c.beneficiario) return 'Sin nombre'
-    return `${c.beneficiario.primer_nombre || ''} ${c.beneficiario.segundo_nombre || ''} ${c.beneficiario.primer_apellido || ''} ${c.beneficiario.segundo_apellido || ''}`.replace(/\s+/g, ' ').trim() || 'Sin nombre'
+    return `${c.beneficiario.nombres || ''} ${c.beneficiario.apellidos || ''}`.replace(/\s+/g, ' ').trim() || 'Sin nombre'
   }
 
   const getEstadoConfig = (estado: string) => {
@@ -1034,7 +1030,7 @@ export function AdminDashboard() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Correo:</span>
-                          <span>{selectedCaracterizacion.beneficiario?.email || 'No registrado'}</span>
+                          <span>{selectedCaracterizacion.beneficiario?.correo || 'No registrado'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Municipio:</span>
