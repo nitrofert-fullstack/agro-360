@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { CheckCircle, FileText, Home, Plus, Cloud, Copy, Download, Leaf } from "lucide-react"
+import { CheckCircle, Home, Plus, Cloud, Download, Leaf, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -11,23 +11,12 @@ import { SyncButton } from "@/components/sync-button"
 import { useAuth } from "@/hooks/use-auth"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { exportToJSON } from "@/lib/db/indexed-db"
-import { useState } from "react"
 
 export default function ExitoPage() {
   const searchParams = useSearchParams()
   const radicado = searchParams.get("radicado")
   const { isAuthenticated } = useAuth()
   const { isOnline } = useOnlineStatus()
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = async () => {
-    if (radicado) {
-      await navigator.clipboard.writeText(radicado)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
-
   const handleDownloadBackup = async () => {
     try {
       const jsonString = await exportToJSON()
@@ -76,24 +65,24 @@ export default function ExitoPage() {
           </CardHeader>
           
           <CardContent className="space-y-6">
-            {/* Radicado */}
+            {/* Consulta por documento */}
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-left">
+              <div className="mb-2 flex items-center gap-2">
+                <Search className="h-4 w-4 text-primary" />
+                <p className="text-sm font-medium">Consulta el estado de tu solicitud</p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Puedes consultar el estado de tu caracterizacion usando tu{" "}
+                <span className="font-semibold text-foreground">numero de documento</span>{" "}
+                en la seccion de consultas.
+              </p>
+            </div>
+
+            {/* Radicado — solo referencia */}
             {radicado && (
-              <div className="rounded-lg border border-border bg-muted/30 p-4">
-                <p className="mb-2 text-sm text-muted-foreground">Numero de Radicado Local</p>
-                <div className="flex items-center justify-center gap-2">
-                  <code className="rounded bg-background px-3 py-2 font-mono text-sm">
-                    {radicado}
-                  </code>
-                  <Button variant="ghost" size="icon" onClick={handleCopy}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                {copied && (
-                  <p className="mt-2 text-xs text-green-600">Copiado al portapapeles</p>
-                )}
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Guarda este numero para consultar el estado de la caracterizacion
-                </p>
+              <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
+                <p className="mb-1 text-xs text-muted-foreground">Referencia interna del registro</p>
+                <code className="font-mono text-xs text-muted-foreground">{radicado}</code>
               </div>
             )}
 
@@ -153,10 +142,11 @@ export default function ExitoPage() {
             <div className="rounded-lg bg-muted/50 p-4 text-left">
               <h4 className="mb-2 font-medium">Proximos pasos:</h4>
               <ul className="space-y-1 text-sm text-muted-foreground">
-                <li>1. Sincroniza cuando tengas conexion e inicies sesion</li>
-                <li>2. Proporciona el numero de radicado al campesino</li>
-                <li>3. El campesino puede consultar con su documento y radicado</li>
-                <li>4. Descarga un respaldo periodicamente por seguridad</li>
+                <li>1. El asesor sincronizara tu registro con el servidor</li>
+                <li>2. Un tecnico revisara y aprobara tu solicitud</li>
+                <li>3. Cuando sea aprobada, recibiras tus credenciales por correo</li>
+                <li>4. Con ellas podras ingresar y ver el estado de tu predio</li>
+                <li>5. Mientras tanto, consulta por tu numero de documento</li>
               </ul>
             </div>
           </CardContent>
