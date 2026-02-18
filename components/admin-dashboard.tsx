@@ -52,6 +52,7 @@ import {
   UserCheck,
   Mail,
   Shield,
+  Download,
 } from "lucide-react"
 import { ThemeToggle } from "./theme-toggle"
 import Link from "next/link"
@@ -190,7 +191,7 @@ interface Invitation {
   email: string
   rol: string
   usado: boolean
-  expira_en: string
+  expires_at: string
   created_at: string
 }
 
@@ -211,9 +212,10 @@ export function AdminDashboard() {
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
   const [showInviteForm, setShowInviteForm] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteNombre, setInviteNombre] = useState("")
   const [inviteRol, setInviteRol] = useState("asesor")
   const [isCreatingInvite, setIsCreatingInvite] = useState(false)
-  const [lastCreatedToken, setLastCreatedToken] = useState<string | null>(null)
+  const [lastInviteResult, setLastInviteResult] = useState<{ mensaje: string; credenciales: { email: string; password: string } | null; emailEnviado: boolean } | null>(null)
 
   const supabase = createClient()
 
@@ -294,18 +296,20 @@ export function AdminDashboard() {
 
   const toggleUserActive = async (userId: string, currentActive: boolean) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ activo: !currentActive })
-        .eq('id', userId)
+      const res = await fetch('/api/admin/toggle-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, activo: !currentActive }),
+      })
 
-      if (error) throw error
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error desconocido')
 
-      toast.success(currentActive ? 'Cuenta inhabilitada' : 'Cuenta habilitada')
+      toast.success(data.mensaje)
       await loadUsers()
     } catch (err) {
       console.error('Error toggling user:', err)
-      toast.error('Error al actualizar el estado de la cuenta')
+      toast.error(err instanceof Error ? err.message : 'Error al actualizar el estado de la cuenta')
     }
   }
 
@@ -313,18 +317,13 @@ export function AdminDashboard() {
     return invitations.find(inv => inv.email === email)
   }
 
-  const generateToken = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-    let token = 'INV-'
-    for (let i = 0; i < 6; i++) {
-      token += chars.charAt(Math.floor(Math.random() * chars.length))
-    }
-    return token
-  }
-
   const handleCreateInvitation = async () => {
     if (!inviteEmail.trim()) {
       toast.error('Ingresa un correo electronico')
+      return
+    }
+    if (!inviteNombre.trim()) {
+      toast.error('Ingresa el nombre completo')
       return
     }
 
@@ -335,38 +334,38 @@ export function AdminDashboard() {
       return
     }
 
-    // Verificar que no tenga una invitacion pendiente
-    const existingInvite = invitations.find(i => i.email === inviteEmail.trim() && !i.usado)
-    if (existingInvite) {
-      toast.error('Ya existe una invitacion pendiente para ese correo')
-      return
-    }
-
     setIsCreatingInvite(true)
     try {
-      const token = generateToken()
-      const expiraEn = new Date()
-      expiraEn.setDate(expiraEn.getDate() + 7) // Expira en 7 dias
-
-      const { error } = await supabase
-        .from('invitations')
-        .insert({
+      const res = await fetch('/api/invitar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           email: inviteEmail.trim(),
+          nombreCompleto: inviteNombre.trim(),
           rol: inviteRol,
-          token,
-          usado: false,
-          expira_en: expiraEn.toISOString(),
-        })
+        }),
+      })
 
-      if (error) throw error
+      const data = await res.json()
 
-      setLastCreatedToken(token)
-      toast.success('Invitacion creada exitosamente')
+      if (!res.ok) {
+        toast.error(data.error || 'Error al crear el usuario')
+        return
+      }
+
+      setLastInviteResult({
+        mensaje: data.mensaje,
+        credenciales: data.credenciales,
+        emailEnviado: data.emailEnviado,
+      })
+
+      toast.success(data.emailEnviado ? 'Cuenta creada y credenciales enviadas por email' : 'Cuenta creada exitosamente')
       setInviteEmail('')
+      setInviteNombre('')
       await loadUsers()
     } catch (err) {
       console.error('Error creating invitation:', err)
-      toast.error('Error al crear la invitacion')
+      toast.error('Error al crear el usuario')
     } finally {
       setIsCreatingInvite(false)
     }
@@ -442,6 +441,58 @@ export function AdminDashboard() {
 
   const getEstadoConfig = (estado: string) => {
     return estadoConfig[estado as EstadoKey] || estadoConfig.pendiente
+  }
+
+  const downloadCSV = (data: CaracterizacionDB[], filename: string) => {
+    const headers = [
+      'Radicado Oficial', 'Radicado Local', 'Estado', 'Fecha Creacion',
+      'Nombres Beneficiario', 'Apellidos Beneficiario', 'Tipo Documento', 'Num. Documento',
+      'Telefono', 'Correo', 'Nombre Predio', 'Municipio', 'Vereda',
+      'Area Total (Ha)', 'Latitud', 'Longitud',
+      'Cultivo Principal', 'Sistema Productivo', 'Ingreso Mensual Ventas',
+      'Fecha Visita', 'Tecnico',
+    ]
+
+    const escape = (v: unknown) => {
+      const s = v == null ? '' : String(v)
+      return s.includes(',') || s.includes('"') || s.includes('\n')
+        ? `"${s.replace(/"/g, '""')}"`
+        : s
+    }
+
+    const rows = data.map(c => [
+      c.radicado_oficial || '',
+      c.radicado_local || '',
+      c.estado || '',
+      c.created_at ? new Date(c.created_at).toLocaleDateString('es-CO') : '',
+      c.beneficiario?.nombres || '',
+      c.beneficiario?.apellidos || '',
+      c.beneficiario?.tipo_documento || '',
+      c.beneficiario?.numero_documento || '',
+      c.beneficiario?.telefono || '',
+      c.beneficiario?.correo || '',
+      c.predio?.nombre_predio || '',
+      c.predio?.municipio || '',
+      c.predio?.vereda || '',
+      c.predio?.area_total ?? '',
+      c.predio?.latitud ?? '',
+      c.predio?.longitud ?? '',
+      c.area_productiva?.cultivo_principal || '',
+      c.area_productiva?.sistema_produccion || '',
+      c.area_productiva?.ingreso_mensual_ventas ?? '',
+      c.visita?.fecha_visita || '',
+      c.visita?.nombre_tecnico || '',
+    ].map(escape))
+
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success(`Archivo descargado: ${filename}`)
   }
 
   return (
@@ -642,9 +693,25 @@ export function AdminDashboard() {
                 </SelectContent>
               </Select>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {filteredCaracterizaciones.length} resultado(s)
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-muted-foreground">
+                {filteredCaracterizaciones.length} resultado(s)
+              </p>
+              {filteredCaracterizaciones.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => {
+                    const fecha = new Date().toISOString().split('T')[0]
+                    downloadCSV(filteredCaracterizaciones, `encuestas-${fecha}.csv`)
+                  }}
+                >
+                  <Download className="h-4 w-4" />
+                  Descargar CSV
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Loading */}
@@ -737,46 +804,54 @@ export function AdminDashboard() {
                     <RefreshCw className="h-4 w-4" />
                     <span className="hidden sm:inline">Actualizar</span>
                   </Button>
-                  <Button size="sm" onClick={() => { setShowInviteForm(!showInviteForm); setLastCreatedToken(null) }} className="gap-2">
+                  <Button size="sm" onClick={() => { setShowInviteForm(!showInviteForm); setLastInviteResult(null) }} className="gap-2">
                     <Mail className="h-4 w-4" />
                     Invitar Asesor
                   </Button>
                 </div>
               </div>
 
-              {/* Formulario de invitacion */}
+              {/* Formulario de creacion de usuario */}
               {showInviteForm && (
                 <Card className="border-primary/20 bg-primary/5">
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Mail className="h-4 w-4 text-primary" />
-                      Crear Invitacion
+                      Crear Usuario
                     </CardTitle>
                     <CardDescription>
-                      Genera un codigo de invitacion para que un nuevo asesor pueda registrarse
+                      Crea una cuenta para un asesor o beneficiario. Las credenciales se envian automaticamente por email.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-3">
                     <div className="flex flex-col gap-3 sm:flex-row">
                       <Input
-                        placeholder="Correo electronico del asesor"
+                        placeholder="Nombre completo"
+                        value={inviteNombre}
+                        onChange={(e) => setInviteNombre(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Input
+                        placeholder="Correo electronico"
                         value={inviteEmail}
                         onChange={(e) => setInviteEmail(e.target.value)}
                         className="flex-1"
                         type="email"
                       />
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row">
                       <Select value={inviteRol} onValueChange={setInviteRol}>
-                        <SelectTrigger className="w-full sm:w-36">
+                        <SelectTrigger className="w-full sm:w-44">
                           <SelectValue placeholder="Rol" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="asesor">Asesor</SelectItem>
-                          <SelectItem value="campesino">Campesino</SelectItem>
+                          <SelectItem value="campesino">Beneficiario / Campesino</SelectItem>
                         </SelectContent>
                       </Select>
                       <Button
                         onClick={handleCreateInvitation}
-                        disabled={isCreatingInvite || !inviteEmail.trim()}
+                        disabled={isCreatingInvite || !inviteEmail.trim() || !inviteNombre.trim()}
                         className="gap-2"
                       >
                         {isCreatingInvite ? (
@@ -784,29 +859,38 @@ export function AdminDashboard() {
                         ) : (
                           <Mail className="h-4 w-4" />
                         )}
-                        Generar Codigo
+                        Crear y Enviar Credenciales
                       </Button>
                     </div>
 
-                    {lastCreatedToken && (
+                    {lastInviteResult && (
                       <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
-                        <p className="mb-2 text-sm font-medium text-green-700 dark:text-green-400">Invitacion creada exitosamente</p>
-                        <div className="flex items-center gap-3">
-                          <code className="rounded bg-card px-3 py-2 text-lg font-bold tracking-widest">{lastCreatedToken}</code>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              navigator.clipboard.writeText(lastCreatedToken)
-                              toast.success('Codigo copiado al portapapeles')
-                            }}
-                          >
-                            Copiar
-                          </Button>
-                        </div>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          Comparte este codigo con el asesor. Debe ir a la pagina de invitacion e ingresar este codigo para crear su cuenta. Expira en 7 dias.
+                        <p className="mb-2 text-sm font-medium text-green-700 dark:text-green-400">
+                          {lastInviteResult.emailEnviado ? '✓ Credenciales enviadas por email' : '✓ Cuenta creada (email no enviado — configura SMTP)'}
                         </p>
+                        {lastInviteResult.credenciales && (
+                          <div className="space-y-1 text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground w-20">Email:</span>
+                              <code className="rounded bg-card px-2 py-0.5">{lastInviteResult.credenciales.email}</code>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground w-20">Contraseña:</span>
+                              <code className="rounded bg-card px-2 py-0.5 font-bold">{lastInviteResult.credenciales.password}</code>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(lastInviteResult!.credenciales!.password)
+                                  toast.success('Contraseña copiada')
+                                }}
+                              >
+                                Copiar
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </CardContent>
@@ -935,8 +1019,8 @@ export function AdminDashboard() {
                               </Badge>
                             </div>
                             <p className="mt-1 text-xs text-muted-foreground">
-                              Rol: {inv.rol} | Expira: {new Date(inv.expira_en).toLocaleDateString()}
-                              {new Date(inv.expira_en) < new Date() && (
+                              Rol: {inv.rol} | Expira: {new Date(inv.expires_at).toLocaleDateString()}
+                              {new Date(inv.expires_at) < new Date() && (
                                 <span className="ml-2 text-red-500">(Expirada)</span>
                               )}
                             </p>

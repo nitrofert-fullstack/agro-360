@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { sendEmail, buildCredentialsEmail } from '@/lib/email/mailer'
 
 export async function POST(request: Request) {
   try {
@@ -11,11 +12,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const { email, nombreCompleto, visitaId, telefono } = await request.json()
+    const { email, nombreCompleto, visitaId, telefono, rol: rolParam } = await request.json()
 
     if (!email || !nombreCompleto) {
       return NextResponse.json({ error: 'email y nombreCompleto son requeridos' }, { status: 400 })
     }
+
+    // Usar el rol recibido, validarlo y fallback a campesino
+    const rolesValidos = ['admin', 'asesor', 'campesino']
+    const rol = rolesValidos.includes(rolParam) ? rolParam : 'campesino'
 
     // Generar credenciales temporales
     const tempPassword = `Agro${crypto.randomBytes(4).toString('hex').toUpperCase()}!`
@@ -39,7 +44,7 @@ export async function POST(request: Request) {
         user_metadata: {
           nombre_completo: nombreCompleto,
           telefono: telefono || null,
-          rol: 'campesino',
+          rol,
         },
       })
 
@@ -47,7 +52,7 @@ export async function POST(request: Request) {
         // Si el usuario ya existe, no es un error fatal
         if (createErr.message?.includes('already been registered') || createErr.message?.includes('already exists')) {
           return NextResponse.json({
-            error: 'Este correo ya tiene una cuenta registrada. El beneficiario puede iniciar sesion con sus credenciales existentes.',
+            error: 'Este correo ya tiene una cuenta registrada.',
           }, { status: 409 })
         }
         console.error('[Invitar] Error creando usuario:', createErr.message)
@@ -58,13 +63,13 @@ export async function POST(request: Request) {
         userId = newUser.user.id
         method = 'admin'
 
-        // Crear perfil con rol campesino
+        // Crear perfil con el rol correcto
         await supabaseAdmin.from('profiles').upsert({
           id: userId,
           email,
           nombre_completo: nombreCompleto,
           telefono: telefono || null,
-          rol: 'campesino',
+          rol,
           activo: true,
         })
       }
@@ -80,7 +85,7 @@ export async function POST(request: Request) {
     await supabase.from('invitations').insert({
       email,
       token,
-      rol: 'campesino',
+      rol,
       invitado_por: user.id,
       usado: method === 'admin',
       expires_at: expiresAt.toISOString(),
@@ -94,18 +99,30 @@ export async function POST(request: Request) {
       }).eq('id', visitaId)
     }
 
+    // Enviar email con credenciales si se creó la cuenta directamente
+    let emailEnviado = false
+    if (method === 'admin') {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+      const html = buildCredentialsEmail({ nombreCompleto, email, password: tempPassword, rol, appUrl })
+      emailEnviado = await sendEmail({
+        to: email,
+        subject: 'Bienvenido a AgroSantander360 — Tus credenciales de acceso',
+        html,
+      })
+    }
+
     return NextResponse.json({
       success: true,
       method,
-      credenciales: method === 'admin' ? {
-        email,
-        password: tempPassword,
-      } : null,
+      emailEnviado,
+      credenciales: method === 'admin' ? { email, password: tempPassword } : null,
       invitationUrl: method === 'invitation'
         ? `${process.env.NEXT_PUBLIC_APP_URL || ''}/auth/invitation?token=${token}`
         : null,
       mensaje: method === 'admin'
-        ? `Cuenta creada exitosamente. Las credenciales del beneficiario son: Email: ${email} | Contrasena temporal: ${tempPassword}`
+        ? emailEnviado
+          ? `Cuenta creada y credenciales enviadas por email a ${email}.`
+          : `Cuenta creada. Email: ${email} | Contraseña temporal: ${tempPassword}`
         : `Invitacion creada. Comparta este enlace con el beneficiario para que complete su registro.`,
     })
   } catch (err) {
