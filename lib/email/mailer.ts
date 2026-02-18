@@ -317,3 +317,64 @@ export function buildSyncNotificationEmail({
 </html>
   `.trim()
 }
+
+export function buildEstadoNotificationEmail({
+  nombreCompleto,
+  radicadoOficial,
+  nuevoEstado,
+  observaciones,
+  appUrl,
+}: {
+  nombreCompleto: string
+  radicadoOficial: string
+  nuevoEstado: string
+  observaciones?: string | null
+  appUrl: string
+}): string {
+  const estadoConfig: Record<string, { label: string; color: string; bg: string; border: string; icon: string }> = {
+    aprobado:     { label: 'Aprobado',     color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', icon: '✓' },
+    rechazado:    { label: 'Rechazado',    color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: '✗' },
+    en_revision:  { label: 'En Revisión',  color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe', icon: '👁' },
+    sincronizado: { label: 'Sincronizado', color: '#0369a1', bg: '#f0f9ff', border: '#bae6fd', icon: '↑' },
+    pendiente:    { label: 'Pendiente',    color: '#b45309', bg: '#fffbeb', border: '#fde68a', icon: '○' },
+  }
+  const cfg = estadoConfig[nuevoEstado.toLowerCase()] ?? { label: nuevoEstado, color: '#555', bg: '#f9fafb', border: '#e5e7eb', icon: '•' }
+
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
+    <div style="background:#16a34a;padding:24px;text-align:center">
+      <h1 style="color:#fff;margin:0;font-size:22px">Agro360</h1>
+      <p style="color:#d1fae5;margin:6px 0 0;font-size:14px">Actualización de tu caracterización</p>
+    </div>
+    <div style="padding:28px 32px">
+      <h2 style="color:#1a1a1a;font-size:18px;margin:0 0 8px">Hola, ${nombreCompleto}</h2>
+      <p style="color:#555;font-size:14px;margin:0 0 20px">
+        El estado de tu caracterización agropecuaria ha sido actualizado.
+      </p>
+      <div style="background:${cfg.bg};border:1px solid ${cfg.border};border-radius:8px;padding:18px;margin-bottom:20px;text-align:center">
+        <p style="color:${cfg.color};font-size:22px;font-weight:700;margin:0">${cfg.icon} ${cfg.label}</p>
+        <p style="color:#6b7280;font-size:12px;margin:6px 0 0;font-family:monospace">Radicado: ${radicadoOficial}</p>
+      </div>
+      ${observaciones ? `
+      <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:14px;margin-bottom:20px">
+        <p style="color:#374151;font-size:13px;font-weight:600;margin:0 0 6px">Observaciones del técnico:</p>
+        <p style="color:#555;font-size:13px;margin:0">${observaciones}</p>
+      </div>` : ''}
+      <a href="${appUrl}/consultar" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-size:15px;font-weight:600">
+        Ver mi solicitud
+      </a>
+    </div>
+    <div style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb">
+      <p style="color:#9ca3af;font-size:12px;margin:0">
+        Puedes consultar el detalle en el portal usando tu número de documento.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim()
+}

@@ -490,16 +490,13 @@ export function AdminDashboard() {
   const handleUpdateEstado = async (id: string, nuevoEstado: string) => {
     setIsUpdating(true)
     try {
-      const { error } = await supabase
-        .from('caracterizaciones')
-        .update({
-          estado: nuevoEstado,
-          observaciones: observaciones || undefined,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-
-      if (error) throw error
+      const res = await fetch('/api/admin/update-estado', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, nuevoEstado, observaciones: observaciones || undefined }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error desconocido')
 
       toast.success(`Estado actualizado a "${estadoConfig[nuevoEstado as EstadoKey]?.label || nuevoEstado}"`)
       await loadData()

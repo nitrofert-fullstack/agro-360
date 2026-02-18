@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient, SupabaseClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
-import { sendEmail, buildSyncNotificationEmail } from '@/lib/email/mailer'
+import { sendEmail, buildSyncNotificationEmail, buildConfirmacionRegistroEmail } from '@/lib/email/mailer'
 
 /**
  * Sube un base64 data URL a Supabase Storage y retorna la URL pública.
@@ -432,6 +432,21 @@ export async function POST(request: Request) {
                   })
                   console.log(`[Sync] Cuenta creada y email enviado a ${correobenef}`)
                 }
+              } else {
+                // Ya tiene cuenta — enviar confirmación de radicado (sin credenciales)
+                const html = buildConfirmacionRegistroEmail({
+                  nombreCompleto: nombrebenef,
+                  radicadoOficial,
+                  numeroDocumento: docNum,
+                  nombrePredio,
+                  appUrl,
+                })
+                await sendEmail({
+                  to: correobenef,
+                  subject: 'Tu caracterización fue registrada — Agro360',
+                  html,
+                })
+                console.log(`[Sync] Confirmación enviada a ${correobenef} (ya tenía cuenta)`)
               }
             }
           } catch (emailErr) {
