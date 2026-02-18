@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, FileText, User, MapPin, Calendar, Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Leaf, LogOut, Download, Image, PenTool, Paperclip, Eye } from "lucide-react"
+import { Search, FileText, User, MapPin, Calendar, Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Leaf, LogOut, Download, Image, PenTool, Paperclip, Eye, FileSpreadsheet, Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,15 +18,11 @@ import { toast } from "sonner"
 
 interface ServerCaracterizacion {
   id: string
-  radicado_local: string
-  radicado_oficial: string | null
-  estado: string
-  created_at: string
-  fecha_sincronizacion: string | null
   observaciones: string | null
   foto_1_url: string | null
   foto_2_url: string | null
   firma_productor_url: string | null
+  created_at: string
   beneficiario: {
     nombres: string
     apellidos: string
@@ -39,6 +35,10 @@ interface ServerCaracterizacion {
     vereda: string | null
   } | null
   visita: {
+    id: string
+    radicado_local: string | null
+    radicado_oficial: string | null
+    estado: string
     fecha_visita: string | null
     nombre_tecnico: string | null
   } | null
@@ -62,12 +62,40 @@ export default function ConsultarPage() {
   }, [authLoading, isAuthenticated, router])
 
   const selectQuery = `
-    id, radicado_local, radicado_oficial, estado, created_at, fecha_sincronizacion, observaciones,
-    foto_1_url, foto_2_url, firma_productor_url,
+    id, observaciones, foto_1_url, foto_2_url, firma_productor_url, created_at,
     beneficiario:beneficiarios!id_beneficiario(nombres, apellidos, numero_documento, tipo_documento),
     predio:predios!id_predio(nombre_predio, municipio, vereda),
-    visita:visitas!id_visita(fecha_visita, nombre_tecnico)
+    visita:visitas!id_visita(id, radicado_local, radicado_oficial, estado, fecha_visita, nombre_tecnico)
   `
+
+  const exportToCSV = () => {
+    if (!resultados.length) return
+    const rows = resultados.map(r => ({
+      radicado: r.visita?.radicado_oficial || r.visita?.radicado_local || r.id,
+      estado: r.visita?.estado || '',
+      nombres: r.beneficiario?.nombres || '',
+      apellidos: r.beneficiario?.apellidos || '',
+      documento: r.beneficiario?.numero_documento || '',
+      municipio: r.predio?.municipio || '',
+      vereda: r.predio?.vereda || '',
+      predio: r.predio?.nombre_predio || '',
+      asesor: r.visita?.nombre_tecnico || '',
+      fecha: r.visita?.fecha_visita || r.created_at,
+    }))
+    const header = Object.keys(rows[0]).join(',')
+    const body = rows.map(r => Object.values(r).map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([header + '\n' + body], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `caracterizaciones-${documento}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportToPDF = () => {
+    window.print()
+  }
 
   const handleSignOut = async () => {
     await signOut()
@@ -189,10 +217,10 @@ export default function ConsultarPage() {
             <div className="min-w-0">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <FileText className="h-5 w-5 shrink-0 text-primary" />
-                <span className="truncate">{res.radicado_oficial || res.radicado_local}</span>
+                <span className="truncate">{res.visita?.radicado_oficial || res.visita?.radicado_local || res.id.slice(0, 8)}</span>
               </CardTitle>
               <CardDescription className="mt-1.5">
-                {res.estado === 'sincronizado' || res.estado === 'en_revision' || res.estado === 'aprobado' || res.estado === 'rechazado' ? (
+                {res.visita?.estado === 'sincronizado' || res.visita?.estado === 'en_revision' || res.visita?.estado === 'aprobado' || res.visita?.estado === 'rechazado' ? (
                   <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
                     <CheckCircle className="h-3.5 w-3.5" />
                     Registro sincronizado con el servidor
@@ -205,14 +233,14 @@ export default function ConsultarPage() {
                 )}
               </CardDescription>
             </div>
-            {getEstadoBadge(res.estado)}
+            {getEstadoBadge(res.visita?.estado || 'pendiente')}
           </div>
         </CardHeader>
 
         <CardContent className="pt-6">
           {/* Estado description */}
           <div className="mb-6 rounded-lg bg-muted/50 p-3">
-            <p className="text-sm text-muted-foreground">{getEstadoDescription(res.estado)}</p>
+            <p className="text-sm text-muted-foreground">{getEstadoDescription(res.visita?.estado || 'pendiente')}</p>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
@@ -286,14 +314,14 @@ export default function ConsultarPage() {
               </div>
             )}
 
-            {res.radicado_oficial && res.radicado_oficial !== res.radicado_local && (
+            {res.visita?.radicado_oficial && res.visita.radicado_oficial !== res.visita.radicado_local && (
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                   <Clock className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Radicado Oficial</p>
-                  <p className="text-sm font-medium font-mono">{res.radicado_oficial}</p>
+                  <p className="text-sm font-medium font-mono">{res.visita.radicado_oficial}</p>
                 </div>
               </div>
             )}
@@ -332,7 +360,7 @@ export default function ConsultarPage() {
                           variant="outline"
                           size="sm"
                           className="flex-1 gap-1.5"
-                          onClick={() => handleDownloadAttachment(res.foto_1_url!, `foto-1-predio-${res.radicado_oficial || res.radicado_local}.jpg`)}
+                          onClick={() => handleDownloadAttachment(res.foto_1_url!, `foto-1-predio-${res.visita?.radicado_oficial || res.visita?.radicado_local || res.id}.jpg`)}
                         >
                           <Download className="h-3.5 w-3.5" />
                           Descargar
@@ -372,7 +400,7 @@ export default function ConsultarPage() {
                           variant="outline"
                           size="sm"
                           className="flex-1 gap-1.5"
-                          onClick={() => handleDownloadAttachment(res.foto_2_url!, `foto-2-predio-${res.radicado_oficial || res.radicado_local}.jpg`)}
+                          onClick={() => handleDownloadAttachment(res.foto_2_url!, `foto-2-predio-${res.visita?.radicado_oficial || res.visita?.radicado_local || res.id}.jpg`)}
                         >
                           <Download className="h-3.5 w-3.5" />
                           Descargar
@@ -412,7 +440,7 @@ export default function ConsultarPage() {
                           variant="outline"
                           size="sm"
                           className="flex-1 gap-1.5"
-                          onClick={() => handleDownloadAttachment(res.firma_productor_url!, `firma-productor-${res.radicado_oficial || res.radicado_local}.png`)}
+                          onClick={() => handleDownloadAttachment(res.firma_productor_url!, `firma-productor-${res.visita?.radicado_oficial || res.visita?.radicado_local || res.id}.png`)}
                         >
                           <Download className="h-3.5 w-3.5" />
                           Descargar
