@@ -6,13 +6,13 @@ import { useAuth } from './use-auth'
 import { createClient } from '@/lib/supabase/client'
 
 /**
- * Hook para validar y refrescar la sesión cuando la conexión se restaura
- * Esto asegura que si el token expiró mientras estabas offline,
- * se pida login nuevamente al conectarte
+ * Hook para validar y refrescar la sesión cuando la conexión se restaura.
+ * Renueva el token proactivamente antes de que expire, pero NO fuerza logout
+ * en caso de error — el middleware se encarga de redirigir si la sesión es inválida.
  */
 export function useSessionValidation() {
   const { isOnline } = useOnlineStatus()
-  const { user, session, signOut } = useAuth()
+  const { user, session } = useAuth()
   const [isValidating, setIsValidating] = useState(false)
   const [sessionValid, setSessionValid] = useState(true)
   const supabase = useMemo(() => createClient(), [])
@@ -22,29 +22,18 @@ export function useSessionValidation() {
 
     setIsValidating(true)
     try {
-      // Intentar obtener sesión actual
-      const { data: { session: currentSession }, error } = await supabase.auth.getSession()
-
-      if (error || !currentSession) {
-        console.log('[SessionValidation] Sesión inválida o expirada')
-        setSessionValid(false)
-        // Forzar logout
-        await signOut()
-        return
-      }
-
       // Verificar si el token está cerca de expirar (menos de 5 minutos)
-      if (currentSession.expires_at) {
-        const expiresIn = currentSession.expires_at * 1000 - Date.now()
+      // y renovar proactivamente usando el refresh token
+      if (session.expires_at) {
+        const expiresIn = session.expires_at * 1000 - Date.now()
         if (expiresIn < 5 * 60 * 1000) {
           console.log('[SessionValidation] Token próximo a expirar, renovando...')
-          // Supabase renovará automáticamente si hay refresh token
-          const { data: { session: refreshedSession }, error: refreshError } =
-            await supabase.auth.refreshSession()
-
-          if (refreshError || !refreshedSession) {
+          const { error: refreshError } = await supabase.auth.refreshSession()
+          if (refreshError) {
+            // Solo loguear el error; NO forzar logout por fallo de red
+            // El middleware se encargará de redirigir si la sesión es realmente inválida
+            console.warn('[SessionValidation] No se pudo renovar token:', refreshError.message)
             setSessionValid(false)
-            await signOut()
             return
           }
         }
@@ -52,12 +41,12 @@ export function useSessionValidation() {
 
       setSessionValid(true)
     } catch (error) {
-      console.error('[SessionValidation] Error validating session:', error)
-      setSessionValid(false)
+      // Error de red u otro error transitorio — no cerrar sesión
+      console.warn('[SessionValidation] Error validando sesión (transitorio):', error)
     } finally {
       setIsValidating(false)
     }
-  }, [isOnline, session, supabase, signOut])
+  }, [isOnline, session, supabase])
 
   // Validar sesión cuando se restaura conexión
   useEffect(() => {
