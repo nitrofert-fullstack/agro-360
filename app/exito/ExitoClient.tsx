@@ -97,14 +97,10 @@ export default function ExitoPage() {
             )}
 
             {isOnline && !isAuthenticated && (
-              <Alert>
-                <Cloud className="h-4 w-4" />
-                <AlertDescription>
-                  Para sincronizar con el servidor, debes{" "}
-                  <Link href="/auth/login" className="font-medium text-primary underline">
-                    iniciar sesion
-                  </Link>
-                  .
+              <Alert className="border-blue-500/20 bg-blue-500/5">
+                <CheckCircle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-700 dark:text-blue-400">
+                  Tu registro esta guardado. Un asesor lo enviara al servidor y sera revisado por el equipo tecnico.
                 </AlertDescription>
               </Alert>
             )}

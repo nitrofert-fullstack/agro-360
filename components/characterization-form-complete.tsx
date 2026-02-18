@@ -359,7 +359,8 @@ export function CharacterizationFormComplete() {
     switch (step) {
       case 1: // Datos Visita
         if (!formData.visita.fechaVisita) stepErrors['visita.fechaVisita'] = 'La fecha de visita es requerida'
-        if (!formData.visita.nombreTecnico.trim()) stepErrors['visita.nombreTecnico'] = 'El nombre del tecnico es requerido'
+        // nombreTecnico solo requerido si hay un asesor logueado (se auto-completa)
+        // Si el usuario llena el formulario solo, el campo es opcional
         break
         
       case 2: // Beneficiario
@@ -509,7 +510,7 @@ export function CharacterizationFormComplete() {
         // 1. Datos de la visita (tabla visitas)
         visita: {
           fechaVisita: formData.visita.fechaVisita,
-          nombreTecnico: formData.visita.nombreTecnico,
+          nombreTecnico: formData.visita.nombreTecnico.trim() || 'Sin asesor',
           codigoFormulario: formData.visita.codigoFormulario,
           versionFormulario: formData.visita.versionFormulario,
           fechaEmisionFormulario: formData.visita.fechaEmisionFormulario,
@@ -702,26 +703,33 @@ export function CharacterizationFormComplete() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="nombreTecnico" className="flex items-center gap-2">
-                    Nombre del Tecnico <span className="text-red-500">*</span>
-                    {isAsesor && (
+                    Nombre del Tecnico / Asesor
+                    {isAsesor ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/40 dark:text-green-400">
                         <Lock className="h-3 w-3" />
                         Auto-completado
                       </span>
+                    ) : (
+                      <span className="text-xs font-normal text-muted-foreground">(Opcional)</span>
                     )}
                   </Label>
                   <Input
                     id="nombreTecnico"
                     value={formData.visita.nombreTecnico}
                     onChange={(e) => !isAsesor && updateField("visita", "nombreTecnico", e.target.value)}
-                    placeholder="Nombre completo del tecnico"
+                    placeholder={isAsesor ? "" : "Nombre del asesor o dejarlo en blanco"}
                     readOnly={isAsesor}
                     className={`h-11 ${errors['visita.nombreTecnico'] ? 'border-red-500' : ''} ${isAsesor ? 'bg-muted cursor-not-allowed' : ''}`}
                   />
-                  {isAsesor && (
+                  {isAsesor ? (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <Info className="h-3 w-3" />
-                      Nombre cargado automáticamente desde tu perfil de asesor.
+                      Nombre cargado automaticamente desde tu perfil de asesor.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Info className="h-3 w-3" />
+                      Si llenas este formulario sin la ayuda de un asesor, puedes dejar este campo en blanco.
                     </p>
                   )}
                   {errors['visita.nombreTecnico'] && <p className="text-sm text-red-500">{errors['visita.nombreTecnico']}</p>}
