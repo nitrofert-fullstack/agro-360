@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { SupabaseClient } from '@supabase/supabase-js'
+import { createClient as createAdminClient, SupabaseClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
+import { sendEmail, buildSyncNotificationEmail } from '@/lib/email/mailer'
 
 /**
  * Sube un base64 data URL a Supabase Storage y retorna la URL pública.
@@ -329,6 +331,73 @@ export async function POST(request: Request) {
 
         if (caracMainErr) throw new Error(`Error creando caracterización: ${caracMainErr.message}`)
         console.log(`[Sync] Caracterización creada exitosamente`)
+
+        // === 11. CREAR CUENTA Y ENVIAR EMAIL AL BENEFICIARIO (si tiene correo) ===
+        const correobenef = c.beneficiario?.email
+        const nombrebenef = [
+          c.beneficiario?.primerNombre || '',
+          c.beneficiario?.primerApellido || '',
+        ].filter(Boolean).join(' ') || 'Beneficiario'
+        const nombrePredio = c.predio?.nombrePredio || 'Sin nombre'
+
+        if (correobenef) {
+          try {
+            const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+
+            if (serviceRoleKey && supabaseUrl) {
+              const supabaseAdmin = createAdminClient(supabaseUrl, serviceRoleKey)
+
+              // Verificar si ya tiene cuenta
+              const { data: existingProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('id')
+                .eq('email', correobenef)
+                .maybeSingle()
+
+              if (!existingProfile) {
+                // Crear cuenta con contraseña temporal
+                const tempPassword = `Agro${crypto.randomBytes(4).toString('hex').toUpperCase()}!`
+
+                const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+                  email: correobenef,
+                  password: tempPassword,
+                  email_confirm: true,
+                  user_metadata: { nombre_completo: nombrebenef, rol: 'campesino' },
+                })
+
+                if (!createErr && newUser?.user) {
+                  await supabaseAdmin.from('profiles').upsert({
+                    id: newUser.user.id,
+                    email: correobenef,
+                    nombre_completo: nombrebenef,
+                    rol: 'campesino',
+                    activo: true,
+                  })
+
+                  const html = buildSyncNotificationEmail({
+                    nombreCompleto: nombrebenef,
+                    email: correobenef,
+                    password: tempPassword,
+                    radicadoOficial,
+                    nombrePredio,
+                    appUrl,
+                  })
+                  await sendEmail({
+                    to: correobenef,
+                    subject: 'Tu caracterización agropecuaria fue registrada — AgroSantander360',
+                    html,
+                  })
+                  console.log(`[Sync] Cuenta creada y email enviado a ${correobenef}`)
+                }
+              }
+            }
+          } catch (emailErr) {
+            // El error de email no debe detener la sincronización
+            console.error('[Sync] Error enviando email al beneficiario:', emailErr)
+          }
+        }
 
         results.push({
           radicadoLocal: c.radicadoLocal,
