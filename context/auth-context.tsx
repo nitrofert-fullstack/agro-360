@@ -48,23 +48,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = useCallback(async (user: User) => {
     if (!supabase) return
 
-    // Intentar obtener de la tabla profiles
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
+    // Timeout de 4 s: si la query no responde, caer a user_metadata de inmediato
+    const TIMEOUT_MS = 4000
 
-      if (data) {
-        setProfile(data as Profile)
+    try {
+      const result = await Promise.race([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('profile_timeout')), TIMEOUT_MS)
+        ),
+      ])
+
+      if (result.data) {
+        setProfile(result.data as Profile)
         return
       }
     } catch {
-      // Red inestable o sin conexión: caemos al fallback
+      // Timeout, error de red o sin conexión: usar fallback
     }
 
-    // Fallback sin red: usar datos del token JWT (disponible offline)
+    // Fallback offline: datos del token JWT (disponible sin red)
     setProfile({
       id: user.id,
       email: user.email || '',
