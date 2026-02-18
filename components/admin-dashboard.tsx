@@ -125,6 +125,9 @@ interface CaracterizacionDB {
     nombre_tecnico: string | null
     objetivo: string | null
     observaciones: string | null
+    radicado_local: string | null
+    radicado_oficial: string | null
+    estado: string | null
   } | null
   caracterizacion_predio: {
     id: string
@@ -203,6 +206,8 @@ export function AdminDashboard() {
   const [showMap, setShowMap] = useState(false)
   const [filterEstado, setFilterEstado] = useState<string>("todos")
   const [searchQuery, setSearchQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 10
   const [observaciones, setObservaciones] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -384,13 +389,27 @@ export function AdminDashboard() {
   const filteredCaracterizaciones = caracterizaciones.filter((c) => {
     const matchesEstado = filterEstado === "todos" || c.estado === filterEstado
     const nombre = `${c.beneficiario?.nombres || ''} ${c.beneficiario?.apellidos || ''}`.toLowerCase()
+    const documento = (c.beneficiario?.numero_documento || '').toLowerCase()
     const nombrePredio = (c.predio?.nombre_predio || '').toLowerCase()
     const municipio = (c.predio?.municipio || '').toLowerCase()
-    const radicado = (c.radicado_oficial || c.radicado_local || '').toLowerCase()
+    // radicado puede estar en el objeto directo o anidado en visita
+    const radicado = (
+      (c as any).radicado_oficial || (c as any).radicado_local ||
+      c.visita?.radicado_oficial || c.visita?.radicado_local || ''
+    ).toLowerCase()
     const q = searchQuery.toLowerCase()
-    const matchesSearch = q === "" || nombre.includes(q) || nombrePredio.includes(q) || municipio.includes(q) || radicado.includes(q)
+    const matchesSearch = q === "" || nombre.includes(q) || documento.includes(q) || nombrePredio.includes(q) || municipio.includes(q) || radicado.includes(q)
     return matchesEstado && matchesSearch
   })
+
+  // Resetear a página 1 cuando cambian búsqueda o filtro de estado
+  useEffect(() => { setCurrentPage(1) }, [searchQuery, filterEstado])
+
+  const totalPages = Math.ceil(filteredCaracterizaciones.length / ITEMS_PER_PAGE)
+  const paginatedCaracterizaciones = filteredCaracterizaciones.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
 
   const handleUpdateEstado = async (id: string, nuevoEstado: string) => {
     setIsUpdating(true)
@@ -696,6 +715,7 @@ export function AdminDashboard() {
             <div className="flex items-center gap-3">
               <p className="text-sm text-muted-foreground">
                 {filteredCaracterizaciones.length} resultado(s)
+                {totalPages > 1 && ` · pág. ${currentPage}/${totalPages}`}
               </p>
               {filteredCaracterizaciones.length > 0 && (
                 <Button
@@ -735,8 +755,9 @@ export function AdminDashboard() {
               </CardContent>
             </Card>
           ) : (
+            <>
             <div className="space-y-3">
-              {filteredCaracterizaciones.map((c) => {
+              {paginatedCaracterizaciones.map((c) => {
                 const config = getEstadoConfig(c.estado)
                 const Icon = config.icon
                 return (
@@ -755,6 +776,12 @@ export function AdminDashboard() {
                           </Badge>
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                          {c.beneficiario?.numero_documento && (
+                            <span className="flex items-center gap-1 font-mono text-xs">
+                              <User className="h-3 w-3" />
+                              {c.beneficiario.numero_documento}
+                            </span>
+                          )}
                           <span className="flex items-center gap-1">
                             <MapPin className="h-3 w-3" />
                             {c.predio?.nombre_predio || 'Sin predio'}
@@ -787,6 +814,52 @@ export function AdminDashboard() {
                 )
               })}
             </div>
+
+            {/* Paginador */}
+            {totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-between gap-2">
+                <p className="text-sm text-muted-foreground">
+                  Página {currentPage} de {totalPages} · {filteredCaracterizaciones.length} registros
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(1)}
+                    className="hidden sm:flex"
+                  >
+                    «
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(p => p - 1)}
+                  >
+                    ‹ Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(p => p + 1)}
+                  >
+                    Siguiente ›
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(totalPages)}
+                    className="hidden sm:flex"
+                  >
+                    »
+                  </Button>
+                </div>
+              </div>
+            )}
+            </>
           )}
           </>
           )}
