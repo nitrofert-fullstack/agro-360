@@ -6,7 +6,7 @@ const SELECT_QUERY = `
   *,
   beneficiario:beneficiarios(*, informacion_financiera(*)),
   predio:predios(*, caracterizacion_predio(*), area_productiva(*)),
-  visita:visitas(*, asesor:profiles(id, nombre_completo, email))
+  visita:visitas(*)
 `
 
 export async function GET() {
@@ -68,19 +68,32 @@ export async function GET() {
 
     if (error) throw error
 
+    // Obtener profiles de los asesores referenciados en visitas
+    const asesorIds = [...new Set(
+      (data || []).map((c: any) => c.visita?.asesor_id).filter(Boolean)
+    )]
+
+    let profilesMap: Record<string, { id: string; nombre_completo: string; email: string }> = {}
+    if (asesorIds.length > 0) {
+      const { data: profiles } = await adminClient
+        .from('profiles')
+        .select('id, nombre_completo, email')
+        .in('id', asesorIds)
+      for (const p of profiles || []) {
+        profilesMap[p.id] = p
+      }
+    }
+
     // Aplanar relaciones anidadas igual que el componente actual
     const items = (data || []).map((c: any) => {
-      const asesorProfile = c.visita?.asesor ?? null
+      const asesorProfile = c.visita?.asesor_id ? (profilesMap[c.visita.asesor_id] ?? null) : null
       return {
         ...c,
         caracterizacion_predio: c.predio?.caracterizacion_predio?.[0] ?? null,
         area_productiva: c.predio?.area_productiva?.[0] ?? null,
         informacion_financiera: c.beneficiario?.informacion_financiera?.[0] ?? null,
         asesor: asesorProfile,
-        // Exponer asesor_id en visita para que el componente pueda detectar registros sin asesor
-        visita: c.visita
-          ? { ...c.visita, asesor: undefined }
-          : null,
+        visita: c.visita ?? null,
       }
     })
 

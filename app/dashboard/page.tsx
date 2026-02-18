@@ -69,7 +69,7 @@ export default function DashboardPage() {
       const supabase = createClient()
       if (!supabase) return
 
-      const { data: serverVisitas, error } = await supabase
+      let visitasQuery = supabase
         .from('visitas')
         .select(`
           id,
@@ -84,9 +84,14 @@ export default function DashboardPage() {
             beneficiarios!id_beneficiario(nombres, apellidos)
           )
         `)
-        .eq('asesor_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20)
+
+      if (!isAdmin) {
+        visitasQuery = visitasQuery.or(`asesor_id.eq.${user.id},asesor_id.is.null`)
+      }
+
+      const { data: serverVisitas, error } = await visitasQuery
 
       if (!error && serverVisitas) {
         setServerStats({ total: serverVisitas.length, registros: serverVisitas })
