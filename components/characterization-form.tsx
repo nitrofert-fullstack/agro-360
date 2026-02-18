@@ -271,7 +271,7 @@ export function CharacterizationForm() {
               <Sprout className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-foreground md:text-xl">AgroSantander360</h1>
+              <h1 className="text-lg font-bold text-foreground md:text-xl">Agro360</h1>
               <p className="hidden text-sm text-muted-foreground sm:block">Caracterizacion Predial</p>
             </div>
           </div>
@@ -1127,7 +1127,7 @@ export function CharacterizationForm() {
             <CardContent className="space-y-4">
               <div className="rounded-lg bg-muted p-4">
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Autorizo de manera voluntaria, previa, explicita, informada e inequivoca a AgroSantander360 
+                  Autorizo de manera voluntaria, previa, explicita, informada e inequivoca a Agro360 
                   para tratar mis datos personales de acuerdo con la Ley 1581 de 2012 y sus decretos reglamentarios. 
                   Entiendo que mis datos seran utilizados unicamente para fines de caracterizacion predial, 
                   analisis agropecuario y gestion de programas de apoyo al sector rural.

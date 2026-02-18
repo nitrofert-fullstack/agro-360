@@ -35,7 +35,7 @@ export default function ExitoPage() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `backup-agrosantander360-${new Date().toISOString().split("T")[0]}.json`
+      a.download = `backup-Agro360-${new Date().toISOString().split("T")[0]}.json`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -54,7 +54,7 @@ export default function ExitoPage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
               <Leaf className="h-5 w-5 text-primary" />
             </div>
-            <span className="text-lg font-semibold">AgroSantander360</span>
+            <span className="text-lg font-semibold">Agro360</span>
           </Link>
           <div className="flex items-center gap-3">
             <ConnectionStatus />

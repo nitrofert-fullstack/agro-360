@@ -70,7 +70,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
               <Download className="h-5 w-5 text-primary" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium">Instalar AgroSantander360</p>
+              <p className="text-sm font-medium">Instalar Agro360</p>
               <p className="text-xs text-muted-foreground">
                 Accede sin conexion y recibe notificaciones
               </p>

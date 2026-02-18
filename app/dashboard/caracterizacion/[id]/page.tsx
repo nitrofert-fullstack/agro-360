@@ -14,6 +14,7 @@ import {
   getCaracterizacionByRadicado,
   type CaracterizacionLocal,
 } from "@/lib/db/indexed-db"
+import { createClient } from "@/lib/supabase/client"
 import {
   Leaf,
   ArrowLeft,
@@ -223,6 +224,18 @@ function StatusChangePanel({
   const [showInvite, setShowInvite] = useState(false)
   const [isSendingInvite, setIsSendingInvite] = useState(false)
   const [credenciales, setCredenciales] = useState<{ email: string; password: string } | null>(null)
+  const [yaTieneCuenta, setYaTieneCuenta] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    if (!beneficiarioEmail) return
+    const supabase = createClient()
+    supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', beneficiarioEmail)
+      .maybeSingle()
+      .then(({ data }) => setYaTieneCuenta(!!data))
+  }, [beneficiarioEmail])
 
   const handleUpdateEstado = async (nuevoEstado: string) => {
     setIsUpdating(true)
@@ -353,16 +366,21 @@ function StatusChangePanel({
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base text-green-700 dark:text-green-400">
               <Mail className="h-5 w-5" />
-              Enviar Credenciales al Beneficiario
+              Credenciales del Beneficiario
             </CardTitle>
             <CardDescription>
               {beneficiarioEmail
-                ? `Se enviaran las credenciales a: ${beneficiarioEmail}`
+                ? `Correo registrado: ${beneficiarioEmail}`
                 : "El beneficiario no tiene correo registrado"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {!credenciales ? (
+            {yaTieneCuenta ? (
+              <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-700 dark:text-green-400">
+                <CheckCircle className="h-4 w-4 shrink-0" />
+                <span>Este beneficiario ya tiene una cuenta de acceso registrada en el sistema.</span>
+              </div>
+            ) : !credenciales ? (
               <Button
                 onClick={handleSendInvite}
                 disabled={isSendingInvite || !beneficiarioEmail}

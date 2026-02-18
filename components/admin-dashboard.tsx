@@ -241,19 +241,22 @@ export function AdminDashboard() {
         .from('caracterizaciones')
         .select(`
           *,
-          beneficiario:beneficiarios(*),
-          predio:predios(*),
-          visita:visitas(*),
-          caracterizacion_predio:caracterizacion_predio(*),
-          area_productiva:area_productiva(*),
-          informacion_financiera:informacion_financiera(*),
-          asesor:profiles!caracterizaciones_asesor_id_fkey(id, nombre_completo, email)
+          beneficiario:beneficiarios(*, informacion_financiera(*)),
+          predio:predios(*, caracterizacion_predio(*), area_productiva(*)),
+          visita:visitas(*)
         `)
         .order('created_at', { ascending: false })
 
       if (error) throw error
 
-      const items = (data || []) as unknown as CaracterizacionDB[]
+      // Aplanar relaciones anidadas — caracterizacion_predio y area_productiva viven
+      // bajo predios en la BD, informacion_financiera bajo beneficiarios.
+      const items = (data || []).map((c: any) => ({
+        ...c,
+        caracterizacion_predio: c.predio?.caracterizacion_predio?.[0] ?? null,
+        area_productiva: c.predio?.area_productiva?.[0] ?? null,
+        informacion_financiera: c.beneficiario?.informacion_financiera?.[0] ?? null,
+      })) as unknown as CaracterizacionDB[]
       setCaracterizaciones(items)
 
       // Stats
@@ -338,6 +341,17 @@ export function AdminDashboard() {
     const existingUser = usuarios.find(u => u.email === inviteEmail.trim())
     if (existingUser) {
       toast.error('Ya existe un usuario registrado con ese correo')
+      return
+    }
+
+    // Verificar que no exista ya una invitación para ese correo
+    const existingInvitation = invitations.find(inv => inv.email === inviteEmail.trim())
+    if (existingInvitation) {
+      if (existingInvitation.usado) {
+        toast.error('Este correo ya tiene una cuenta activa y ha iniciado sesión')
+      } else {
+        toast.error('Ya se enviaron credenciales a este correo. El usuario aún no ha iniciado sesión por primera vez.')
+      }
       return
     }
 
@@ -527,7 +541,7 @@ export function AdminDashboard() {
               <Sprout className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-foreground md:text-xl">AgroSantander360</h1>
+              <h1 className="text-lg font-bold text-foreground md:text-xl">Agro360</h1>
               <p className="hidden text-sm text-muted-foreground sm:block">Panel de Administracion</p>
             </div>
           </div>
@@ -664,7 +678,7 @@ export function AdminDashboard() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-3 md:p-6">
           {/* Mobile section tabs */}
           <div className="mb-4 flex gap-2 lg:hidden">
             <Button
@@ -870,7 +884,7 @@ export function AdminDashboard() {
           {/* Seccion Usuarios */}
           {activeSection === 'usuarios' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold">Gestion de Usuarios</h2>
                   <p className="text-sm text-muted-foreground">Administra las cuentas de asesores y sus permisos de acceso</p>
@@ -1007,7 +1021,7 @@ export function AdminDashboard() {
                           </div>
 
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <h3 className="truncate font-medium">{u.nombre_completo || 'Sin nombre'}</h3>
                               <Badge variant="outline" className={
                                 u.rol === 'admin'

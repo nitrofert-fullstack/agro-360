@@ -64,13 +64,13 @@ export function buildCredentialsEmail({
 <body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px">
   <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
     <div style="background:#16a34a;padding:24px;text-align:center">
-      <h1 style="color:#fff;margin:0;font-size:22px">AgroSantander360</h1>
+      <h1 style="color:#fff;margin:0;font-size:22px">Agro360</h1>
       <p style="color:#d1fae5;margin:6px 0 0;font-size:14px">Sistema de Caracterización Agropecuaria</p>
     </div>
     <div style="padding:28px 32px">
       <h2 style="color:#1a1a1a;font-size:18px;margin:0 0 8px">Bienvenido(a), ${nombreCompleto || email}</h2>
       <p style="color:#555;font-size:14px;margin:0 0 20px">
-        Se ha creado tu cuenta como <strong>${rolLabel}</strong> en AgroSantander360.
+        Se ha creado tu cuenta como <strong>${rolLabel}</strong> en Agro360.
         A continuación encuentras tus credenciales de acceso:
       </p>
       <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:16px;margin-bottom:20px">
@@ -125,7 +125,7 @@ export function buildSyncNotificationEmail({
 <body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px">
   <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
     <div style="background:#16a34a;padding:24px;text-align:center">
-      <h1 style="color:#fff;margin:0;font-size:22px">AgroSantander360</h1>
+      <h1 style="color:#fff;margin:0;font-size:22px">Agro360</h1>
       <p style="color:#d1fae5;margin:6px 0 0;font-size:14px">Caracterización Agropecuaria Registrada</p>
     </div>
     <div style="padding:28px 32px">

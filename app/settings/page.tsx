@@ -7,8 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Smartphone, Database, Bell } from "lucide-react"
+import { ArrowLeft, Smartphone, Database, Bell, Leaf } from "lucide-react"
 import Link from "next/link"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function SettingsPage() {
   const { isAuthenticated, loading } = useAuth()
@@ -47,20 +48,28 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-2xl px-4 py-8 md:px-6">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          asChild 
-          className="mb-6 gap-1.5"
-        >
-          <Link href="/">
-            <ArrowLeft className="h-4 w-4" />
-            Volver
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+              <Leaf className="h-4 w-4 text-primary" />
+            </div>
+            <span className="text-sm font-bold text-foreground">Agro360</span>
           </Link>
-        </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" asChild className="gap-1.5">
+              <Link href="/dashboard">
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Dashboard</span>
+              </Link>
+            </Button>
+            <ThemeToggle />
+          </div>
+        </div>
+      </header>
 
+      <div className="mx-auto max-w-2xl px-4 py-6 md:px-6">
         <div className="space-y-6">
           {/* Configuración offline */}
           <Card>

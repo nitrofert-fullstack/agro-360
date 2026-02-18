@@ -42,7 +42,7 @@ export default function Home() {
               <Leaf className="h-5 w-5 text-primary-foreground md:h-6 md:w-6" />
             </div>
             <div>
-              <h1 className="text-base font-bold text-foreground md:text-lg">AgroSantander360</h1>
+              <h1 className="text-base font-bold text-foreground md:text-lg">Agro360</h1>
               <p className="hidden text-xs text-muted-foreground sm:block">Caracterizacion Predial</p>
             </div>
           </div>
@@ -290,7 +290,7 @@ export default function Home() {
             <div className="md:col-span-2">
               <div className="flex items-center gap-2">
                 <Leaf className="h-5 w-5 text-primary" />
-                <span className="text-sm font-bold">AgroSantander360</span>
+                <span className="text-sm font-bold">Agro360</span>
               </div>
               <p className="mt-2 max-w-sm text-sm text-muted-foreground">
                 Sistema de caracterizacion predial para el sector agropecuario de Santander, Colombia.
@@ -320,7 +320,7 @@ export default function Home() {
             </div>
           </div>
           <div className="mt-8 border-t border-border pt-6 text-center text-sm text-muted-foreground">
-            <p>AgroSantander360 - Santander, Colombia</p>
+            <p>Agro360 - Santander, Colombia</p>
           </div>
         </div>
       </footer>

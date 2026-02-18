@@ -125,7 +125,7 @@ export default function DashboardPage() {
               <Leaf className="h-5 w-5 text-primary-foreground md:h-6 md:w-6" />
             </div>
             <div>
-              <h1 className="text-base font-bold text-foreground md:text-lg">AgroSantander360</h1>
+              <h1 className="text-base font-bold text-foreground md:text-lg">Agro360</h1>
               <p className="hidden text-xs text-muted-foreground sm:block">Dashboard</p>
             </div>
           </div>

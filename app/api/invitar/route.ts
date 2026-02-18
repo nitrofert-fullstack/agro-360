@@ -18,6 +18,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'email y nombreCompleto son requeridos' }, { status: 400 })
     }
 
+    // Verificar si ya existe un perfil con ese email
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (existingProfile) {
+      return NextResponse.json({
+        error: 'Este correo ya tiene una cuenta registrada en el sistema.',
+        code: 'EMAIL_EXISTS',
+      }, { status: 409 })
+    }
+
     // Usar el rol recibido, validarlo y fallback a campesino
     const rolesValidos = ['admin', 'asesor', 'campesino']
     const rol = rolesValidos.includes(rolParam) ? rolParam : 'campesino'
@@ -106,7 +120,7 @@ export async function POST(request: Request) {
       const html = buildCredentialsEmail({ nombreCompleto, email, password: tempPassword, rol, appUrl })
       emailEnviado = await sendEmail({
         to: email,
-        subject: 'Bienvenido a AgroSantander360 — Tus credenciales de acceso',
+        subject: 'Bienvenido a Agro360 — Tus credenciales de acceso',
         html,
       })
     }

@@ -1,4 +1,4 @@
-// Types for the characterization system
+﻿// Types for the characterization system
 
 export interface DatosTecnico {
   nombreTecnico: string
@@ -91,7 +91,7 @@ export interface Caracterizacion {
 }
 
 // Local storage key
-const STORAGE_KEY = "agrosantander_caracterizaciones"
+const STORAGE_KEY = "agro360_caracterizaciones"
 
 // Store functions
 export function getCaracterizaciones(): Caracterizacion[] {

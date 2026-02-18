@@ -427,7 +427,7 @@ export async function POST(request: Request) {
                   })
                   await sendEmail({
                     to: correobenef,
-                    subject: 'Tu caracterización agropecuaria fue registrada — AgroSantander360',
+                    subject: 'Tu caracterización agropecuaria fue registrada — Agro360',
                     html,
                   })
                   console.log(`[Sync] Cuenta creada y email enviado a ${correobenef}`)

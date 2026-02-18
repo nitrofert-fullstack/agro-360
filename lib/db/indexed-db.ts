@@ -206,13 +206,13 @@ export interface SyncLog {
 }
 
 // Create Dexie database
-class AgroSantanderDB extends Dexie {
+class Agro360DB extends Dexie {
   caracterizaciones!: EntityTable<CaracterizacionLocal, 'id'>
   backups!: EntityTable<BackupLocal, 'id'>
   syncLogs!: EntityTable<SyncLog, 'id'>
 
   constructor() {
-    super('AgroSantander360DB')
+    super('Agro360DB')
     
     this.version(2).stores({
       caracterizaciones: '++id, radicadoLocal, radicadoOficial, estado, documentoProductor, fechaRegistro',
@@ -223,7 +223,7 @@ class AgroSantanderDB extends Dexie {
 }
 
 // Singleton instance
-export const db = new AgroSantanderDB()
+export const db = new Agro360DB()
 
 // Helper functions
 export function generateRadicadoLocal(): string {

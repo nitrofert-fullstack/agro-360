@@ -1530,7 +1530,7 @@ export function CharacterizationFormComplete() {
                     checked={formData.areaProductiva.interesadoPrograma}
                     onCheckedChange={(checked) => updateField("areaProductiva", "interesadoPrograma", checked)}
                   />
-                  <Label htmlFor="interesadoPrograma">Interesado en AgroSantander360</Label>
+                  <Label htmlFor="interesadoPrograma">Interesado en Agro360</Label>
                 </div>
               </div>
               {formData.areaProductiva.tieneInfraestructuraProcesamiento && (
@@ -1768,7 +1768,7 @@ export function CharacterizationFormComplete() {
                     </Label>
                     <p className="text-sm text-muted-foreground">
                       Autorizo el tratamiento de mis datos personales conforme a la Ley 1581 de 2012 
-                      y demas normas concordantes, para los fines del proyecto AgroSantander360.
+                      y demas normas concordantes, para los fines del proyecto Agro360.
                     </p>
                     {errors['autorizaciones.autorizacionDatosPersonales'] && <p className="text-sm text-red-500 mt-2">{errors['autorizaciones.autorizacionDatosPersonales']}</p>}
                   </div>
@@ -1841,7 +1841,7 @@ export function CharacterizationFormComplete() {
               <Sprout className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold">AgroSantander360</h1>
+              <h1 className="text-lg font-semibold">Agro360</h1>
               <p className="text-xs text-muted-foreground">Caracterización Predial</p>
             </div>
           </div>

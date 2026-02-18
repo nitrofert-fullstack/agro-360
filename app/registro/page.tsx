@@ -71,7 +71,7 @@ export default function RegistroPage() {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
             <Sprout className="h-5 w-5 text-primary" />
           </div>
-          <span className="text-lg font-bold text-foreground">AgroSantander360</span>
+          <span className="text-lg font-bold text-foreground">Agro360</span>
         </Link>
         <ThemeToggle />
       </header>
@@ -283,7 +283,7 @@ export default function RegistroPage() {
 
       {/* Footer */}
       <footer className="border-t border-border py-4 text-center text-sm text-muted-foreground">
-        <p>AgroSantander360 - Sistema de Caracterizacion Predial</p>
+        <p>Agro360 - Sistema de Caracterizacion Predial</p>
       </footer>
     </div>
   )

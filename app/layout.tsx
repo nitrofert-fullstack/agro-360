@@ -14,14 +14,14 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'AgroSantander360 - Sistema de Caracterizacion Predial',
+  title: 'Agro360 - Sistema de Caracterizacion Predial',
   description: 'Sistema de caracterizacion predial con monitoreo NDVI, temperatura y precipitacion en Santander, Colombia',
   generator: 'v0.app',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'AgroSantander360',
+    title: 'Agro360',
   },
   formatDetection: {
     telephone: false,
@@ -55,7 +55,7 @@ export default function RootLayout({
       <body className={`font-sans antialiased`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
+          defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
