@@ -57,6 +57,7 @@ import {
 } from "lucide-react"
 import { ThemeToggle } from "./theme-toggle"
 import Link from "next/link"
+import { useAuth } from "@/hooks/use-auth"
 
 const MapViewer = dynamic(
   () => import("./map-viewer").then((mod) => mod.MapViewer),
@@ -129,6 +130,7 @@ interface CaracterizacionDB {
     radicado_local: string | null
     radicado_oficial: string | null
     estado: string | null
+    asesor_id: string | null
   } | null
   caracterizacion_predio: {
     id: string
@@ -202,6 +204,7 @@ interface Invitation {
 }
 
 export function AdminDashboard() {
+  const { isAdmin, user: currentUser } = useAuth()
   const [caracterizaciones, setCaracterizaciones] = useState<CaracterizacionDB[]>([])
   const [estadisticas, setEstadisticas] = useState({ total: 0, pendientes: 0, sincronizados: 0, aprobados: 0, rechazados: 0 })
   const [selectedCaracterizacion, setSelectedCaracterizacion] = useState<CaracterizacionDB | null>(null)
@@ -224,6 +227,12 @@ export function AdminDashboard() {
   const [inviteRol, setInviteRol] = useState("asesor")
   const [isCreatingInvite, setIsCreatingInvite] = useState(false)
   const [lastInviteResult, setLastInviteResult] = useState<{ mensaje: string; credenciales: { email: string; password: string } | null; emailEnviado: boolean } | null>(null)
+  // Asignación de asesor
+  const [asesoresDisponibles, setAsesoresDisponibles] = useState<{ id: string; nombre_completo: string }[]>([])
+  const [selectedNewAsesorId, setSelectedNewAsesorId] = useState<string>("")
+  const [isAssigningAsesor, setIsAssigningAsesor] = useState(false)
+  // Cambio de rol
+  const [changingRoleUserId, setChangingRoleUserId] = useState<string | null>(null)
 
   const supabase = createClient()
 
@@ -238,26 +247,11 @@ export function AdminDashboard() {
   const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('caracterizaciones')
-        .select(`
-          *,
-          beneficiario:beneficiarios(*, informacion_financiera(*)),
-          predio:predios(*, caracterizacion_predio(*), area_productiva(*)),
-          visita:visitas(*)
-        `)
-        .order('created_at', { ascending: false })
+      const res = await fetch('/api/admin/caracterizaciones')
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Error al cargar caracterizaciones')
 
-      if (error) throw error
-
-      // Aplanar relaciones anidadas — caracterizacion_predio y area_productiva viven
-      // bajo predios en la BD, informacion_financiera bajo beneficiarios.
-      const items = (data || []).map((c: any) => ({
-        ...c,
-        caracterizacion_predio: c.predio?.caracterizacion_predio?.[0] ?? null,
-        area_productiva: c.predio?.area_productiva?.[0] ?? null,
-        informacion_financiera: c.beneficiario?.informacion_financiera?.[0] ?? null,
-      })) as unknown as CaracterizacionDB[]
+      const items: CaracterizacionDB[] = json.data || []
       setCaracterizaciones(items)
 
       // Stats
@@ -274,7 +268,7 @@ export function AdminDashboard() {
     } finally {
       setIsLoading(false)
     }
-  }, [supabase])
+  }, [])
 
   const loadUsers = useCallback(async () => {
     setIsLoadingUsers(true)
@@ -393,6 +387,67 @@ export function AdminDashboard() {
     }
   }
 
+  const loadAsesores = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, nombre_completo')
+        .in('rol', ['asesor', 'admin'])
+        .eq('activo', true)
+        .order('nombre_completo')
+      setAsesoresDisponibles((data || []) as { id: string; nombre_completo: string }[])
+    } catch {
+      // No crítico
+    }
+  }, [supabase])
+
+  const assignAsesor = async (visitaId: string, asesorId: string) => {
+    if (!visitaId || !asesorId) return
+    setIsAssigningAsesor(true)
+    try {
+      const res = await fetch('/api/admin/assign-asesor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visitaId, asesorId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error desconocido')
+      toast.success(data.mensaje)
+      setSelectedNewAsesorId("")
+      await loadData()
+      // Actualizar el registro seleccionado en el diálogo
+      if (selectedCaracterizacion?.visita?.id === visitaId) {
+        const updated = (await (await fetch('/api/admin/caracterizaciones')).json()).data?.find(
+          (c: CaracterizacionDB) => c.visita?.id === visitaId
+        )
+        if (updated) setSelectedCaracterizacion(updated)
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al asignar asesor')
+    } finally {
+      setIsAssigningAsesor(false)
+    }
+  }
+
+  const changeUserRole = async (userId: string, newRole: string) => {
+    setChangingRoleUserId(userId)
+    try {
+      const res = await fetch('/api/admin/change-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, newRole }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error desconocido')
+      toast.success(data.mensaje)
+      await loadUsers()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al cambiar rol')
+    } finally {
+      setChangingRoleUserId(null)
+    }
+  }
+
   useEffect(() => {
     loadData()
   }, [loadData])
@@ -404,7 +459,11 @@ export function AdminDashboard() {
   }, [activeSection, loadUsers])
 
   const filteredCaracterizaciones = caracterizaciones.filter((c) => {
-    const matchesEstado = filterEstado === "todos" || (c.estado || '').toLowerCase() === filterEstado
+    const matchesEstado = filterEstado === "todos"
+      ? true
+      : filterEstado === "sin_asesor"
+        ? !c.visita?.asesor_id
+        : (c.estado || '').toLowerCase() === filterEstado
     const nombre = `${c.beneficiario?.nombres || ''} ${c.beneficiario?.apellidos || ''}`.toLowerCase()
     const documento = (c.beneficiario?.numero_documento || '').toLowerCase()
     const nombrePredio = (c.predio?.nombre_predio || '').toLowerCase()
@@ -463,6 +522,8 @@ export function AdminDashboard() {
     setSelectedCaracterizacion(c)
     setShowDetail(true)
     setObservaciones(c.observaciones || "")
+    setSelectedNewAsesorId("")
+    if (isAdmin && asesoresDisponibles.length === 0) loadAsesores()
   }
 
   const openMapView = (c: CaracterizacionDB) => {
@@ -987,6 +1048,7 @@ export function AdminDashboard() {
                   <SelectItem value="sincronizado">Sincronizados</SelectItem>
                   <SelectItem value="aprobado">Aprobados</SelectItem>
                   <SelectItem value="rechazado">Rechazados</SelectItem>
+                  {isAdmin && <SelectItem value="sin_asesor">Sin Asesor</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
@@ -1075,6 +1137,12 @@ export function AdminDashboard() {
                               <Calendar className="h-3 w-3 shrink-0" />
                               {new Date(c.created_at).toLocaleDateString()}
                             </span>
+                            {!c.visita?.asesor_id && (
+                              <span className="flex items-center gap-1 text-blue-500">
+                                <User className="h-3 w-3 shrink-0" />
+                                Sin asesor
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -1333,7 +1401,26 @@ export function AdminDashboard() {
                             </div>
                           </div>
 
-                          <div className="flex shrink-0 items-center gap-2">
+                          <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+                            {/* Cambiar rol — solo admin, no sobre sí mismo */}
+                            {isAdmin && u.id !== currentUser?.id && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={changingRoleUserId === u.id}
+                                onClick={() => changeUserRole(u.id, u.rol === 'admin' ? 'asesor' : 'admin')}
+                                className={`gap-1.5 ${u.rol === 'admin' ? 'hover:bg-orange-50 hover:text-orange-600 hover:border-orange-300 dark:hover:bg-orange-950' : 'hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 dark:hover:bg-blue-950'}`}
+                              >
+                                {changingRoleUserId === u.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Shield className="h-4 w-4" />
+                                )}
+                                <span className="hidden sm:inline">
+                                  {u.rol === 'admin' ? 'Quitar Admin' : 'Hacer Admin'}
+                                </span>
+                              </Button>
+                            )}
                             {u.rol !== 'admin' && (
                               <Button
                                 variant={u.activo ? "outline" : "default"}
@@ -1710,6 +1797,47 @@ export function AdminDashboard() {
                         </p>
                       </CardContent>
                     </Card>
+
+                    {/* Asignar Asesor — solo admin, solo cuando el registro no tiene asesor */}
+                    {isAdmin && !selectedCaracterizacion.visita?.asesor_id && (
+                      <Card className="border-blue-500/20 bg-blue-500/5">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="flex items-center gap-2 text-base">
+                            <UserCheck className="h-4 w-4 text-blue-500" />
+                            Asignar Asesor
+                          </CardTitle>
+                          <CardDescription>
+                            Este registro fue enviado sin asesor asignado. Asígnalo a un asesor o admin.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                          <Select value={selectedNewAsesorId} onValueChange={setSelectedNewAsesorId}>
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Seleccionar asesor..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {asesoresDisponibles.map(a => (
+                                <SelectItem key={a.id} value={a.id}>
+                                  {a.nombre_completo || a.id}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            disabled={!selectedNewAsesorId || isAssigningAsesor}
+                            onClick={() => assignAsesor(selectedCaracterizacion.visita!.id, selectedNewAsesorId)}
+                            className="gap-2 shrink-0"
+                          >
+                            {isAssigningAsesor ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <UserCheck className="h-4 w-4" />
+                            )}
+                            Asignar
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
 
                     <Card>
                       <CardHeader>
