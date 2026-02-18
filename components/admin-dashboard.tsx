@@ -53,6 +53,7 @@ import {
   Mail,
   Shield,
   Download,
+  Printer,
 } from "lucide-react"
 import { ThemeToggle } from "./theme-toggle"
 import Link from "next/link"
@@ -481,12 +482,32 @@ export function AdminDashboard() {
 
   const downloadCSV = (data: CaracterizacionDB[], filename: string) => {
     const headers = [
-      'Radicado Oficial', 'Radicado Local', 'Estado', 'Fecha Creacion',
-      'Nombres Beneficiario', 'Apellidos Beneficiario', 'Tipo Documento', 'Num. Documento',
-      'Telefono', 'Correo', 'Nombre Predio', 'Municipio', 'Vereda',
-      'Area Total (Ha)', 'Latitud', 'Longitud',
-      'Cultivo Principal', 'Sistema Productivo', 'Ingreso Mensual Ventas',
-      'Fecha Visita', 'Tecnico',
+      // Identificacion
+      'Radicado Oficial', 'Radicado Local', 'Estado', 'Fecha Registro', 'Fecha Visita',
+      // Beneficiario
+      'Nombres', 'Apellidos', 'Tipo Documento', 'Num. Documento',
+      'Edad', 'Telefono', 'Correo', 'Ocupacion Principal',
+      // Predio
+      'Nombre Predio', 'Departamento', 'Municipio', 'Vereda', 'Direccion',
+      'Tipo Tenencia', 'Codigo Catastral', 'Area Total (Ha)', 'Area Cultivada (Ha)',
+      'Latitud', 'Longitud', 'Altitud (msnm)',
+      'Vive en Predio', 'Tiene Vivienda', 'Cultivos Existentes',
+      // Caracterizacion predio
+      'Topografia', 'Tipo Suelo', 'Cobertura Vegetal', 'Ruta Acceso',
+      'Distancia Cabecera (km)', 'Tiempo Acceso', 'Temperatura (C)', 'Meses Lluvia',
+      // Agua
+      'Fuente Agua',
+      // Area productiva
+      'Cultivo Principal', 'Area Cultivo (Ha)', 'Produccion Estimada', 'Estado Cultivo',
+      'Destino Produccion', 'Sistema Productivo', 'Caracterizacion Cultivo',
+      'Donde Comercializa', 'Ingreso Mensual Ventas',
+      // Financiero
+      'Ingresos Agropecuarios', 'Ingresos Otros', 'Egresos Mensuales',
+      'Activos Totales', 'Pasivos Totales', 'Acceso Credito',
+      // Autorizaciones
+      'Autoriza Datos Personales',
+      // Tecnico
+      'Tecnico / Asesor', 'Asesor Email',
     ]
 
     const escape = (v: unknown) => {
@@ -496,28 +517,65 @@ export function AdminDashboard() {
         : s
     }
 
+    const bool = (v: boolean | null | undefined) => v ? 'Si' : (v === false ? 'No' : '')
+    const money = (v: number | null | undefined) => v != null ? String(v) : ''
+
     const rows = data.map(c => [
       c.radicado_oficial || '',
       c.radicado_local || '',
       c.estado || '',
       c.created_at ? new Date(c.created_at).toLocaleDateString('es-CO') : '',
+      c.visita?.fecha_visita || '',
       c.beneficiario?.nombres || '',
       c.beneficiario?.apellidos || '',
       c.beneficiario?.tipo_documento || '',
       c.beneficiario?.numero_documento || '',
+      c.beneficiario?.edad ?? '',
       c.beneficiario?.telefono || '',
       c.beneficiario?.correo || '',
+      c.beneficiario?.ocupacion_principal || '',
       c.predio?.nombre_predio || '',
+      c.predio?.departamento || '',
       c.predio?.municipio || '',
       c.predio?.vereda || '',
+      c.predio?.acceso_vial || '',
+      c.predio?.tipo_tenencia || '',
+      c.predio?.codigo_catastral || '',
       c.predio?.area_total ?? '',
+      c.predio?.area_cultivada ?? '',
       c.predio?.latitud ?? '',
       c.predio?.longitud ?? '',
+      c.predio?.altitud ?? '',
+      bool(c.predio?.vive_en_predio),
+      bool(c.predio?.tiene_vivienda),
+      c.predio?.cultivos_existentes || '',
+      c.caracterizacion_predio?.topografia || '',
+      c.caracterizacion_predio?.tipo_suelo || '',
+      c.caracterizacion_predio?.cobertura_vegetal || '',
+      c.caracterizacion_predio?.ruta_acceso || '',
+      c.caracterizacion_predio?.distancia_km ?? '',
+      c.caracterizacion_predio?.tiempo_acceso || '',
+      c.caracterizacion_predio?.temperatura_celsius ?? '',
+      c.caracterizacion_predio?.meses_lluvia || '',
+      c.predio?.fuente_agua || '',
       c.area_productiva?.cultivo_principal || '',
+      c.area_productiva?.area_cultivo_principal ?? '',
+      c.area_productiva?.produccion_estimada ?? '',
+      c.area_productiva?.estado_cultivo || '',
+      c.area_productiva?.destino_produccion || '',
       c.area_productiva?.sistema_produccion || '',
-      c.area_productiva?.ingreso_mensual_ventas ?? '',
-      c.visita?.fecha_visita || '',
-      c.visita?.nombre_tecnico || '',
+      c.area_productiva?.caracterizacion_cultivo || '',
+      c.area_productiva?.donde_comercializa || '',
+      money(c.area_productiva?.ingreso_mensual_ventas),
+      money(c.informacion_financiera?.ingresos_mensuales_agropecuaria),
+      money(c.informacion_financiera?.ingresos_mensuales_otros),
+      money(c.informacion_financiera?.egresos_mensuales),
+      money(c.informacion_financiera?.activos_totales),
+      money(c.informacion_financiera?.pasivos_totales),
+      bool(c.informacion_financiera?.acceso_credito),
+      bool(c.autoriza_tratamiento_datos),
+      c.visita?.nombre_tecnico || c.asesor?.nombre_completo || '',
+      c.asesor?.email || '',
     ].map(escape))
 
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
@@ -529,6 +587,209 @@ export function AdminDashboard() {
     a.click()
     URL.revokeObjectURL(url)
     toast.success(`Archivo descargado: ${filename}`)
+  }
+
+  const generatePDF = (c: CaracterizacionDB) => {
+    const nombre = getNombreCompleto(c)
+    const fechaGen = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })
+    const estadoLabel = getEstadoConfig(c.estado).label
+
+    const field = (label: string, value: string | number | null | undefined) =>
+      value != null && value !== ''
+        ? `<div class="field"><span class="lbl">${label}:</span> <span class="val">${value}</span></div>`
+        : ''
+
+    const tag = (label: string, active: boolean | null | undefined) =>
+      active ? `<span class="tag">${label}</span>` : ''
+
+    const money = (v: number | null | undefined) =>
+      v != null ? `$${Number(v).toLocaleString('es-CO')}` : null
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Caracterizacion — ${nombre}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#111;background:#fff}
+    .page{padding:14mm 12mm;max-width:210mm;margin:0 auto}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #16a34a;padding-bottom:10px;margin-bottom:14px}
+    .logo{font-size:18px;font-weight:900;color:#16a34a;letter-spacing:-0.5px}
+    .logo-sub{font-size:9px;color:#555;margin-top:2px}
+    .header-right{text-align:right}
+    .doc-title{font-size:12px;font-weight:700;text-transform:uppercase;color:#111;margin-bottom:3px}
+    .radicado{font-family:monospace;font-size:9.5px;color:#555}
+    .estado-badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:9px;font-weight:700;margin-top:3px;background:#dcfce7;color:#15803d}
+    h2{font-size:11px;font-weight:700;color:#15803d;border-left:3px solid #16a34a;padding:2px 0 2px 7px;margin:12px 0 7px;text-transform:uppercase;letter-spacing:0.4px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:3px 18px}
+    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 12px}
+    .field{margin-bottom:4px;line-height:1.4}
+    .lbl{color:#555;font-size:9.5px}
+    .val{font-weight:600;font-size:10px;color:#111}
+    .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+    .tag{padding:2px 7px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;font-size:9px;color:#15803d;font-weight:600}
+    .tag-blue{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+    .tag-red{background:#fef2f2;border-color:#fecaca;color:#dc2626}
+    .section-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:5px;padding:8px 10px;margin-bottom:10px}
+    .divider{border:none;border-top:1px solid #e5e7eb;margin:10px 0}
+    .footer{margin-top:20px;border-top:1px solid #e5e7eb;padding-top:8px;display:flex;justify-content:space-between;color:#9ca3af;font-size:8.5px}
+    .auth-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}
+    .auth-item{padding:2px 8px;border-radius:4px;font-size:9px;font-weight:600}
+    .auth-ok{background:#dcfce7;color:#15803d}
+    .auth-no{background:#fee2e2;color:#dc2626}
+    @page{size:A4;margin:10mm}
+    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="logo">Agro360</div>
+      <div class="logo-sub">Sistema de Caracterizacion Agropecuaria — Santander, Colombia</div>
+    </div>
+    <div class="header-right">
+      <div class="doc-title">Ficha de Caracterizacion Predial</div>
+      <div class="radicado">Radicado: ${c.radicado_oficial || c.radicado_local}</div>
+      <div class="radicado">Generado: ${fechaGen}</div>
+      <div class="estado-badge">${estadoLabel}</div>
+    </div>
+  </div>
+
+  <!-- Beneficiario -->
+  <h2>Datos del Productor</h2>
+  <div class="section-box">
+    <div class="grid2">
+      ${field('Nombre completo', nombre)}
+      ${field('Tipo documento', c.beneficiario?.tipo_documento)}
+      ${field('Num. documento', c.beneficiario?.numero_documento)}
+      ${field('Edad', c.beneficiario?.edad ? `${c.beneficiario.edad} años` : null)}
+      ${field('Telefono', c.beneficiario?.telefono)}
+      ${field('Correo', c.beneficiario?.correo)}
+      ${field('Ocupacion', c.beneficiario?.ocupacion_principal)}
+      ${field('Municipio', c.predio?.municipio)}
+      ${field('Vereda', c.predio?.vereda)}
+    </div>
+  </div>
+
+  <!-- Predio -->
+  <h2>Datos del Predio</h2>
+  <div class="section-box">
+    <div class="grid3">
+      ${field('Nombre predio', c.predio?.nombre_predio)}
+      ${field('Departamento', c.predio?.departamento)}
+      ${field('Municipio', c.predio?.municipio)}
+      ${field('Vereda', c.predio?.vereda)}
+      ${field('Tipo tenencia', c.predio?.tipo_tenencia)}
+      ${field('Codigo catastral', c.predio?.codigo_catastral)}
+      ${field('Area total', c.predio?.area_total ? `${c.predio.area_total} ha` : null)}
+      ${field('Area cultivada', c.predio?.area_cultivada ? `${c.predio.area_cultivada} ha` : null)}
+      ${field('Altitud', c.predio?.altitud ? `${c.predio.altitud} msnm` : null)}
+      ${field('Coordenadas', c.predio?.latitud && c.predio?.longitud ? `${c.predio.latitud.toFixed(5)}, ${c.predio.longitud.toFixed(5)}` : null)}
+      ${field('Vive en predio', c.predio?.vive_en_predio ? 'Si' : (c.predio?.vive_en_predio === false ? 'No' : null))}
+      ${field('Acceso vial', c.predio?.acceso_vial)}
+      ${field('Cultivos existentes', c.predio?.cultivos_existentes)}
+    </div>
+  </div>
+
+  <!-- Caracterizacion predio -->
+  ${c.caracterizacion_predio ? `
+  <h2>Caracterizacion del Predio</h2>
+  <div class="section-box">
+    <div class="grid3">
+      ${field('Topografia', c.caracterizacion_predio.topografia)}
+      ${field('Tipo suelo', c.caracterizacion_predio.tipo_suelo)}
+      ${field('Cobertura vegetal', c.caracterizacion_predio.cobertura_vegetal)}
+      ${field('Ruta acceso', c.caracterizacion_predio.ruta_acceso)}
+      ${field('Distancia', c.caracterizacion_predio.distancia_km ? `${c.caracterizacion_predio.distancia_km} km` : null)}
+      ${field('Tiempo acceso', c.caracterizacion_predio.tiempo_acceso)}
+      ${field('Temperatura', c.caracterizacion_predio.temperatura_celsius ? `${c.caracterizacion_predio.temperatura_celsius} °C` : null)}
+      ${field('Meses lluvia', c.caracterizacion_predio.meses_lluvia)}
+    </div>
+  </div>` : ''}
+
+  <!-- Agua y riesgos -->
+  ${c.predio?.fuente_agua ? `
+  <h2>Abastecimiento de Agua</h2>
+  <div class="section-box">${field('Fuente', c.predio.fuente_agua)}</div>` : ''}
+
+  <!-- Area productiva -->
+  ${c.area_productiva ? `
+  <h2>Area Productiva</h2>
+  <div class="section-box">
+    <div class="grid3">
+      ${field('Cultivo principal', c.area_productiva.cultivo_principal)}
+      ${field('Area cultivo', c.area_productiva.area_cultivo_principal ? `${c.area_productiva.area_cultivo_principal} ha` : null)}
+      ${field('Estado cultivo', c.area_productiva.estado_cultivo)}
+      ${field('Sistema productivo', c.area_productiva.sistema_produccion)}
+      ${field('Prod. estimada', c.area_productiva.produccion_estimada ? `${c.area_productiva.produccion_estimada} ton` : null)}
+      ${field('Destino produccion', c.area_productiva.destino_produccion)}
+      ${field('Donde comercializa', c.area_productiva.donde_comercializa)}
+      ${field('Ingreso mensual', money(c.area_productiva.ingreso_mensual_ventas))}
+      ${field('Caracterizacion cultivo', c.area_productiva.caracterizacion_cultivo)}
+    </div>
+  </div>` : ''}
+
+  <!-- Info financiera -->
+  ${c.informacion_financiera ? `
+  <h2>Informacion Financiera</h2>
+  <div class="section-box">
+    <div class="grid3">
+      ${field('Ingresos agropecuarios', money(c.informacion_financiera.ingresos_mensuales_agropecuaria))}
+      ${field('Otros ingresos', money(c.informacion_financiera.ingresos_mensuales_otros))}
+      ${field('Egresos mensuales', money(c.informacion_financiera.egresos_mensuales))}
+      ${field('Activos totales', money(c.informacion_financiera.activos_totales))}
+      ${field('Pasivos totales', money(c.informacion_financiera.pasivos_totales))}
+      ${field('Acceso credito', c.informacion_financiera.acceso_credito ? 'Si' : (c.informacion_financiera.acceso_credito === false ? 'No' : null))}
+    </div>
+  </div>` : ''}
+
+  <!-- Registro -->
+  <h2>Datos del Registro</h2>
+  <div class="section-box">
+    <div class="grid3">
+      ${field('Tecnico / Asesor', c.visita?.nombre_tecnico || c.asesor?.nombre_completo)}
+      ${field('Correo asesor', c.asesor?.email)}
+      ${field('Fecha visita', c.visita?.fecha_visita ? new Date(c.visita.fecha_visita).toLocaleDateString('es-CO') : null)}
+      ${field('Fecha registro', c.created_at ? new Date(c.created_at).toLocaleDateString('es-CO') : null)}
+      ${field('Radicado local', c.radicado_local)}
+      ${field('Radicado oficial', c.radicado_oficial)}
+    </div>
+  </div>
+
+  <!-- Autorizaciones -->
+  <h2>Autorizaciones</h2>
+  <div class="section-box">
+    <div class="auth-row">
+      <span class="auth-item ${c.autoriza_tratamiento_datos ? 'auth-ok' : 'auth-no'}">
+        ${c.autoriza_tratamiento_datos ? '✓' : '✗'} Tratamiento de datos personales
+      </span>
+    </div>
+    ${c.observaciones ? `<div style="margin-top:8px">${field('Observaciones', c.observaciones)}</div>` : ''}
+  </div>
+
+  <div class="footer">
+    <span>Agro360 — Sistema de Caracterizacion Agropecuaria</span>
+    <span>Documento generado el ${fechaGen}</span>
+  </div>
+</div>
+</body>
+</html>`
+
+    const win = window.open('', '_blank', 'width=900,height=700')
+    if (!win) {
+      toast.error('Permite las ventanas emergentes para generar el PDF')
+      return
+    }
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+    setTimeout(() => {
+      win.print()
+    }, 500)
   }
 
   return (
@@ -704,20 +965,20 @@ export function AdminDashboard() {
           {activeSection === 'caracterizaciones' && (
           <>
           {/* Filters */}
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1 sm:w-64">
+          <div className="mb-6 flex flex-col gap-3">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por nombre, predio, municipio..."
+                  placeholder="Buscar nombre, predio, municipio..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 w-full"
                 />
               </div>
               <Select value={filterEstado} onValueChange={setFilterEstado}>
-                <SelectTrigger className="w-40">
-                  <Filter className="mr-2 h-4 w-4" />
+                <SelectTrigger className="w-28 shrink-0 sm:w-36">
+                  <Filter className="mr-1.5 h-3.5 w-3.5 shrink-0" />
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
@@ -729,7 +990,7 @@ export function AdminDashboard() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
                 {filteredCaracterizaciones.length} resultado(s)
                 {totalPages > 1 && ` · pág. ${currentPage}/${totalPages}`}
@@ -745,7 +1006,7 @@ export function AdminDashboard() {
                   }}
                 >
                   <Download className="h-4 w-4" />
-                  Descargar CSV
+                  <span className="hidden xs:inline">Descargar</span> CSV
                 </Button>
               )}
             </div>
@@ -779,52 +1040,57 @@ export function AdminDashboard() {
                 const Icon = config.icon
                 return (
                   <Card key={c.id} className="transition-colors hover:bg-muted/30">
-                    <CardContent className="flex items-center gap-4 p-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                        <Users className="h-6 w-6 text-primary" />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="truncate font-medium">{getNombreCompleto(c)}</h3>
-                          <Badge variant="outline" className={config.color}>
-                            <Icon className="mr-1 h-3 w-3" />
-                            {config.label}
-                          </Badge>
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex items-start gap-3">
+                        {/* Icon — hidden on mobile */}
+                        <div className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                          <Users className="h-5 w-5 text-primary" />
                         </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                          {c.beneficiario?.numero_documento && (
-                            <span className="flex items-center gap-1 font-mono text-xs">
-                              <User className="h-3 w-3" />
-                              {c.beneficiario.numero_documento}
+
+                        {/* Main content */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <h3 className="font-medium leading-tight">{getNombreCompleto(c)}</h3>
+                            <Badge variant="outline" className={`${config.color} shrink-0 text-[10px] px-1.5 py-0`}>
+                              <Icon className="mr-1 h-2.5 w-2.5" />
+                              {config.label}
+                            </Badge>
+                          </div>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                            {c.beneficiario?.numero_documento && (
+                              <span className="flex items-center gap-1 font-mono">
+                                <User className="h-3 w-3 shrink-0" />
+                                {c.beneficiario.numero_documento}
+                              </span>
+                            )}
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3 shrink-0" />
+                              <span className="max-w-[110px] truncate sm:max-w-none">{c.predio?.nombre_predio || 'Sin predio'}</span>
                             </span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {c.predio?.nombre_predio || 'Sin predio'}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Map className="h-3 w-3" />
-                            {c.predio?.municipio || 'Sin municipio'}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {new Date(c.created_at).toLocaleDateString()}
-                          </span>
+                            <span className="flex items-center gap-1">
+                              <Map className="h-3 w-3 shrink-0" />
+                              {c.predio?.municipio || 'Sin municipio'}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3 shrink-0" />
+                              {new Date(c.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="flex shrink-0 items-center gap-2">
-                        {c.predio?.latitud && c.predio?.longitud && (
-                          <Button variant="outline" size="sm" onClick={() => openMapView(c)} className="gap-1">
-                            <Map className="h-4 w-4" />
-                            <span className="hidden sm:inline">Mapa</span>
+                        {/* Action buttons — stacked on mobile, row on desktop */}
+                        <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                          {c.predio?.latitud && c.predio?.longitud && (
+                            <Button variant="outline" size="sm" onClick={() => openMapView(c)} className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:gap-1 sm:px-3">
+                              <Map className="h-3.5 w-3.5" />
+                              <span className="hidden sm:inline text-xs">Mapa</span>
+                            </Button>
+                          )}
+                          <Button variant="default" size="sm" onClick={() => openDetail(c)} className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:gap-1 sm:px-3">
+                            <Eye className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline text-xs">Ver</span>
                           </Button>
-                        )}
-                        <Button variant="default" size="sm" onClick={() => openDetail(c)} className="gap-1">
-                          <Eye className="h-4 w-4" />
-                          <span className="hidden sm:inline">Ver</span>
-                        </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -1135,7 +1401,7 @@ export function AdminDashboard() {
 
       {/* Detail Dialog */}
       <Dialog open={showDetail} onOpenChange={setShowDetail}>
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden p-0">
+        <DialogContent className="max-h-[95dvh] w-[calc(100vw-16px)] max-w-4xl overflow-hidden p-0 sm:w-full sm:max-h-[90vh]">
           <DialogHeader className="border-b border-border px-6 py-4">
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
@@ -1148,24 +1414,26 @@ export function AdminDashboard() {
 
           {selectedCaracterizacion && (
             <Tabs defaultValue="general" className="flex-1">
-              <TabsList className="w-full justify-start rounded-none border-b border-border bg-transparent px-6">
-                <TabsTrigger value="general" className="gap-2">
-                  <User className="h-4 w-4" />
-                  General
-                </TabsTrigger>
-                <TabsTrigger value="predio" className="gap-2">
-                  <MapPin className="h-4 w-4" />
-                  Predio
-                </TabsTrigger>
-                <TabsTrigger value="produccion" className="gap-2">
-                  <Sprout className="h-4 w-4" />
-                  Produccion
-                </TabsTrigger>
-                <TabsTrigger value="acciones" className="gap-2">
-                  <CheckCircle className="h-4 w-4" />
-                  Acciones
-                </TabsTrigger>
-              </TabsList>
+              <div className="overflow-x-auto border-b border-border">
+                <TabsList className="inline-flex w-auto min-w-full justify-start rounded-none bg-transparent px-3 sm:px-6">
+                  <TabsTrigger value="general" className="gap-1.5 text-xs sm:gap-2 sm:text-sm">
+                    <User className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    General
+                  </TabsTrigger>
+                  <TabsTrigger value="predio" className="gap-1.5 text-xs sm:gap-2 sm:text-sm">
+                    <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    Predio
+                  </TabsTrigger>
+                  <TabsTrigger value="produccion" className="gap-1.5 text-xs sm:gap-2 sm:text-sm">
+                    <Sprout className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    Produccion
+                  </TabsTrigger>
+                  <TabsTrigger value="acciones" className="gap-1.5 text-xs sm:gap-2 sm:text-sm">
+                    <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    Acciones
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
               <ScrollArea className="h-[60vh]">
                 <TabsContent value="general" className="m-0 p-6">
@@ -1421,6 +1689,28 @@ export function AdminDashboard() {
 
                 <TabsContent value="acciones" className="m-0 p-6">
                   <div className="space-y-6">
+
+                    {/* Exportar PDF */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Exportar Ficha</CardTitle>
+                        <CardDescription>Genera una ficha PDF con todos los datos del registro</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button
+                          variant="outline"
+                          className="gap-2"
+                          onClick={() => generatePDF(selectedCaracterizacion)}
+                        >
+                          <Printer className="h-4 w-4" />
+                          Generar PDF / Imprimir
+                        </Button>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Se abrira una ventana con la ficha completa lista para imprimir o guardar como PDF.
+                        </p>
+                      </CardContent>
+                    </Card>
+
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-base">Cambiar Estado</CardTitle>
