@@ -86,16 +86,17 @@ export function useAuth() {
 
         if (error) throw error
 
+        // Cargar perfil ANTES de quitar el loading, para evitar flash del menú incorrecto
+        if (session?.user) {
+          await fetchProfile(session.user.id)
+        }
+
         setState(prev => ({
           ...prev,
           user: session?.user ?? null,
           session,
           loading: false,
         }))
-
-        if (session?.user) {
-          await fetchProfile(session.user.id)
-        }
       } catch (err) {
         setState(prev => ({
           ...prev,
@@ -110,18 +111,19 @@ export function useAuth() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
+        if (session?.user) {
+          // Cargar perfil primero para que el rol esté disponible cuando loading pase a false
+          await fetchProfile(session.user.id)
+        } else {
+          setProfile(null)
+        }
+
         setState(prev => ({
           ...prev,
           user: session?.user ?? null,
           session,
           loading: false,
         }))
-
-        if (session?.user) {
-          await fetchProfile(session.user.id)
-        } else {
-          setProfile(null)
-        }
       }
     )
 
