@@ -7,6 +7,7 @@ import { PWAProvider } from '@/components/pwa-provider'
 import { SessionValidator } from '@/components/session-validator'
 import { EnvVarChecker } from '@/components/env-var-checker'
 import { Toaster } from '@/components/ui/sonner'
+import { AuthProvider } from '@/context/auth-context'
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -58,11 +59,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <PWAProvider>
-            <SessionValidator>
-              {children}
-            </SessionValidator>
-          </PWAProvider>
+          <AuthProvider>
+            <PWAProvider>
+              <SessionValidator>
+                {children}
+              </SessionValidator>
+            </PWAProvider>
+          </AuthProvider>
         </ThemeProvider>
         <Toaster richColors position="top-center" />
         <EnvVarChecker />
