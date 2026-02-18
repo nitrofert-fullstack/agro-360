@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient as createAdminClient, SupabaseClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
 import {
   sendEmail,
+  buildSyncNotificationEmail,
   buildConfirmacionRegistroEmail,
   buildNuevoRegistroEmail,
 } from '@/lib/email/mailer'
@@ -323,24 +325,71 @@ export async function POST(request: Request) {
           year: 'numeric', month: 'long', day: 'numeric',
         })
 
-        // Email de confirmación al productor (si tiene correo)
+        // === CUENTA Y EMAIL AL PRODUCTOR (si tiene correo) ===
         if (correobenef) {
           try {
-            const html = buildConfirmacionRegistroEmail({
-              nombreCompleto: nombrebenef,
-              radicadoOficial,
-              numeroDocumento: docNum,
-              nombrePredio,
-              appUrl,
-            })
-            await sendEmail({
-              to: correobenef,
-              subject: 'Tu solicitud de caracterización fue recibida — Agro360',
-              html,
-            })
-            console.log(`[SyncPublic] Confirmación enviada a ${correobenef}`)
+            // Verificar si ya tiene cuenta
+            const { data: existingProfile } = await adminClient
+              .from('profiles')
+              .select('id')
+              .eq('email', correobenef)
+              .maybeSingle()
+
+            if (!existingProfile) {
+              // Crear cuenta con contraseña temporal y enviar credenciales
+              const tempPassword = `Agro${crypto.randomBytes(4).toString('hex').toUpperCase()}!`
+
+              const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
+                email: correobenef,
+                password: tempPassword,
+                email_confirm: true,
+                user_metadata: { nombre_completo: nombrebenef, rol: 'campesino' },
+              })
+
+              if (!createErr && newUser?.user) {
+                await adminClient.from('profiles').upsert({
+                  id: newUser.user.id,
+                  email: correobenef,
+                  nombre_completo: nombrebenef,
+                  rol: 'campesino',
+                  activo: true,
+                })
+
+                const html = buildSyncNotificationEmail({
+                  nombreCompleto: nombrebenef,
+                  email: correobenef,
+                  password: tempPassword,
+                  radicadoOficial,
+                  nombrePredio,
+                  appUrl,
+                })
+                await sendEmail({
+                  to: correobenef,
+                  subject: 'Tu caracterización fue registrada — accede a Agro360',
+                  html,
+                })
+                console.log(`[SyncPublic] Cuenta creada y credenciales enviadas a ${correobenef}`)
+              } else if (createErr) {
+                console.error('[SyncPublic] Error creando cuenta:', createErr.message)
+              }
+            } else {
+              // Ya tiene cuenta — enviar solo confirmación de radicado
+              const html = buildConfirmacionRegistroEmail({
+                nombreCompleto: nombrebenef,
+                radicadoOficial,
+                numeroDocumento: docNum,
+                nombrePredio,
+                appUrl,
+              })
+              await sendEmail({
+                to: correobenef,
+                subject: 'Tu solicitud de caracterización fue recibida — Agro360',
+                html,
+              })
+              console.log(`[SyncPublic] Confirmación enviada a ${correobenef} (ya tenía cuenta)`)
+            }
           } catch (emailErr) {
-            console.error('[SyncPublic] Error enviando confirmación al productor:', emailErr)
+            console.error('[SyncPublic] Error en gestión de cuenta/email del productor:', emailErr)
           }
         }
 
