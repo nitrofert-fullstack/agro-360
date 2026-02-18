@@ -157,26 +157,32 @@ export default function ConsultarPage() {
   }
 
   const getEstadoBadge = (estado: string) => {
+    const key = estado.toLowerCase()
     const estados: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; className?: string }> = {
       'pendiente': { label: 'Pendiente', variant: 'outline', className: 'border-yellow-500/50 text-yellow-600 bg-yellow-500/10' },
+      'pendiente_sincronizacion': { label: 'Pendiente Sync', variant: 'outline', className: 'border-yellow-500/50 text-yellow-600 bg-yellow-500/10' },
       'sincronizado': { label: 'Sincronizado', variant: 'outline', className: 'border-green-500/50 text-green-600 bg-green-500/10' },
-      'en_revision': { label: 'En Revision', variant: 'outline', className: 'border-blue-500/50 text-blue-600 bg-blue-500/10' },
+      'en_revision': { label: 'En Revisión', variant: 'outline', className: 'border-blue-500/50 text-blue-600 bg-blue-500/10' },
       'aprobado': { label: 'Aprobado', variant: 'outline', className: 'border-green-600/50 text-green-700 bg-green-600/10' },
       'rechazado': { label: 'Rechazado', variant: 'destructive' },
+      'error_sincronizacion': { label: 'Error', variant: 'destructive' },
     }
-    const config = estados[estado] || { label: estado, variant: 'outline' as const }
+    const config = estados[key] || { label: estado, variant: 'outline' as const }
     return <Badge variant={config.variant} className={config.className}>{config.label}</Badge>
   }
 
   const getEstadoDescription = (estado: string) => {
+    const key = estado.toLowerCase()
     const desc: Record<string, string> = {
       'pendiente': 'Su solicitud fue recibida y esta pendiente de revision por parte del equipo tecnico.',
-      'sincronizado': 'Su solicitud fue sincronizada correctamente y esta en espera de revision.',
+      'pendiente_sincronizacion': 'Su solicitud fue guardada localmente y esta pendiente de sincronizacion con el servidor.',
+      'sincronizado': 'Su solicitud fue sincronizada correctamente con el servidor y esta en espera de revision.',
       'en_revision': 'Su solicitud esta siendo revisada por un asesor tecnico.',
       'aprobado': 'Su solicitud fue aprobada. Pronto sera contactado por un asesor.',
       'rechazado': 'Su solicitud fue rechazada. Contacte a su asesor para mas informacion.',
+      'error_sincronizacion': 'Ocurrio un error al sincronizar. Contacte al asesor responsable.',
     }
-    return desc[estado] || 'Estado en proceso.'
+    return desc[key] || 'Estado en proceso.'
   }
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -220,20 +226,24 @@ export default function ConsultarPage() {
                 <span className="truncate">{res.visita?.radicado_oficial || res.visita?.radicado_local || res.id.slice(0, 8)}</span>
               </CardTitle>
               <CardDescription className="mt-1.5">
-                {res.visita?.estado === 'sincronizado' || res.visita?.estado === 'en_revision' || res.visita?.estado === 'aprobado' || res.visita?.estado === 'rechazado' ? (
-                  <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
-                    <CheckCircle className="h-3.5 w-3.5" />
-                    Registro sincronizado con el servidor
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400">
-                    <Clock className="h-3.5 w-3.5" />
-                    Registro pendiente de sincronizacion
-                  </span>
-                )}
+                {(() => {
+                  const est = (res.visita?.estado || '').toLowerCase()
+                  const sincronizado = est === 'sincronizado' || est === 'en_revision' || est === 'aprobado' || est === 'rechazado'
+                  return sincronizado ? (
+                    <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Registro sincronizado con el servidor
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400">
+                      <Clock className="h-3.5 w-3.5" />
+                      Registro pendiente de sincronizacion
+                    </span>
+                  )
+                })()}
               </CardDescription>
             </div>
-            {getEstadoBadge(res.visita?.estado || 'pendiente')}
+            {getEstadoBadge(res.visita?.estado || 'PENDIENTE_SINCRONIZACION')}
           </div>
         </CardHeader>
 

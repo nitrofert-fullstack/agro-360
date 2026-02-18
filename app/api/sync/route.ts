@@ -57,6 +57,36 @@ function generateRadicadoOficial(): string {
   return `RAD-${year}${month}${day}-${random}`
 }
 
+/**
+ * Verifica que los buckets de almacenamiento necesarios existan.
+ * Los crea automáticamente (públicos) si no existen.
+ */
+async function ensureStorageBuckets(adminClient: SupabaseClient): Promise<void> {
+  const buckets = [
+    { name: 'fotos-productores', public: true },
+    { name: 'firmas', public: true },
+    { name: 'fotos-predios', public: true },
+  ]
+
+  const { data: existingBuckets } = await adminClient.storage.listBuckets()
+  const existing = new Set((existingBuckets || []).map((b: { name: string }) => b.name))
+
+  for (const bucket of buckets) {
+    if (!existing.has(bucket.name)) {
+      const { error } = await adminClient.storage.createBucket(bucket.name, {
+        public: bucket.public,
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+        fileSizeLimit: 10485760, // 10 MB
+      })
+      if (error) {
+        console.warn(`[Sync] No se pudo crear bucket '${bucket.name}':`, error.message)
+      } else {
+        console.log(`[Sync] Bucket '${bucket.name}' creado correctamente`)
+      }
+    }
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
@@ -81,6 +111,16 @@ export async function POST(request: Request) {
       )
     }
 
+    // Inicializar buckets de almacenamiento si no existen
+    const serviceRoleKeyInit = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const supabaseUrlInit = process.env.NEXT_PUBLIC_SUPABASE_URL
+    if (serviceRoleKeyInit && supabaseUrlInit) {
+      const adminInit = createAdminClient(supabaseUrlInit, serviceRoleKeyInit)
+      await ensureStorageBuckets(adminInit).catch(e =>
+        console.warn('[Sync] ensureStorageBuckets error:', e)
+      )
+    }
+
     const results = []
 
     for (const c of caracterizaciones) {
@@ -100,7 +140,7 @@ export async function POST(request: Request) {
           .from('beneficiarios')
           .select('id')
           .eq('numero_documento', docNum)
-          .single()
+          .maybeSingle()
 
         let beneficiarioId: string
 
@@ -163,6 +203,7 @@ export async function POST(request: Request) {
             coordenada_y: c.predio?.coordenadaY || null,
             latitud: c.predio?.latitud ?? null,
             longitud: c.predio?.longitud ?? null,
+            poligono: c.predio?.poligono ?? null,
             altitud_msnm: c.predio?.altitudMsnm ?? null,
             vive_en_predio: c.predio?.viveEnPredio || null,
             tiene_vivienda: c.predio?.tieneVivienda ?? false,

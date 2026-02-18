@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,14 +13,14 @@ import { LocationPicker } from "./location-picker"
 import { SignaturePad } from "./signature-pad"
 import { PhotoUpload } from "./photo-upload"
 import { saveCaracterizacion } from "@/lib/db/indexed-db"
-import { 
-  User, 
-  MapPin, 
-  Mountain, 
+import {
+  User,
+  MapPin,
+  Mountain,
   Droplets,
   AlertTriangle,
-  Sprout, 
-  Wallet, 
+  Sprout,
+  Wallet,
   FileCheck,
   ChevronLeft,
   ChevronRight,
@@ -28,7 +28,9 @@ import {
   Loader2,
   Home,
   Camera,
-  FileSignature
+  FileSignature,
+  Lock,
+  Info
 } from "lucide-react"
 import { ThemeToggle } from "./theme-toggle"
 import { ConnectionStatus } from "./connection-status"
@@ -106,6 +108,8 @@ interface FormData {
     coordenadaY: string
     latitud: number
     longitud: number
+    poligono?: [number, number][]
+    tipoUbicacion?: 'punto' | 'poligono'
     altitudMsnm: number | null
     viveEnPredio: string
     tieneVivienda: boolean
@@ -308,12 +312,26 @@ const validateDocument = (doc: string): boolean => {
 
 export function CharacterizationFormComplete() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, profile, isAuthenticated } = useAuth()
+  const isAsesor = isAuthenticated && (profile?.rol === 'asesor' || profile?.rol === 'admin')
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<ValidationErrors>({})
   const [showErrors, setShowErrors] = useState(false)
+
+  // Auto-llenar nombre del técnico si el usuario autenticado es asesor o admin
+  useEffect(() => {
+    if (isAsesor && profile?.nombre_completo) {
+      setFormData(prev => ({
+        ...prev,
+        visita: {
+          ...prev.visita,
+          nombreTecnico: profile.nombre_completo,
+        },
+      }))
+    }
+  }, [isAsesor, profile?.nombre_completo])
 
   // Helper para actualizar campos anidados
   const updateField = (section: keyof FormData, field: string, value: unknown) => {
@@ -530,6 +548,8 @@ export function CharacterizationFormComplete() {
           areaProductivaHectareas: formData.predio.areaProductivaHectareas ?? undefined,
           latitud: formData.predio.latitud,
           longitud: formData.predio.longitud,
+          poligono: formData.predio.poligono,
+          tipoUbicacion: formData.predio.tipoUbicacion,
           altitudMsnm: formData.predio.altitudMsnm ?? undefined,
           direccion: formData.predio.direccion,
           codigoCatastral: formData.predio.codigoCatastral,
@@ -681,14 +701,29 @@ export function CharacterizationFormComplete() {
                   {errors['visita.fechaVisita'] && <p className="text-sm text-red-500">{errors['visita.fechaVisita']}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="nombreTecnico">Nombre del Tecnico <span className="text-red-500">*</span></Label>
+                  <Label htmlFor="nombreTecnico" className="flex items-center gap-2">
+                    Nombre del Tecnico <span className="text-red-500">*</span>
+                    {isAsesor && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/40 dark:text-green-400">
+                        <Lock className="h-3 w-3" />
+                        Auto-completado
+                      </span>
+                    )}
+                  </Label>
                   <Input
                     id="nombreTecnico"
                     value={formData.visita.nombreTecnico}
-                    onChange={(e) => updateField("visita", "nombreTecnico", e.target.value)}
+                    onChange={(e) => !isAsesor && updateField("visita", "nombreTecnico", e.target.value)}
                     placeholder="Nombre completo del tecnico"
-                    className={`h-11 ${errors['visita.nombreTecnico'] ? 'border-red-500' : ''}`}
+                    readOnly={isAsesor}
+                    className={`h-11 ${errors['visita.nombreTecnico'] ? 'border-red-500' : ''} ${isAsesor ? 'bg-muted cursor-not-allowed' : ''}`}
                   />
+                  {isAsesor && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Info className="h-3 w-3" />
+                      Nombre cargado automáticamente desde tu perfil de asesor.
+                    </p>
+                  )}
                   {errors['visita.nombreTecnico'] && <p className="text-sm text-red-500">{errors['visita.nombreTecnico']}</p>}
                 </div>
                 <div className="space-y-2">
@@ -1082,13 +1117,16 @@ export function CharacterizationFormComplete() {
                         ...prev.predio,
                         latitud: loc.latitud,
                         longitud: loc.longitud,
+                        poligono: loc.poligono,
+                        tipoUbicacion: loc.tipoUbicacion,
                       }
                     }))
                   }}
                   initialLocation={{
                     latitud: formData.predio.latitud,
                     longitud: formData.predio.longitud,
-                    tipoUbicacion: "punto",
+                    poligono: formData.predio.poligono,
+                    tipoUbicacion: formData.predio.tipoUbicacion || "punto",
                   }}
                 />
               </div>
@@ -1815,9 +1853,17 @@ export function CharacterizationFormComplete() {
           </div>
           <div className="flex items-center gap-2">
             <ConnectionStatus showLabel={false} className="hidden sm:flex" />
-            <SyncButton variant="compact" />
+            {isAuthenticated && <SyncButton variant="compact" />}
+            {!isAuthenticated && (
+              <Button variant="outline" size="sm" asChild className="hidden sm:flex gap-1.5 text-xs">
+                <Link href={`/auth/login?redirectTo=/formulario`}>
+                  <User className="h-3.5 w-3.5" />
+                  Asesor: Inicia sesión
+                </Link>
+              </Button>
+            )}
             <Button variant="outline" size="icon" asChild className="h-9 w-9">
-              <Link href="/dashboard">
+              <Link href={isAuthenticated ? "/dashboard" : "/"}>
                 <Home className="h-4 w-4" />
               </Link>
             </Button>
@@ -1865,6 +1911,27 @@ export function CharacterizationFormComplete() {
 
       {/* Content */}
       <main className="mx-auto max-w-5xl px-4 py-6">
+        {/* Banner informativo para usuarios no autenticados */}
+        {!isAuthenticated && (
+          <div className="mb-4 flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800/60 dark:bg-blue-900/20 dark:text-blue-300">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Este formulario es público y puede diligenciarse sin iniciar sesión. Si eres asesor técnico,{" "}
+              <Link href="/auth/login?redirectTo=/formulario" className="font-semibold underline underline-offset-2 hover:no-underline">
+                inicia sesión
+              </Link>{" "}
+              para que tu nombre se complete automáticamente.
+            </span>
+          </div>
+        )}
+        {isAsesor && (
+          <div className="mb-4 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800/60 dark:bg-green-900/20 dark:text-green-300">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Estás registrando como asesor <strong>{profile?.nombre_completo}</strong>. Tu nombre se ha completado automáticamente y quedará asociado a esta caracterización.
+            </span>
+          </div>
+        )}
         {renderStep()}
 
         {/* Navigation */}

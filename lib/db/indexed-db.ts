@@ -51,6 +51,8 @@ export interface CaracterizacionLocal {
     areaProductivaHectareas?: number
     latitud?: number
     longitud?: number
+    poligono?: [number, number][]
+    tipoUbicacion?: 'punto' | 'poligono'
     altitudMsnm?: number
     direccion?: string
     codigoCatastral?: string

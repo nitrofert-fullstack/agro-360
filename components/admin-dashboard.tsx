@@ -169,14 +169,16 @@ interface CaracterizacionDB {
   } | null
 }
 
-type EstadoKey = "pendiente" | "sincronizado" | "aprobado" | "rechazado" | "en_revision"
+type EstadoKey = "pendiente" | "pendiente_sincronizacion" | "sincronizado" | "aprobado" | "rechazado" | "en_revision" | "error_sincronizacion"
 
 const estadoConfig: Record<EstadoKey, { label: string; color: string; icon: typeof Clock }> = {
   pendiente: { label: "Pendiente", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", icon: Clock },
+  pendiente_sincronizacion: { label: "Pend. Sync", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", icon: Clock },
   sincronizado: { label: "Sincronizado", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Eye },
-  en_revision: { label: "En Revision", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Eye },
+  en_revision: { label: "En Revisión", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Eye },
   aprobado: { label: "Aprobado", color: "bg-green-500/10 text-green-500 border-green-500/20", icon: CheckCircle },
   rechazado: { label: "Rechazado", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: XCircle },
+  error_sincronizacion: { label: "Error", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: XCircle },
 }
 
 interface UserProfile {
@@ -257,10 +259,10 @@ export function AdminDashboard() {
       // Stats
       setEstadisticas({
         total: items.length,
-        pendientes: items.filter(c => c.estado === 'pendiente').length,
-        sincronizados: items.filter(c => c.estado === 'sincronizado').length,
-        aprobados: items.filter(c => c.estado === 'aprobado').length,
-        rechazados: items.filter(c => c.estado === 'rechazado').length,
+        pendientes: items.filter(c => ['pendiente', 'pendiente_sincronizacion'].includes((c.estado || '').toLowerCase())).length,
+        sincronizados: items.filter(c => (c.estado || '').toLowerCase() === 'sincronizado').length,
+        aprobados: items.filter(c => (c.estado || '').toLowerCase() === 'aprobado').length,
+        rechazados: items.filter(c => (c.estado || '').toLowerCase() === 'rechazado').length,
       })
     } catch (err) {
       console.error('Error loading data:', err)
@@ -387,7 +389,7 @@ export function AdminDashboard() {
   }, [activeSection, loadUsers])
 
   const filteredCaracterizaciones = caracterizaciones.filter((c) => {
-    const matchesEstado = filterEstado === "todos" || c.estado === filterEstado
+    const matchesEstado = filterEstado === "todos" || (c.estado || '').toLowerCase() === filterEstado
     const nombre = `${c.beneficiario?.nombres || ''} ${c.beneficiario?.apellidos || ''}`.toLowerCase()
     const documento = (c.beneficiario?.numero_documento || '').toLowerCase()
     const nombrePredio = (c.predio?.nombre_predio || '').toLowerCase()
@@ -459,7 +461,8 @@ export function AdminDashboard() {
   }
 
   const getEstadoConfig = (estado: string) => {
-    return estadoConfig[estado as EstadoKey] || estadoConfig.pendiente
+    const key = (estado || '').toLowerCase() as EstadoKey
+    return estadoConfig[key] || estadoConfig.pendiente
   }
 
   const downloadCSV = (data: CaracterizacionDB[], filename: string) => {
@@ -920,6 +923,7 @@ export function AdminDashboard() {
                         <SelectContent>
                           <SelectItem value="asesor">Asesor</SelectItem>
                           <SelectItem value="campesino">Beneficiario / Campesino</SelectItem>
+                          <SelectItem value="admin">Administrador</SelectItem>
                         </SelectContent>
                       </Select>
                       <Button
@@ -1016,6 +1020,12 @@ export function AdminDashboard() {
                                   <><User className="mr-1 h-3 w-3" />Asesor</>
                                 )}
                               </Badge>
+                              {invitation && (
+                                <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-600 border-green-500/20">
+                                  <CheckCircle className="h-3 w-3" />
+                                  {invitation.usado ? 'Accedió' : 'Cred. enviadas'}
+                                </Badge>
+                              )}
                               {!u.activo && (
                                 <Badge variant="destructive" className="gap-1">
                                   <XCircle className="h-3 w-3" />
@@ -1407,7 +1417,7 @@ export function AdminDashboard() {
                           {(["pendiente", "sincronizado", "en_revision", "aprobado", "rechazado"] as const).map((est) => {
                             const cfg = estadoConfig[est]
                             const EstIcon = cfg.icon
-                            const isCurrent = selectedCaracterizacion.estado === est
+                            const isCurrent = (selectedCaracterizacion.estado || '').toLowerCase() === est
                             return (
                               <Button
                                 key={est}

@@ -64,7 +64,7 @@ export default function MapaPage() {
           .from('caracterizaciones')
           .select(`
             id,
-            predio:predios!id_predio(id, nombre_predio, municipio, vereda, latitud, longitud, area_total, area_cultivada),
+            predio:predios!id_predio(id, nombre_predio, municipio, vereda, latitud, longitud, area_total, area_cultivada, poligono),
             beneficiario:beneficiarios!id_beneficiario(nombres, apellidos),
             caracterizacion_predio:caracterizacion_predio(temperatura_celsius)
           `)
@@ -105,10 +105,15 @@ export default function MapaPage() {
             </div>
           `
 
+          const polygonCoords = predio.poligono
+            ? (typeof predio.poligono === 'string' ? JSON.parse(predio.poligono) : predio.poligono) as [number, number][]
+            : undefined
+
           mapMarkers.push({
             id: predio.id,
             position: [predio.latitud, predio.longitud],
             popupContent: popup,
+            polygonCoords,
           })
         }
 

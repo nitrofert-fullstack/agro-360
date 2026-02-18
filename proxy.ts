@@ -5,14 +5,12 @@ import { updateSession } from '@/lib/supabase/middleware'
 const protectedRoutes = [
   '/admin',
   '/dashboard',
-  '/formulario',
   '/consultar',
-  '/mapa',
   '/profile',
   '/settings'
 ]
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Refrescar sesión y obtener el usuario verificado por el servidor

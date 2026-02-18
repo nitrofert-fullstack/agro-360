@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!supabase) return
 
     // Timeout de 4 s: si la query no responde, caer a user_metadata de inmediato
-    const TIMEOUT_MS = 4000
+    const TIMEOUT_MS = 8000
 
     try {
       const result = await Promise.race([
@@ -90,17 +90,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data: { session }, error } = await supabase.auth.getSession()
         if (error) throw error
 
-        if (session?.user) {
-          // fetchProfile: 1 sola petición de red (profiles), con fallback offline
-          await fetchProfile(session.user)
-        }
-
+        // Parar el loading INMEDIATAMENTE — getSession() lee de localStorage sin red
         setState(prev => ({
           ...prev,
           user: session?.user ?? null,
           session,
           loading: false,
         }))
+
+        // Cargar perfil en segundo plano sin bloquear la UI
+        if (session?.user) {
+          fetchProfile(session.user)
+        }
       } catch (err) {
         setState(prev => ({
           ...prev,
@@ -130,7 +131,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     )
 
-    return () => { subscription.unsubscribe() }
+    // Refrescar sesión cuando el usuario vuelve a la pestaña (previene expiración silenciosa)
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            // Forzar refresco del token si está próximo a vencer o ya venció
+            await supabase.auth.refreshSession()
+          }
+        } catch {
+          // Silenciar: el onAuthStateChange manejará el estado resultante
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      subscription.unsubscribe()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [supabase, fetchProfile])
 
   const signIn = useCallback(async (email: string, password: string) => {

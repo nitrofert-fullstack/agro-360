@@ -36,6 +36,7 @@ export interface MapMarker {
   position: [number, number]
   popupContent: string
   id?: string
+  polygonCoords?: [number, number][]
 }
 
 interface MapViewerProps {
@@ -418,8 +419,23 @@ export function MapViewer({
           iconAnchor: [16, 32],
         })
         markers.forEach((m) => {
-          const marker = L.default.marker(m.position, { icon: markerIcon }).addTo(map)
-          marker.bindPopup(m.popupContent)
+          if (m.polygonCoords && m.polygonCoords.length >= 3) {
+            // Renderizar como polígono con marker en el centro
+            const polygon = L.default.polygon(m.polygonCoords, {
+              color: "#3b82f6",
+              fillColor: "#3b82f6",
+              fillOpacity: 0.2,
+              weight: 2,
+            }).addTo(map)
+            polygon.bindPopup(m.popupContent)
+            // Pequeño marker en el centro para facilitar click en zoom bajo
+            const centerMarker = L.default.marker(m.position, { icon: markerIcon }).addTo(map)
+            centerMarker.bindPopup(m.popupContent)
+          } else {
+            // Renderizar como punto
+            const marker = L.default.marker(m.position, { icon: markerIcon }).addTo(map)
+            marker.bindPopup(m.popupContent)
+          }
         })
       }
 

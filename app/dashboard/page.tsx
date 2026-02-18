@@ -53,50 +53,45 @@ export default function DashboardPage() {
   }, [loading, isAuthenticated, router, statsLoaded])
 
   const loadStats = async () => {
-    // Cargar datos locales de IndexedDB
-    const s = await getStats()
+    // 1. IndexedDB (instantáneo, sin red) — para pendientes y errores locales
+    const [s, all] = await Promise.all([getStats(), getAllCaracterizaciones()])
     setStats(s)
-    const all = await getAllCaracterizaciones()
-    // Solo mostrar registros NO sincronizados en la sección local (los sincronizados aparecen en servidor)
     const noSincronizados = all.filter(c => c.estado !== 'SINCRONIZADO')
-    setRecentItems(noSincronizados.sort((a, b) => new Date(b.fechaRegistro).getTime() - new Date(a.fechaRegistro).getTime()).slice(0, 5))
-    
-    // Cargar datos del servidor si está logueado y Supabase está configurado
+    setRecentItems(
+      noSincronizados
+        .sort((a, b) => new Date(b.fechaRegistro).getTime() - new Date(a.fechaRegistro).getTime())
+        .slice(0, 5)
+    )
+
+    // 2. Servidor (fuente primaria) — registros sincronizados reales
+    if (!user?.id) return
     try {
       const supabase = createClient()
-      if (!supabase) {
-        return
-      }
+      if (!supabase) return
 
-      // Cargar registros sincronizados del servidor
-      if (user?.id) {
-        const { data: serverVisitas, error } = await supabase
-          .from('visitas')
-          .select(`
-            id,
-            radicado_local,
-            radicado_oficial,
-            estado,
-            fecha_visita,
-            nombre_tecnico,
-            created_at,
-            caracterizaciones!id_visita(
-              id_beneficiario,
-              beneficiarios!id_beneficiario(nombres, apellidos)
-            )
-          `)
-          .eq('asesor_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(5)
+      const { data: serverVisitas, error } = await supabase
+        .from('visitas')
+        .select(`
+          id,
+          radicado_local,
+          radicado_oficial,
+          estado,
+          fecha_visita,
+          nombre_tecnico,
+          created_at,
+          caracterizaciones!id_visita(
+            id_beneficiario,
+            beneficiarios!id_beneficiario(nombres, apellidos)
+          )
+        `)
+        .eq('asesor_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(20)
 
-        if (!error && serverVisitas) {
-          setServerStats({
-            total: serverVisitas.length,
-            registros: serverVisitas
-          })
-        } else if (error) {
-          console.log("[v0] Error loading server stats:", error)
-        }
+      if (!error && serverVisitas) {
+        setServerStats({ total: serverVisitas.length, registros: serverVisitas })
+      } else if (error) {
+        console.log("[v0] Error loading server stats:", error)
       }
     } catch (err) {
       console.log("[v0] Error loading server stats:", err)
@@ -183,7 +178,7 @@ export default function DashboardPage() {
                 <FileText className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <p className="text-3xl font-bold">{stats.total}</p>
+                <p className="text-3xl font-bold">{(serverStats?.total ?? 0) + stats.pendientes + stats.errores}</p>
                 <p className="text-sm text-muted-foreground">Total registros</p>
               </div>
             </CardContent>
@@ -196,7 +191,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-3xl font-bold text-yellow-500">{stats.pendientes}</p>
-                <p className="text-sm text-muted-foreground">Pendientes</p>
+                <p className="text-sm text-muted-foreground">Pendientes sync</p>
               </div>
             </CardContent>
           </Card>
@@ -207,8 +202,8 @@ export default function DashboardPage() {
                 <CheckCircle className="h-6 w-6 text-green-500" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-green-500">{stats.sincronizados}</p>
-                <p className="text-sm text-muted-foreground">Sincronizados</p>
+                <p className="text-3xl font-bold text-green-500">{serverStats?.total ?? stats.sincronizados}</p>
+                <p className="text-sm text-muted-foreground">En servidor</p>
               </div>
             </CardContent>
           </Card>
@@ -369,7 +364,7 @@ export default function DashboardPage() {
                               {nombreProductor}
                             </p>
                             <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
-                              {item.estado === 'SINCRONIZADO' ? 'Sincronizado' : item.estado}
+                              {(item.estado || '').toUpperCase() === 'SINCRONIZADO' ? 'Sincronizado' : (item.estado || 'Sincronizado')}
                             </Badge>
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
