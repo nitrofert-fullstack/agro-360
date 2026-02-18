@@ -15,6 +15,7 @@ import { exportToJSON } from "@/lib/db/indexed-db"
 export default function ExitoPage() {
   const searchParams = useSearchParams()
   const radicado = searchParams.get("radicado")
+  const synced = searchParams.get("synced") === "1"
   const { isAuthenticated } = useAuth()
   const { isOnline } = useOnlineStatus()
   const handleDownloadBackup = async () => {
@@ -91,21 +92,30 @@ export default function ExitoPage() {
               <Alert>
                 <Cloud className="h-4 w-4" />
                 <AlertDescription>
-                  Estas sin conexion. El formulario esta guardado localmente y se sincronizara cuando tengas internet.
+                  Estas sin conexion. Tu formulario esta guardado localmente y se enviara al servidor automaticamente cuando recuperes internet.
                 </AlertDescription>
               </Alert>
             )}
 
-            {isOnline && !isAuthenticated && (
-              <Alert className="border-blue-500/20 bg-blue-500/5">
-                <CheckCircle className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-700 dark:text-blue-400">
-                  Tu registro esta guardado. Un asesor lo enviara al servidor y sera revisado por el equipo tecnico.
+            {isOnline && synced && (
+              <Alert className="border-green-500/20 bg-green-500/10">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-700 dark:text-green-400">
+                  Tu registro fue enviado al servidor exitosamente. El equipo tecnico lo revisara pronto.
                 </AlertDescription>
               </Alert>
             )}
 
-            {isOnline && isAuthenticated && (
+            {isOnline && !synced && !isAuthenticated && (
+              <Alert className="border-yellow-500/20 bg-yellow-500/5">
+                <Cloud className="h-4 w-4 text-yellow-600" />
+                <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+                  Tu registro esta guardado localmente. Se intentara enviar al servidor automaticamente en breve.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {isOnline && isAuthenticated && !synced && (
               <Alert className="border-green-500/20 bg-green-500/10">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-700 dark:text-green-400">
@@ -138,11 +148,11 @@ export default function ExitoPage() {
             <div className="rounded-lg bg-muted/50 p-4 text-left">
               <h4 className="mb-2 font-medium">Proximos pasos:</h4>
               <ul className="space-y-1 text-sm text-muted-foreground">
-                <li>1. El asesor sincronizara tu registro con el servidor</li>
+                <li>1. Tu registro se envia automaticamente al servidor cuando hay internet</li>
                 <li>2. Un tecnico revisara y aprobara tu solicitud</li>
-                <li>3. Cuando sea aprobada, recibiras tus credenciales por correo</li>
-                <li>4. Con ellas podras ingresar y ver el estado de tu predio</li>
-                <li>5. Mientras tanto, consulta por tu numero de documento</li>
+                <li>3. Si proporcionaste correo, recibiras una confirmacion por email</li>
+                <li>4. Cuando sea aprobada, recibiras tus credenciales de acceso</li>
+                <li>5. Mientras tanto, consulta el estado por tu numero de documento</li>
               </ul>
             </div>
           </CardContent>

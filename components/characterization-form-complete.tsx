@@ -12,7 +12,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { LocationPicker } from "./location-picker"
 import { SignaturePad } from "./signature-pad"
 import { PhotoUpload } from "./photo-upload"
-import { saveCaracterizacion } from "@/lib/db/indexed-db"
+import { saveCaracterizacion, updateCaracterizacion } from "@/lib/db/indexed-db"
+import { useOnlineStatus } from "@/hooks/use-online-status"
 import {
   User,
   MapPin,
@@ -314,6 +315,7 @@ export function CharacterizationFormComplete() {
   const router = useRouter()
   const { user, profile, isAuthenticated } = useAuth()
   const isAsesor = isAuthenticated && (profile?.rol === 'asesor' || profile?.rol === 'admin')
+  const { isOnline } = useOnlineStatus()
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -656,11 +658,39 @@ export function CharacterizationFormComplete() {
       }
       
       const saved = await saveCaracterizacion(dataToSave)
+
+      // Si está online y no es un asesor autenticado, sincronizar automáticamente
+      let syncedPublic = false
+      if (isOnline && !isAsesor) {
+        try {
+          const response = await fetch('/api/sync-public', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ caracterizaciones: [saved] }),
+          })
+          if (response.ok) {
+            const data = await response.json()
+            const resultado = data.resultados?.[0]
+            if (resultado?.estado === 'SINCRONIZADO' && saved.id) {
+              await updateCaracterizacion(saved.id, {
+                estado: 'SINCRONIZADO',
+                radicadoOficial: resultado.radicadoOficial,
+                fechaSincronizacion: new Date().toISOString(),
+              })
+              syncedPublic = true
+            }
+          }
+        } catch {
+          // Silently fail — el registro ya está en IndexedDB
+          console.warn('[Form] Auto-sync público falló, el registro queda pendiente')
+        }
+      }
+
       toast.success("Caracterizacion guardada exitosamente", {
-        description: `Radicado: ${saved.radicadoLocal}`,
+        description: syncedPublic ? "Enviado al servidor correctamente" : `Guardado localmente: ${saved.radicadoLocal}`,
         duration: 4000,
       })
-      router.push(`/exito?radicado=${saved.radicadoLocal}`)
+      router.push(`/exito?radicado=${saved.radicadoLocal}&synced=${syncedPublic ? '1' : '0'}`)
     } catch (error) {
       console.error("Error saving:", error)
       toast.error("Error al guardar el formulario", {

@@ -103,6 +103,148 @@ export function buildCredentialsEmail({
   `.trim()
 }
 
+export function buildConfirmacionRegistroEmail({
+  nombreCompleto,
+  radicadoOficial,
+  numeroDocumento,
+  nombrePredio,
+  appUrl,
+}: {
+  nombreCompleto: string
+  radicadoOficial: string
+  numeroDocumento: string
+  nombrePredio: string
+  appUrl: string
+}): string {
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
+    <div style="background:#16a34a;padding:24px;text-align:center">
+      <h1 style="color:#fff;margin:0;font-size:22px">Agro360</h1>
+      <p style="color:#d1fae5;margin:6px 0 0;font-size:14px">Registro Recibido</p>
+    </div>
+    <div style="padding:28px 32px">
+      <h2 style="color:#1a1a1a;font-size:18px;margin:0 0 8px">Hola, ${nombreCompleto}</h2>
+      <p style="color:#555;font-size:14px;margin:0 0 16px">
+        Tu solicitud de caracterización agropecuaria fue recibida exitosamente. Un asesor técnico la revisará en los próximos días.
+      </p>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:16px;margin-bottom:20px">
+        <p style="color:#15803d;font-weight:600;margin:0 0 8px;font-size:14px">Datos de tu registro:</p>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <tr>
+            <td style="color:#6b7280;padding:4px 0;width:160px">Número de radicado:</td>
+            <td style="color:#111827;font-weight:600;font-family:monospace">${radicadoOficial}</td>
+          </tr>
+          <tr>
+            <td style="color:#6b7280;padding:4px 0">Número de documento:</td>
+            <td style="color:#111827;font-weight:600">${numeroDocumento}</td>
+          </tr>
+          <tr>
+            <td style="color:#6b7280;padding:4px 0">Predio:</td>
+            <td style="color:#111827">${nombrePredio}</td>
+          </tr>
+        </table>
+      </div>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:14px;margin-bottom:20px">
+        <p style="color:#1d4ed8;font-size:13px;margin:0">
+          <strong>¿Cómo consultar el estado?</strong><br>
+          Puedes revisar el estado de tu solicitud en el portal usando tu número de documento: <strong>${numeroDocumento}</strong>
+        </p>
+      </div>
+      <a href="${appUrl}/consultar" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-size:15px;font-weight:600">
+        Consultar mi solicitud
+      </a>
+    </div>
+    <div style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb">
+      <p style="color:#9ca3af;font-size:12px;margin:0">
+        Si no realizaste este registro, por favor ignora este correo o contacta a tu asesor agropecuario.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim()
+}
+
+export function buildNuevoRegistroEmail({
+  nombreProductor,
+  numeroDocumento,
+  nombrePredio,
+  municipio,
+  radicadoOficial,
+  fechaRegistro,
+  appUrl,
+}: {
+  nombreProductor: string
+  numeroDocumento: string
+  nombrePredio: string
+  municipio: string
+  radicadoOficial: string
+  fechaRegistro: string
+  appUrl: string
+}): string {
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
+    <div style="background:#1d4ed8;padding:24px;text-align:center">
+      <h1 style="color:#fff;margin:0;font-size:22px">Agro360</h1>
+      <p style="color:#bfdbfe;margin:6px 0 0;font-size:14px">Nuevo Registro — Revisión Pendiente</p>
+    </div>
+    <div style="padding:28px 32px">
+      <h2 style="color:#1a1a1a;font-size:18px;margin:0 0 8px">Nuevo registro recibido</h2>
+      <p style="color:#555;font-size:14px;margin:0 0 16px">
+        Se ha registrado una nueva caracterización agropecuaria a través del formulario público. Ingresa al panel de administración para revisarla.
+      </p>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:16px;margin-bottom:20px">
+        <p style="color:#1e40af;font-weight:600;margin:0 0 8px;font-size:14px">Datos del registro:</p>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <tr>
+            <td style="color:#6b7280;padding:4px 0;width:160px">Productor:</td>
+            <td style="color:#111827;font-weight:600">${nombreProductor}</td>
+          </tr>
+          <tr>
+            <td style="color:#6b7280;padding:4px 0">Documento:</td>
+            <td style="color:#111827">${numeroDocumento}</td>
+          </tr>
+          <tr>
+            <td style="color:#6b7280;padding:4px 0">Predio:</td>
+            <td style="color:#111827">${nombrePredio}</td>
+          </tr>
+          <tr>
+            <td style="color:#6b7280;padding:4px 0">Municipio:</td>
+            <td style="color:#111827">${municipio}</td>
+          </tr>
+          <tr>
+            <td style="color:#6b7280;padding:4px 0">Radicado:</td>
+            <td style="color:#111827;font-family:monospace;font-weight:600">${radicadoOficial}</td>
+          </tr>
+          <tr>
+            <td style="color:#6b7280;padding:4px 0">Fecha:</td>
+            <td style="color:#111827">${fechaRegistro}</td>
+          </tr>
+        </table>
+      </div>
+      <a href="${appUrl}/admin" style="display:inline-block;background:#1d4ed8;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-size:15px;font-weight:600">
+        Revisar en el panel
+      </a>
+    </div>
+    <div style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb">
+      <p style="color:#9ca3af;font-size:12px;margin:0">
+        Este mensaje fue generado automáticamente por el sistema Agro360.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim()
+}
+
 export function buildSyncNotificationEmail({
   nombreCompleto,
   email,
