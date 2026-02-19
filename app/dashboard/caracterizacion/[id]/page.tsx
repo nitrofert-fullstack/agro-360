@@ -55,6 +55,20 @@ const MapViewer = dynamic(
   }
 )
 
+const PredioInsights = dynamic(
+  () => import("@/components/predio-insights").then((mod) => mod.PredioInsights),
+  { ssr: false }
+)
+
+function parsePoligono(raw: any): [number, number][] | undefined {
+  if (!raw) return undefined
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (Array.isArray(parsed) && parsed.length >= 3) return parsed as [number, number][]
+  } catch {}
+  return undefined
+}
+
 interface ServerData {
   visita: any
   caracterizacion: any
@@ -458,7 +472,14 @@ function ServerDetailView({
   const { visita, caracterizacion, beneficiario, predio, caracterizacionPredio, abastecimientoAgua, riesgosPredio, areaProductiva, infoFinanciera } = data
 
   const nombre = beneficiario
-    ? `${beneficiario.nombres || ""} ${beneficiario.apellidos || ""}`.trim()
+    ? [
+        beneficiario.primer_nombre,
+        beneficiario.segundo_nombre,
+        beneficiario.primer_apellido,
+        beneficiario.segundo_apellido,
+      ]
+        .filter(Boolean)
+        .join(" ") || "Sin nombre"
     : "Sin nombre"
 
   const lat = predio?.latitud ? parseFloat(predio.latitud) : null
@@ -568,10 +589,23 @@ function ServerDetailView({
                   initialCenter={[lat!, lng!]}
                   initialZoom={14}
                   markerPosition={[lat!, lng!]}
+                  polygonCoords={parsePoligono(predio?.poligono)}
                 />
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Insights: clima + NDVI */}
+        {hasCoords && (
+          <div className="mb-6">
+            <PredioInsights
+              lat={lat!}
+              lng={lng!}
+              areaTotalHa={predio?.area_total_hectareas}
+              areaProductivaHa={predio?.area_productiva_hectareas}
+            />
+          </div>
         )}
 
         {/* Status Management - for asesor/admin */}
@@ -889,10 +923,27 @@ function LocalDetailView({
             </CardHeader>
             <CardContent className="p-0 pb-0">
               <div className="h-[500px] md:h-[600px]">
-                <MapViewer initialCenter={[lat!, lng!]} initialZoom={14} markerPosition={[lat!, lng!]} />
+                <MapViewer
+                  initialCenter={[lat!, lng!]}
+                  initialZoom={14}
+                  markerPosition={[lat!, lng!]}
+                  polygonCoords={parsePoligono(data.predio?.poligono)}
+                />
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Insights: clima + NDVI */}
+        {hasCoords && (
+          <div className="mb-6">
+            <PredioInsights
+              lat={lat!}
+              lng={lng!}
+              areaTotalHa={data.predio?.areaTotalHectareas}
+              areaProductivaHa={data.predio?.areaProductivaHectareas}
+            />
+          </div>
         )}
 
         <div className="grid gap-6 lg:grid-cols-2">

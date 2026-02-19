@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { LocationPicker } from "./location-picker"
 import { SignaturePad } from "./signature-pad"
 import { PhotoUpload } from "./photo-upload"
-import { saveCaracterizacion, updateCaracterizacion } from "@/lib/db/indexed-db"
+import { saveCaracterizacion, exportToJSON, generateRadicadoLocal } from "@/lib/db/indexed-db"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import {
   User,
@@ -31,8 +31,13 @@ import {
   Camera,
   FileSignature,
   Lock,
-  Info
+  Info,
+  CheckCircle,
+  Cloud,
+  Download,
+  Plus,
 } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ThemeToggle } from "./theme-toggle"
 import { ConnectionStatus } from "./connection-status"
 import { SyncButton } from "./sync-button"
@@ -89,6 +94,7 @@ interface FormData {
     apellidos: string
     tipoDocumento: string
     numeroDocumento: string
+    fechaNacimiento: string
     edad: number | null
     telefono: string
     correo: string
@@ -200,6 +206,7 @@ const initialFormData: FormData = {
     apellidos: "",
     tipoDocumento: "CC",
     numeroDocumento: "",
+    fechaNacimiento: "",
     edad: null,
     telefono: "",
     correo: "",
@@ -311,6 +318,23 @@ const validateDocument = (doc: string): boolean => {
   return re.test(doc.replace(/\s/g, ''))
 }
 
+const calcularEdad = (fechaNacimiento: string): number | null => {
+  if (!fechaNacimiento) return null
+  const dob = new Date(fechaNacimiento)
+  if (isNaN(dob.getTime())) return null
+  const today = new Date()
+  const age = Math.floor((today.getTime() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+  return age >= 0 && age <= 120 ? age : null
+}
+
+// Bloquea caracteres no numéricos en campos de solo dígitos
+const soloNumeros = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const permitidos = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter', 'Home', 'End']
+  if (!permitidos.includes(e.key) && !/^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault()
+  }
+}
+
 export function CharacterizationFormComplete() {
   const router = useRouter()
   const { user, profile, isAuthenticated } = useAuth()
@@ -321,6 +345,8 @@ export function CharacterizationFormComplete() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<ValidationErrors>({})
   const [showErrors, setShowErrors] = useState(false)
+  const [submittedData, setSubmittedData] = useState<{ radicado: string; sincronizado: boolean } | null>(null)
+  const [edadManual, setEdadManual] = useState(false)
 
   // Auto-llenar nombre del técnico si el usuario autenticado es asesor o admin
   useEffect(() => {
@@ -334,6 +360,18 @@ export function CharacterizationFormComplete() {
       }))
     }
   }, [isAsesor, profile?.nombre_completo])
+
+  // Auto-calcular edad desde la fecha de nacimiento (solo si el usuario no la editó manualmente)
+  useEffect(() => {
+    if (edadManual) return
+    const edad = calcularEdad(formData.beneficiario.fechaNacimiento)
+    if (edad !== null) {
+      setFormData(prev => ({
+        ...prev,
+        beneficiario: { ...prev.beneficiario, edad },
+      }))
+    }
+  }, [formData.beneficiario.fechaNacimiento, edadManual])
 
   // Helper para actualizar campos anidados
   const updateField = (section: keyof FormData, field: string, value: unknown) => {
@@ -483,6 +521,15 @@ export function CharacterizationFormComplete() {
 
   // Enviar formulario
   const handleSubmit = async () => {
+    // Solo asesores autenticados pueden guardar
+    if (!isAsesor) {
+      toast.error("Debes iniciar sesión como asesor para guardar", {
+        description: "Inicia sesión con tu cuenta de asesor y vuelve a intentarlo",
+      })
+      router.push(`/auth/login?redirectTo=/formulario`)
+      return
+    }
+
     // Validar TODOS los pasos antes de guardar
     const validation = validateAllSteps()
     if (!validation.valid) {
@@ -657,40 +704,46 @@ export function CharacterizationFormComplete() {
         },
       }
       
-      const saved = await saveCaracterizacion(dataToSave)
-
-      // Si está online y no es un asesor autenticado, sincronizar automáticamente
-      let syncedPublic = false
-      if (isOnline && !isAsesor) {
+      // Online-first: intentar enviar directo al servidor
+      if (isOnline) {
         try {
-          const response = await fetch('/api/sync-public', {
+          const tempRadicado = generateRadicadoLocal()
+          const payload = {
+            ...dataToSave,
+            radicadoLocal: tempRadicado,
+            estado: 'PENDIENTE_SINCRONIZACION',
+            fechaRegistro: new Date().toISOString(),
+            fechaActualizacion: new Date().toISOString(),
+            intentosSincronizacion: 0,
+          }
+          const res = await fetch('/api/sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ caracterizaciones: [saved] }),
+            body: JSON.stringify({ caracterizaciones: [payload] }),
           })
-          if (response.ok) {
-            const data = await response.json()
-            const resultado = data.resultados?.[0]
-            if (resultado?.estado === 'SINCRONIZADO' && saved.id) {
-              await updateCaracterizacion(saved.id, {
-                estado: 'SINCRONIZADO',
-                radicadoOficial: resultado.radicadoOficial,
-                fechaSincronizacion: new Date().toISOString(),
-              })
-              syncedPublic = true
-            }
+          if (res.ok) {
+            const result = await res.json()
+            const radicadoOficial = result.resultados?.[0]?.radicadoOficial || tempRadicado
+            toast.success("Caracterizacion guardada y sincronizada", {
+              description: `Radicado oficial: ${radicadoOficial}`,
+              duration: 5000,
+            })
+            setSubmittedData({ radicado: radicadoOficial, sincronizado: true })
+            return
           }
+          // Si el servidor falla, caer al offline
         } catch {
-          // Silently fail — el registro ya está en IndexedDB
-          console.warn('[Form] Auto-sync público falló, el registro queda pendiente')
+          // Ignorar error de red y guardar offline
         }
       }
 
+      // Offline fallback
+      const saved = await saveCaracterizacion(dataToSave)
       toast.success("Caracterizacion guardada exitosamente", {
-        description: syncedPublic ? "Enviado al servidor correctamente" : `Guardado localmente: ${saved.radicadoLocal}`,
+        description: "Guardada sin conexión. Se sincronizará cuando uses el botón de sincronizar con internet.",
         duration: 4000,
       })
-      router.push(`/exito?radicado=${saved.radicadoLocal}&synced=${syncedPublic ? '1' : '0'}`)
+      setSubmittedData({ radicado: saved.radicadoLocal, sincronizado: false })
     } catch (error) {
       console.error("Error saving:", error)
       toast.error("Error al guardar el formulario", {
@@ -849,7 +902,7 @@ export function CharacterizationFormComplete() {
                   {errors['beneficiario.apellidos'] && <p className="text-sm text-red-500">{errors['beneficiario.apellidos']}</p>}
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="tipoDocumento">Tipo Documento <span className="text-red-500">*</span></Label>
                   <Select
@@ -873,49 +926,93 @@ export function CharacterizationFormComplete() {
                   <Label htmlFor="numeroDocumento">Numero Documento <span className="text-red-500">*</span></Label>
                   <Input
                     id="numeroDocumento"
+                    inputMode="numeric"
                     value={formData.beneficiario.numeroDocumento}
-                    onChange={(e) => updateField("beneficiario", "numeroDocumento", e.target.value)}
-                    placeholder="Numero de documento"
+                    onChange={(e) => updateField("beneficiario", "numeroDocumento", e.target.value.replace(/\D/g, ''))}
+                    onKeyDown={soloNumeros}
+                    placeholder="Solo digitos (6-12 digitos)"
                     className={`h-11 ${errors['beneficiario.numeroDocumento'] ? 'border-red-500' : ''}`}
                   />
                   {errors['beneficiario.numeroDocumento'] && <p className="text-sm text-red-500">{errors['beneficiario.numeroDocumento']}</p>}
                 </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="edad">Edad</Label>
+                  <Label htmlFor="fechaNacimiento">Fecha de Nacimiento</Label>
+                  <Input
+                    id="fechaNacimiento"
+                    type="date"
+                    max={new Date().toISOString().split('T')[0]}
+                    value={formData.beneficiario.fechaNacimiento}
+                    onChange={(e) => updateField("beneficiario", "fechaNacimiento", e.target.value)}
+                    className="h-11"
+                  />
+                  <p className="text-xs text-muted-foreground">Calcula la edad automaticamente</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edad">Edad (años)</Label>
                   <Input
                     id="edad"
                     type="number"
+                    inputMode="numeric"
                     min="0"
                     max="120"
-                    value={formData.beneficiario.edad || ""}
-                    onChange={(e) => updateField("beneficiario", "edad", e.target.value ? parseInt(e.target.value) : null)}
+                    value={formData.beneficiario.edad ?? ""}
+                    onChange={(e) => {
+                      setEdadManual(true)
+                      updateField("beneficiario", "edad", e.target.value ? parseInt(e.target.value) : null)
+                    }}
+                    onKeyDown={soloNumeros}
                     placeholder="Anos"
                     className="h-11"
                   />
+                  {formData.beneficiario.fechaNacimiento && !edadManual && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Info className="h-3 w-3" />
+                      Calculada desde la fecha de nacimiento. Puedes editarla.
+                    </p>
+                  )}
+                  {edadManual && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEdadManual(false)
+                        const edad = calcularEdad(formData.beneficiario.fechaNacimiento)
+                        if (edad !== null) updateField("beneficiario", "edad", edad)
+                      }}
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                    >
+                      Recalcular desde fecha de nacimiento
+                    </button>
+                  )}
                 </div>
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="telefono">Telefono <span className="text-red-500">*</span></Label>
                   <Input
                     id="telefono"
+                    inputMode="numeric"
                     value={formData.beneficiario.telefono}
-                    onChange={(e) => updateField("beneficiario", "telefono", e.target.value)}
-                    placeholder="Numero de contacto (7-10 digitos)"
+                    onChange={(e) => updateField("beneficiario", "telefono", e.target.value.replace(/\D/g, ''))}
+                    onKeyDown={soloNumeros}
+                    placeholder="7-10 digitos"
                     className={`h-11 ${errors['beneficiario.telefono'] ? 'border-red-500' : ''}`}
                   />
                   {errors['beneficiario.telefono'] && <p className="text-sm text-red-500">{errors['beneficiario.telefono']}</p>}
                 </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="correo">Correo Electronico</Label>
                   <Input
                     id="correo"
                     type="email"
+                    inputMode="email"
                     value={formData.beneficiario.correo}
                     onChange={(e) => updateField("beneficiario", "correo", e.target.value)}
                     placeholder="correo@ejemplo.com"
-                    className="h-11"
+                    className={`h-11 ${errors['beneficiario.correo'] ? 'border-red-500' : ''}`}
                   />
+                  {errors['beneficiario.correo'] && <p className="text-sm text-red-500">{errors['beneficiario.correo']}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ocupacionPrincipal">Ocupación Principal</Label>
@@ -1076,6 +1173,8 @@ export function CharacterizationFormComplete() {
                   <Input
                     id="areaTotalHectareas"
                     type="number"
+                    inputMode="decimal"
+                    min="0"
                     step="0.01"
                     value={formData.predio.areaTotalHectareas || ""}
                     onChange={(e) => updateField("predio", "areaTotalHectareas", e.target.value ? parseFloat(e.target.value) : null)}
@@ -1088,6 +1187,8 @@ export function CharacterizationFormComplete() {
                   <Input
                     id="areaProductivaHectareas"
                     type="number"
+                    inputMode="decimal"
+                    min="0"
                     step="0.01"
                     value={formData.predio.areaProductivaHectareas || ""}
                     onChange={(e) => updateField("predio", "areaProductivaHectareas", e.target.value ? parseFloat(e.target.value) : null)}
@@ -1100,6 +1201,8 @@ export function CharacterizationFormComplete() {
                   <Input
                     id="altitudMsnm"
                     type="number"
+                    inputMode="numeric"
+                    min="0"
                     value={formData.predio.altitudMsnm || ""}
                     onChange={(e) => updateField("predio", "altitudMsnm", e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="Metros sobre nivel del mar"
@@ -1212,6 +1315,8 @@ export function CharacterizationFormComplete() {
                   <Input
                     id="distanciaKm"
                     type="number"
+                    inputMode="decimal"
+                    min="0"
                     step="0.1"
                     value={formData.caracterizacion.distanciaKm || ""}
                     onChange={(e) => updateField("caracterizacion", "distanciaKm", e.target.value ? parseFloat(e.target.value) : null)}
@@ -1234,6 +1339,7 @@ export function CharacterizationFormComplete() {
                   <Input
                     id="temperaturaCelsius"
                     type="number"
+                    inputMode="decimal"
                     step="0.1"
                     value={formData.caracterizacion.temperaturaCelsius || ""}
                     onChange={(e) => updateField("caracterizacion", "temperaturaCelsius", e.target.value ? parseFloat(e.target.value) : null)}
@@ -1546,6 +1652,8 @@ export function CharacterizationFormComplete() {
                   <Input
                     id="ingresoMensualVentas"
                     type="number"
+                    inputMode="numeric"
+                    min="0"
                     value={formData.areaProductiva.ingresoMensualVentas || ""}
                     onChange={(e) => updateField("areaProductiva", "ingresoMensualVentas", e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="Pesos colombianos"
@@ -1618,6 +1726,8 @@ export function CharacterizationFormComplete() {
                   <Input
                     id="ingresosMensualesAgropecuaria"
                     type="number"
+                    inputMode="numeric"
+                    min="0"
                     value={formData.infoFinanciera.ingresosMensualesAgropecuaria || ""}
                     onChange={(e) => updateField("infoFinanciera", "ingresosMensualesAgropecuaria", e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="Mensuales"
@@ -1629,6 +1739,8 @@ export function CharacterizationFormComplete() {
                   <Input
                     id="ingresosMensualesOtros"
                     type="number"
+                    inputMode="numeric"
+                    min="0"
                     value={formData.infoFinanciera.ingresosMensualesOtros || ""}
                     onChange={(e) => updateField("infoFinanciera", "ingresosMensualesOtros", e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="Mensuales"
@@ -1640,6 +1752,8 @@ export function CharacterizationFormComplete() {
                   <Input
                     id="egresosMensuales"
                     type="number"
+                    inputMode="numeric"
+                    min="0"
                     value={formData.infoFinanciera.egresosMensuales || ""}
                     onChange={(e) => updateField("infoFinanciera", "egresosMensuales", e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="Mensuales"
@@ -1653,6 +1767,8 @@ export function CharacterizationFormComplete() {
                   <Input
                     id="activosTotales"
                     type="number"
+                    inputMode="numeric"
+                    min="0"
                     value={formData.infoFinanciera.activosTotales || ""}
                     onChange={(e) => updateField("infoFinanciera", "activosTotales", e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="Total de activos"
@@ -1664,6 +1780,8 @@ export function CharacterizationFormComplete() {
                   <Input
                     id="activosAgropecuaria"
                     type="number"
+                    inputMode="numeric"
+                    min="0"
                     value={formData.infoFinanciera.activosAgropecuaria || ""}
                     onChange={(e) => updateField("infoFinanciera", "activosAgropecuaria", e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="Activos agropecuarios"
@@ -1675,6 +1793,8 @@ export function CharacterizationFormComplete() {
                   <Input
                     id="pasivosTotales"
                     type="number"
+                    inputMode="numeric"
+                    min="0"
                     value={formData.infoFinanciera.pasivosTotales || ""}
                     onChange={(e) => updateField("infoFinanciera", "pasivosTotales", e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="Total de deudas"
@@ -1869,6 +1989,109 @@ export function CharacterizationFormComplete() {
     }
   }
 
+  // Pantalla de éxito — renderizada inline (funciona sin conexión)
+  if (submittedData) {
+    const handleDownloadBackup = async () => {
+      try {
+        const jsonString = await exportToJSON()
+        const blob = new Blob([jsonString], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `backup-Agro360-${new Date().toISOString().split('T')[0]}.json`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } catch (err) {
+        console.error('Error creating backup:', err)
+      }
+    }
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+        <header className="border-b border-border bg-card/80 backdrop-blur-md">
+          <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                <Sprout className="h-5 w-5 text-primary" />
+              </div>
+              <span className="text-lg font-semibold">Agro360</span>
+            </Link>
+            <div className="flex items-center gap-3">
+              <ConnectionStatus />
+              <SyncButton variant="compact" />
+            </div>
+          </div>
+        </header>
+        <main className="mx-auto max-w-2xl px-4 py-12">
+          <Card className="text-center">
+            <CardHeader className="pb-4">
+              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10">
+                <CheckCircle className="h-10 w-10 text-green-500" />
+              </div>
+              <CardTitle className="text-2xl">
+                {submittedData.sincronizado ? "¡Sincronizado!" : "Caracterizacion Guardada"}
+              </CardTitle>
+              <CardDescription>
+                {submittedData.sincronizado
+                  ? "El formulario se guardó y sincronizó correctamente con el servidor"
+                  : "El formulario se guardó en tu dispositivo"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
+                <p className="mb-1 text-xs text-muted-foreground">
+                  {submittedData.sincronizado ? "Radicado oficial" : "Referencia local"}
+                </p>
+                <code className="font-mono text-xs text-muted-foreground">{submittedData.radicado}</code>
+              </div>
+
+              {submittedData.sincronizado ? (
+                <Alert className="border-green-500/20 bg-green-500/5">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-foreground">
+                    Registro sincronizado con el servidor. El radicado oficial ya está disponible en el sistema.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <Alert>
+                  <Cloud className="h-4 w-4" />
+                  <AlertDescription>
+                    Sin conexión. El registro está guardado localmente y se sincronizará cuando uses el botón de sincronizar con internet.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-center">
+                <button
+                  onClick={() => { setSubmittedData(null); setFormData(initialFormData); setCurrentStep(1) }}
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nuevo Formulario
+                </button>
+                <button
+                  onClick={handleDownloadBackup}
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted/50"
+                >
+                  <Download className="h-4 w-4" />
+                  Descargar Respaldo
+                </button>
+                <Link
+                  href="/dashboard"
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted/50"
+                >
+                  <Home className="h-4 w-4" />
+                  Dashboard
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       {/* Header */}
@@ -1949,16 +2172,16 @@ export function CharacterizationFormComplete() {
 
       {/* Content */}
       <main className="mx-auto max-w-5xl px-4 py-6">
-        {/* Banner informativo para usuarios no autenticados */}
+        {/* Banner: login requerido para guardar */}
         {!isAuthenticated && (
-          <div className="mb-4 flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800/60 dark:bg-blue-900/20 dark:text-blue-300">
-            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800/60 dark:bg-amber-900/20 dark:text-amber-300">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              Este formulario es público y puede diligenciarse sin iniciar sesión. Si eres asesor técnico,{" "}
+              Puedes diligenciar el formulario, pero{" "}
+              <strong>debes iniciar sesión como asesor para guardarlo</strong>.{" "}
               <Link href="/auth/login?redirectTo=/formulario" className="font-semibold underline underline-offset-2 hover:no-underline">
-                inicia sesión
-              </Link>{" "}
-              para que tu nombre se complete automáticamente.
+                Iniciar sesión
+              </Link>
             </span>
           </div>
         )}
