@@ -472,14 +472,7 @@ function ServerDetailView({
   const { visita, caracterizacion, beneficiario, predio, caracterizacionPredio, abastecimientoAgua, riesgosPredio, areaProductiva, infoFinanciera } = data
 
   const nombre = beneficiario
-    ? [
-        beneficiario.primer_nombre,
-        beneficiario.segundo_nombre,
-        beneficiario.primer_apellido,
-        beneficiario.segundo_apellido,
-      ]
-        .filter(Boolean)
-        .join(" ") || "Sin nombre"
+    ? `${beneficiario.nombres || ''} ${beneficiario.apellidos || ''}`.trim() || "Sin nombre"
     : "Sin nombre"
 
   const lat = predio?.latitud ? parseFloat(predio.latitud) : null
