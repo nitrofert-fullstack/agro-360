@@ -644,6 +644,16 @@ export function MapViewer({
         markerLayersRef.current.push(marker)
       }
     })
+
+    // Ajustar zoom para mostrar todos los predios (solo cuando no hay centro forzado)
+    if (!initialCenter) {
+      const allPositions = markers.map(m => m.position)
+      if (allPositions.length === 1) {
+        map.setView(allPositions[0], 13)
+      } else {
+        map.fitBounds(Lf.latLngBounds(allPositions), { padding: [60, 60], maxZoom: 14 })
+      }
+    }
   }, [markers, isMapReady])
 
   // Handle drawing
