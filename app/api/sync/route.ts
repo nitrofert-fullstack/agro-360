@@ -133,6 +133,27 @@ export async function POST(request: Request) {
           throw new Error('Número de documento del beneficiario es requerido')
         }
 
+        // === 0. IDEMPOTENCIA: verificar si este radicadoLocal ya fue sincronizado ===
+        // Esto ocurre cuando la red cae después de que el servidor insertó pero antes
+        // de que el cliente recibiera la respuesta. El formulario queda PENDIENTE en
+        // IndexedDB y en el siguiente intento causaría duplicate key en visitas.
+        const { data: visitaExistente } = await supabase
+          .from('visitas')
+          .select('id, radicado_oficial')
+          .eq('radicado_local', c.radicadoLocal)
+          .maybeSingle()
+
+        if (visitaExistente) {
+          console.log(`[Sync] ${c.radicadoLocal} ya existe en BD, retornando como sincronizado`)
+          results.push({
+            radicadoLocal: c.radicadoLocal,
+            radicadoOficial: visitaExistente.radicado_oficial,
+            estado: 'SINCRONIZADO',
+            mensaje: 'Ya estaba sincronizado previamente',
+          })
+          continue
+        }
+
         const radicadoOficial = generateRadicadoOficial()
 
         // === 1. BENEFICIARIO (tabla: beneficiarios) ===
@@ -299,21 +320,38 @@ export async function POST(request: Request) {
         }
 
         // === 7. INFORMACION FINANCIERA (tabla: informacion_financiera) ===
+        // Upsert por id_beneficiario para evitar duplicate key si el mismo productor
+        // aparece en dos formularios que se sincronizan juntos.
         if (c.infoFinanciera) {
-          const { error: finErr } = await supabase
-            .from('informacion_financiera')
-            .insert({
-              id_beneficiario: beneficiarioId,
-              ingresos_mensuales_agropecuaria: c.infoFinanciera.ingresosMensualesAgropecuaria ?? null,
-              ingresos_mensuales_otros: c.infoFinanciera.ingresosMensualesOtros ?? null,
-              egresos_mensuales: c.infoFinanciera.egresosMensuales ?? null,
-              activos_totales: c.infoFinanciera.activosTotales ?? null,
-              activos_agropecuaria: c.infoFinanciera.activosAgropecuaria ?? null,
-              pasivos_totales: c.infoFinanciera.pasivosTotales ?? null,
-            })
+          const finData = {
+            ingresos_mensuales_agropecuaria: c.infoFinanciera.ingresosMensualesAgropecuaria ?? null,
+            ingresos_mensuales_otros: c.infoFinanciera.ingresosMensualesOtros ?? null,
+            egresos_mensuales: c.infoFinanciera.egresosMensuales ?? null,
+            activos_totales: c.infoFinanciera.activosTotales ?? null,
+            activos_agropecuaria: c.infoFinanciera.activosAgropecuaria ?? null,
+            pasivos_totales: c.infoFinanciera.pasivosTotales ?? null,
+          }
 
-          if (finErr) throw new Error(`Error creando información financiera: ${finErr.message}`)
-          console.log(`[Sync] Información financiera creada para beneficiario: ${beneficiarioId}`)
+          const { data: existingFin } = await supabase
+            .from('informacion_financiera')
+            .select('id')
+            .eq('id_beneficiario', beneficiarioId)
+            .maybeSingle()
+
+          if (existingFin) {
+            const { error: finErr } = await supabase
+              .from('informacion_financiera')
+              .update(finData)
+              .eq('id', existingFin.id)
+            if (finErr) throw new Error(`Error actualizando información financiera: ${finErr.message}`)
+            console.log(`[Sync] Información financiera actualizada para beneficiario: ${beneficiarioId}`)
+          } else {
+            const { error: finErr } = await supabase
+              .from('informacion_financiera')
+              .insert({ id_beneficiario: beneficiarioId, ...finData })
+            if (finErr) throw new Error(`Error creando información financiera: ${finErr.message}`)
+            console.log(`[Sync] Información financiera creada para beneficiario: ${beneficiarioId}`)
+          }
         }
 
         // === 8. VISITA (tabla: visitas) ===

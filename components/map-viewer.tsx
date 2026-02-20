@@ -37,6 +37,38 @@ export interface MapMarker {
   popupContent: string
   id?: string
   polygonCoords?: [number, number][]
+  name?: string
+}
+
+interface NDVIRecord {
+  dt: number
+  source: string
+  dc: number
+  cl: number
+  data: {
+    mean: number
+    median: number
+    min: number
+    max: number
+    std: number
+    p25: number
+    p75: number
+    num: number
+  }
+}
+
+interface ModisNdvi {
+  ndvi: number
+  interpretacion: string
+  color: string
+  fecha: string
+}
+
+interface SelectedPredio {
+  id: string
+  name: string
+  coords: [number, number][]
+  position: [number, number]
 }
 
 interface MapViewerProps {
@@ -134,6 +166,17 @@ function remapNDVIColors(imageData: ImageData): void {
   }
 }
 
+function ndviColor(v: number): string {
+  if (v < 0)    return '#1565C0'
+  if (v < 0.1)  return '#8B0000'
+  if (v < 0.2)  return '#d32f2f'
+  if (v < 0.3)  return '#ff7043'
+  if (v < 0.4)  return '#ffee58'
+  if (v < 0.5)  return '#aed581'
+  if (v < 0.65) return '#66bb6a'
+  return '#2e7d32'
+}
+
 // Factory function to create ColorRemapTileLayer class after Leaflet loads
 function createColorRemapTileLayer(LeafletLib: typeof L) {
   return class ColorRemapTileLayer extends LeafletLib.TileLayer {
@@ -217,7 +260,10 @@ export function MapViewer({
   const currentDrawLayerRef = useRef<L.Circle | L.Rectangle | L.Polygon | null>(null)
   const predioMarkerRef = useRef<L.Marker | null>(null)
   const predioPolygonRef = useRef<L.Polygon | null>(null)
-  
+  const selectedPolygonLayerRef = useRef<L.Polygon | null>(null)
+  const markerLayersRef = useRef<(L.Marker | L.Polygon)[]>([])
+  const ndviTileLayerRef = useRef<L.TileLayer | null>(null)
+
   const [activeLayer, setActiveLayer] = useState<LayerType>("ndvi")
   const [opacity, setOpacity] = useState(0.85)
   const [isLoading, setIsLoading] = useState(true)
@@ -232,6 +278,23 @@ export function MapViewer({
   const [mapBounds, setMapBounds] = useState({ north: 10, south: 4, east: -70, west: -76 })
   const [mouseCoords, setMouseCoords] = useState({ lat: 7.1254, lng: -73.1198 })
   const [polygonPoints, setPolygonPoints] = useState<L.LatLng[]>([])
+
+  // Panel de predio seleccionado
+  const [selectedPredio, setSelectedPredio] = useState<SelectedPredio | null>(null)
+  const [showNdviPanel, setShowNdviPanel] = useState(false)
+
+  // NDVI MODIS (carga automática por coordenadas — misma API que el detalle)
+  const [modisNdvi, setModisNdvi] = useState<ModisNdvi | null>(null)
+  const [modisNdviLoading, setModisNdviLoading] = useState(false)
+  const [modisNdviError, setModisNdviError] = useState<string | null>(null)
+
+  // NDVI Agromonitoring (historial manual)
+  const [ndviData, setNdviData] = useState<NDVIRecord[]>([])
+  const [ndviLoading, setNdviLoading] = useState(false)
+  const [ndviError, setNdviError] = useState<string | null>(null)
+  const [agroPolyId, setAgroPolyId] = useState<string | null>(null)
+  const [ndviStart, setNdviStart] = useState('')
+  const [ndviEnd, setNdviEnd] = useState('')
 
   const drawStartRef = useRef<L.LatLng | null>(null)
 
@@ -407,38 +470,6 @@ export function MapViewer({
         predioMarkerRef.current.bindPopup("<strong>Ubicacion del Predio</strong>").openPopup()
       }
       
-      // Add multiple markers if provided
-      if (markers && markers.length > 0) {
-        const markerIcon = L.default.divIcon({
-          html: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#3b82f6" stroke="#1e40af" strokeWidth="2">
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-          <circle cx="12" cy="10" r="3" fill="white"></circle>
-          </svg>`,
-          className: "multi-marker",
-          iconSize: [32, 32],
-          iconAnchor: [16, 32],
-        })
-        markers.forEach((m) => {
-          if (m.polygonCoords && m.polygonCoords.length >= 3) {
-            // Renderizar como polígono con marker en el centro
-            const polygon = L.default.polygon(m.polygonCoords, {
-              color: "#3b82f6",
-              fillColor: "#3b82f6",
-              fillOpacity: 0.2,
-              weight: 2,
-            }).addTo(map)
-            polygon.bindPopup(m.popupContent)
-            // Pequeño marker en el centro para facilitar click en zoom bajo
-            const centerMarker = L.default.marker(m.position, { icon: markerIcon }).addTo(map)
-            centerMarker.bindPopup(m.popupContent)
-          } else {
-            // Renderizar como punto
-            const marker = L.default.marker(m.position, { icon: markerIcon }).addTo(map)
-            marker.bindPopup(m.popupContent)
-          }
-        })
-      }
-
       // Add predio polygon if provided
       if (polygonCoords && polygonCoords.length >= 3) {
         predioPolygonRef.current = L.default.polygon(polygonCoords, {
@@ -552,6 +583,68 @@ export function MapViewer({
       }
     }
   }, [])
+
+  // Reactive effect: re-render markers/polygons whenever data loads or map becomes ready
+  useEffect(() => {
+    if (!isMapReady || !mapInstanceRef.current || !leafletRef.current) return
+    const map = mapInstanceRef.current
+    const Lf = leafletRef.current
+
+    // Remove previously rendered marker layers
+    markerLayersRef.current.forEach(layer => map.removeLayer(layer))
+    markerLayersRef.current = []
+
+    if (!markers || markers.length === 0) return
+
+    const markerIcon = Lf.divIcon({
+      html: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#3b82f6" stroke="#1e40af" strokeWidth="2">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+      <circle cx="12" cy="10" r="3" fill="white"></circle>
+      </svg>`,
+      className: "multi-marker",
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+    })
+
+    const selectPredio = (polygon: L.Polygon, m: MapMarker) => {
+      if (selectedPolygonLayerRef.current && selectedPolygonLayerRef.current !== polygon) {
+        selectedPolygonLayerRef.current.setStyle({ color: "#3b82f6", fillColor: "#3b82f6", fillOpacity: 0.2, weight: 2 })
+      }
+      polygon.setStyle({ color: "#22c55e", fillColor: "#22c55e", fillOpacity: 0.35, weight: 3 })
+      selectedPolygonLayerRef.current = polygon
+      setSelectedPredio({ id: m.id!, name: m.name || 'Predio', coords: m.polygonCoords!, position: m.position })
+      setNdviData([])
+      setAgroPolyId(null)
+      setNdviError(null)
+      setShowNdviPanel(true)
+      setShowDrawTools(false)
+    }
+
+    markers.forEach((m) => {
+      if (m.polygonCoords && m.polygonCoords.length >= 3) {
+        const polygon = Lf.polygon(m.polygonCoords, {
+          color: "#3b82f6",
+          fillColor: "#3b82f6",
+          fillOpacity: 0.2,
+          weight: 2,
+        }).addTo(map)
+        polygon.bindPopup(m.popupContent)
+        if (m.id) {
+          polygon.on('click', () => selectPredio(polygon, m))
+        }
+        const centerMarker = Lf.marker(m.position, { icon: markerIcon }).addTo(map)
+        centerMarker.bindPopup(m.popupContent)
+        if (m.id) {
+          centerMarker.on('click', () => selectPredio(polygon, m))
+        }
+        markerLayersRef.current.push(polygon, centerMarker)
+      } else {
+        const marker = Lf.marker(m.position, { icon: markerIcon }).addTo(map)
+        marker.bindPopup(m.popupContent)
+        markerLayersRef.current.push(marker)
+      }
+    })
+  }, [markers, isMapReady])
 
   // Handle drawing
   useEffect(() => {
@@ -672,6 +765,136 @@ export function MapViewer({
       layer.setOpacity(key === activeLayer ? opacity : 0)
     })
   }, [activeLayer, opacity])
+
+  // Auto-fetch NDVI MODIS (NASA) cuando se selecciona un predio
+  useEffect(() => {
+    if (!selectedPredio) {
+      setModisNdvi(null)
+      setModisNdviError(null)
+      return
+    }
+    setModisNdviLoading(true)
+    setModisNdvi(null)
+    setModisNdviError(null)
+    const [lat, lng] = selectedPredio.position
+    fetch(`/api/ndvi?lat=${lat}&lng=${lng}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) throw new Error(d.error)
+        setModisNdvi(d)
+      })
+      .catch(e => setModisNdviError(e.message))
+      .finally(() => setModisNdviLoading(false))
+  }, [selectedPredio?.id])
+
+  // Fechas por defecto: últimos 6 meses
+  useEffect(() => {
+    const today = new Date()
+    const sixAgo = new Date()
+    sixAgo.setMonth(today.getMonth() - 6)
+    setNdviEnd(today.toISOString().split('T')[0])
+    setNdviStart(sixAgo.toISOString().split('T')[0])
+  }, [])
+
+  // Colorear el polígono seleccionado según NDVI real
+  useEffect(() => {
+    if (!ndviData.length || !selectedPolygonLayerRef.current) return
+    const latest = ndviData[ndviData.length - 1]
+    const color = ndviColor(latest.data.mean)
+    selectedPolygonLayerRef.current.setStyle({ color, fillColor: color, fillOpacity: 0.5, weight: 3 })
+  }, [ndviData])
+
+  const loadNDVIImagery = async (polyId: string, start: number, end: number) => {
+    const map = mapInstanceRef.current
+    const Lf  = leafletRef.current
+    if (!map || !Lf) return
+
+    // Quitar capa de tiles anterior si existe
+    if (ndviTileLayerRef.current) {
+      map.removeLayer(ndviTileLayerRef.current)
+      ndviTileLayerRef.current = null
+    }
+
+    try {
+      const res = await fetch(`/api/agro-images?polyid=${polyId}&start=${start}&end=${end}`)
+      if (!res.ok) return
+      const images: any[] = await res.json()
+      if (!Array.isArray(images) || !images.length) return
+
+      // Elegir la imagen con menos nubes y más reciente
+      const best = [...images]
+        .sort((a, b) => {
+          const cloudDiff = (a.cl ?? 100) - (b.cl ?? 100)
+          return Math.abs(cloudDiff) > 20 ? cloudDiff : b.dt - a.dt
+        })[0]
+
+      const tileUrl = best?.tile?.ndvi || best?.tile?.falsecolor
+      if (!tileUrl) return
+
+      ndviTileLayerRef.current = Lf.tileLayer(tileUrl, {
+        opacity: 0.8,
+        maxZoom: 18,
+        attribution: 'Agromonitoring Sentinel-2',
+      }).addTo(map)
+    } catch {
+      // La capa de imagen es opcional — si falla, ignoramos
+    }
+  }
+
+  const consultarNDVI = async () => {
+    if (!selectedPredio) return
+    setNdviLoading(true)
+    setNdviError(null)
+    try {
+      let polyId = agroPolyId
+
+      // Crear polígono en Agromonitoring si aún no existe
+      if (!polyId) {
+        const res  = await fetch('/api/polygon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: `${selectedPredio.name}_${selectedPredio.id}`.slice(0, 64),
+            coordinates: selectedPredio.coords,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          // 422 duplicado: Agromonitoring devuelve el ID del polígono existente en el mensaje
+          const errMsg: string =
+            typeof data.message === 'string' ? data.message : JSON.stringify(data)
+          const match = errMsg.match(/['"]([\da-f]{24})['"]/i)
+          if (match) {
+            polyId = match[1]
+            setAgroPolyId(polyId)
+          } else {
+            throw new Error(errMsg || 'Error al crear polígono en Agromonitoring')
+          }
+        } else {
+          polyId = data.id
+          setAgroPolyId(polyId)
+        }
+      }
+
+      const start = Math.floor(new Date(ndviStart).getTime() / 1000)
+      const end   = Math.floor(new Date(ndviEnd).getTime() / 1000)
+
+      // Estadísticas NDVI
+      const res  = await fetch(`/api/agro-ndvi?polyid=${polyId}&start=${start}&end=${end}`)
+      const data: NDVIRecord[] = await res.json()
+      if (!res.ok) throw new Error((data as any).message || (data as any).error || 'Error al consultar NDVI')
+      if (!Array.isArray(data) || !data.length)
+        throw new Error('Sin datos NDVI para ese período. Amplía el rango de fechas.')
+      setNdviData(data.sort((a, b) => a.dt - b.dt))
+
+      // Cargar capa de imagen satelital (en paralelo, no bloquea)
+      loadNDVIImagery(polyId, start, end)
+    } catch (err: any) {
+      setNdviError(err.message)
+    } finally {
+      setNdviLoading(false)
+    }
+  }
 
   const handleLayerChange = (layer: LayerType) => {
     setActiveLayer(layer)
@@ -848,6 +1071,19 @@ export function MapViewer({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
         </button>
+        {selectedPredio && (
+          <button
+            onClick={() => { setShowNdviPanel(!showNdviPanel); setShowLayerPanel(false); setShowDrawTools(false); setShowLegend(false); }}
+            className={`flex h-10 w-10 items-center justify-center rounded-lg border shadow-lg backdrop-blur-md transition-all ${
+              showNdviPanel ? "border-primary bg-primary/20 text-primary" : "border-border bg-card/95 text-muted-foreground"
+            }`}
+            aria-label="NDVI Predio"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Layer Controls - Desktop: fixed right, Mobile: bottom sheet */}
@@ -977,11 +1213,13 @@ export function MapViewer({
         </div>
       )}
 
-      {/* Draw Tools - Desktop: left side, Mobile: bottom sheet */}
+      {/* Draw Tools - Desktop: left side (oculto cuando NDVI panel está activo), Mobile: bottom sheet */}
       <div className={`absolute z-[1001] transition-all duration-300 ${
-        showDrawTools 
-          ? "bottom-0 left-0 right-0 md:bottom-auto md:left-4 md:right-auto md:top-4" 
-          : "pointer-events-none -bottom-full opacity-0 md:pointer-events-auto md:bottom-auto md:left-4 md:opacity-100 md:top-4"
+        showDrawTools
+          ? "bottom-0 left-0 right-0 md:bottom-auto md:left-4 md:right-auto md:top-4"
+          : showNdviPanel
+            ? "pointer-events-none -bottom-full opacity-0 md:pointer-events-none md:opacity-0 md:bottom-auto md:left-4 md:top-4"
+            : "pointer-events-none -bottom-full opacity-0 md:pointer-events-auto md:bottom-auto md:left-4 md:opacity-100 md:top-4"
       }`}>
         <div className="max-h-[40vh] overflow-y-auto rounded-t-2xl border border-border bg-card/98 shadow-xl backdrop-blur-md md:max-h-none md:w-56 md:rounded-lg lg:w-64">
           {/* Mobile drag handle */}
@@ -1174,6 +1412,111 @@ export function MapViewer({
               >
                 {isLoadingWeather ? 'Cargando...' : weatherData ? 'Actualizar' : 'Obtener Clima'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── NDVI Predio Panel (Agromonitoring) ── */}
+      {selectedPredio && (
+        <div className={`absolute z-[1001] transition-all duration-300 ${
+          showNdviPanel
+            ? "bottom-0 left-0 right-0 md:bottom-auto md:left-4 md:right-auto md:top-4"
+            : "pointer-events-none -bottom-full opacity-0 md:pointer-events-none md:opacity-0 md:bottom-auto md:left-4 md:top-4"
+        }`}>
+          <div className="max-h-[70vh] overflow-y-auto rounded-t-2xl border border-border bg-card/98 shadow-xl backdrop-blur-md md:max-h-[calc(100vh-5rem)] md:w-64 md:rounded-lg lg:w-72">
+            {/* Mobile drag handle */}
+            <div className="flex items-center justify-center py-2 md:hidden">
+              <div className="h-1 w-12 rounded-full bg-muted-foreground/30" />
+            </div>
+
+            {/* Header */}
+            <div className="border-b border-border p-3 md:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold text-foreground">NDVI · Predio</h2>
+                  <p className="truncate text-xs text-muted-foreground">{selectedPredio.name}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowNdviPanel(false)
+                    setSelectedPredio(null)
+                    setModisNdvi(null)
+                    setModisNdviError(null)
+                    setNdviData([])
+                    setAgroPolyId(null)
+                    setNdviError(null)
+                    if (selectedPolygonLayerRef.current) {
+                      selectedPolygonLayerRef.current.setStyle({ color: "#3b82f6", fillColor: "#3b82f6", fillOpacity: 0.2, weight: 2 })
+                      selectedPolygonLayerRef.current = null
+                    }
+                    if (ndviTileLayerRef.current && mapInstanceRef.current) {
+                      mapInstanceRef.current.removeLayer(ndviTileLayerRef.current)
+                      ndviTileLayerRef.current = null
+                    }
+                  }}
+                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-3 p-3">
+
+              {/* ── NDVI MODIS (automático) ── */}
+              <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                <p className="mb-2 text-[10px] font-medium text-muted-foreground">ÍNDICE NDVI · NASA MODIS</p>
+
+                {modisNdviLoading && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    <span className="text-xs">Cargando NDVI...</span>
+                  </div>
+                )}
+
+                {modisNdviError && !modisNdviLoading && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <svg className="h-4 w-4 text-yellow-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    </svg>
+                    No disponible
+                  </div>
+                )}
+
+                {modisNdvi && !modisNdviLoading && (
+                  <div className="space-y-2">
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <p className="text-2xl font-bold" style={{ color: modisNdvi.color }}>
+                          {modisNdvi.ndvi.toFixed(3)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{modisNdvi.interpretacion}</p>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{modisNdvi.fecha}</p>
+                    </div>
+                    <div className="relative h-3 overflow-hidden rounded-full bg-secondary">
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full"
+                        style={{
+                          width: `${Math.max(0, Math.min(100, ((modisNdvi.ndvi + 1) / 2) * 100))}%`,
+                          backgroundColor: modisNdvi.color,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[9px] text-muted-foreground">
+                      <span>-1 (Agua)</span>
+                      <span>+1 (Denso)</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
             </div>
           </div>
         </div>

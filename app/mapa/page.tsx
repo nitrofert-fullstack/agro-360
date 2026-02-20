@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation"
 import { Home, Loader2 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/hooks/use-auth"
-import { createClient } from "@/lib/supabase/client"
 import type { MapMarker } from "@/components/map-viewer"
 
 const MapViewer = dynamic(
@@ -25,22 +24,9 @@ const MapViewer = dynamic(
   }
 )
 
-interface PredioMarkerData {
-  id: string
-  nombre_predio: string
-  municipio: string | null
-  vereda: string | null
-  latitud: number | null
-  longitud: number | null
-  area_total: number | null
-  area_cultivada: number | null
-  beneficiario_nombre: string
-  temperatura: number | null
-}
-
 export default function MapaPage() {
   const router = useRouter()
-  const { user, profile, loading: authLoading, isAuthenticated } = useAuth()
+  const { user, loading: authLoading, isAuthenticated } = useAuth()
   const [mounted, setMounted] = useState(false)
   const [markers, setMarkers] = useState<MapMarker[]>([])
 
@@ -52,29 +38,20 @@ export default function MapaPage() {
     setMounted(true)
   }, [authLoading, isAuthenticated, router])
 
-  // Cargar predios del asesor
+  // Cargar todos los predios registrados vía el endpoint de admin
+  // (maneja admin = todos, asesor = los suyos; columnas correctas del schema)
   useEffect(() => {
     if (!user?.id || !isAuthenticated) return
 
     const loadPredios = async () => {
-      const supabase = createClient()
       try {
-        // Obtener caracterizaciones del asesor con datos del predio y beneficiario
-        const { data, error } = await supabase
-          .from('caracterizaciones')
-          .select(`
-            id,
-            predio:predios!id_predio(id, nombre_predio, municipio, vereda, latitud, longitud, area_total, area_cultivada, poligono),
-            beneficiario:beneficiarios!id_beneficiario(nombres, apellidos),
-            caracterizacion_predio:caracterizacion_predio(temperatura_celsius)
-          `)
-          .eq('asesor_id', user.id)
-
-        if (error) {
-          console.log("[Mapa] Error loading predios:", error)
+        const response = await fetch('/api/admin/caracterizaciones')
+        if (!response.ok) {
+          console.log("[Mapa] Error loading predios:", response.status)
           return
         }
 
+        const { data } = await response.json()
         if (!data) return
 
         const mapMarkers: MapMarker[] = []
@@ -90,6 +67,7 @@ export default function MapaPage() {
             ? `${c.beneficiario.nombres || ''} ${c.beneficiario.apellidos || ''}`.trim()
             : 'Sin nombre'
 
+          // caracterizacion_predio ya viene aplanado como objeto (no array) desde la API
           const temp = c.caracterizacion_predio?.temperatura_celsius
 
           const popup = `
@@ -99,8 +77,8 @@ export default function MapaPage() {
               <p style="margin:2px 0;font-size:12px;"><b>Productor:</b> ${benefNombre}</p>
               <p style="margin:2px 0;font-size:12px;"><b>Municipio:</b> ${predio.municipio || 'N/A'}</p>
               ${predio.vereda ? `<p style="margin:2px 0;font-size:12px;"><b>Vereda:</b> ${predio.vereda}</p>` : ''}
-              ${predio.area_total ? `<p style="margin:2px 0;font-size:12px;"><b>Area total:</b> ${predio.area_total} ha</p>` : ''}
-              ${predio.area_cultivada ? `<p style="margin:2px 0;font-size:12px;"><b>Area cultivada:</b> ${predio.area_cultivada} ha</p>` : ''}
+              ${predio.area_total_hectareas ? `<p style="margin:2px 0;font-size:12px;"><b>Área total:</b> ${predio.area_total_hectareas} ha</p>` : ''}
+              ${predio.area_productiva_hectareas ? `<p style="margin:2px 0;font-size:12px;"><b>Área productiva:</b> ${predio.area_productiva_hectareas} ha</p>` : ''}
               ${temp ? `<p style="margin:2px 0;font-size:12px;"><b>Temperatura:</b> ${temp}°C</p>` : ''}
             </div>
           `
@@ -111,6 +89,7 @@ export default function MapaPage() {
 
           mapMarkers.push({
             id: predio.id,
+            name: predio.nombre_predio || 'Sin nombre',
             position: [predio.latitud, predio.longitud],
             popupContent: popup,
             polygonCoords,
