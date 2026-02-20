@@ -834,9 +834,8 @@ export function CharacterizationFormComplete() {
                   <Input
                     id="versionFormulario"
                     value={formData.visita.versionFormulario}
-                    onChange={(e) => updateField("visita", "versionFormulario", e.target.value)}
-                    placeholder="Ej: 1.0"
-                    className="h-11"
+                    readOnly
+                    className="h-11 cursor-default bg-muted/50 text-muted-foreground"
                   />
                 </div>
                 <div className="space-y-2">
@@ -845,8 +844,8 @@ export function CharacterizationFormComplete() {
                     id="fechaEmisionFormulario"
                     type="date"
                     value={formData.visita.fechaEmisionFormulario}
-                    onChange={(e) => updateField("visita", "fechaEmisionFormulario", e.target.value)}
-                    className="h-11"
+                    readOnly
+                    className="h-11 cursor-default bg-muted/50 text-muted-foreground"
                   />
                 </div>
               </div>
