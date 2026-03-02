@@ -38,7 +38,9 @@ import {
   Copy,
   Shield,
   Mail,
+  Download,
 } from "lucide-react"
+import { generateCaracterizacionPDF, pdfFromServerData, pdfFromLocalData } from "@/lib/generate-pdf"
 
 const MapViewer = dynamic(
   () => import("@/components/map-viewer").then((mod) => mod.MapViewer),
@@ -65,7 +67,7 @@ function parsePoligono(raw: any): [number, number][] | undefined {
   try {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
     if (Array.isArray(parsed) && parsed.length >= 3) return parsed as [number, number][]
-  } catch {}
+  } catch { }
   return undefined
 }
 
@@ -116,10 +118,11 @@ function SectionCard({ title, icon: Icon, children }: { title: string; icon: Rea
 
 const estadoConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   PENDIENTE_SINCRONIZACION: { label: "Pendiente", color: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20", icon: Clock },
-  SINCRONIZADO: { label: "Sincronizado", color: "bg-blue-500/10 text-blue-600 border-blue-500/20", icon: Eye },
-  EN_REVISION: { label: "En Revision", color: "bg-purple-500/10 text-purple-600 border-purple-500/20", icon: Eye },
+  INICIADO: { label: "Iniciado", color: "bg-slate-500/10 text-slate-600 border-slate-500/20", icon: Clock },
+  REVISADO: { label: "En Revisión", color: "bg-blue-500/10 text-blue-600 border-blue-500/20", icon: Eye },
+  EN_ESTUDIO_CREDITO: { label: "En Estudio Crédito", color: "bg-purple-500/10 text-purple-600 border-purple-500/20", icon: Eye },
   APROBADO: { label: "Aprobado", color: "bg-green-500/10 text-green-600 border-green-500/20", icon: CheckCircle },
-  RECHAZADO: { label: "Rechazado", color: "bg-red-500/10 text-red-600 border-red-500/20", icon: XCircle },
+  CANCELADO: { label: "Cancelado", color: "bg-red-500/10 text-red-600 border-red-500/20", icon: XCircle },
 }
 
 function getEstado(estado: string) {
@@ -224,6 +227,7 @@ function StatusChangePanel({
   beneficiarioEmail,
   beneficiarioNombre,
   beneficiarioTelefono,
+  userRol,
   onReload,
 }: {
   visitaId: string
@@ -231,6 +235,7 @@ function StatusChangePanel({
   beneficiarioEmail: string | null
   beneficiarioNombre: string
   beneficiarioTelefono: string | null
+  userRol: string | undefined
   onReload: () => void
 }) {
   const [isUpdating, setIsUpdating] = useState(false)
@@ -248,7 +253,7 @@ function StatusChangePanel({
       .select('id')
       .eq('email', beneficiarioEmail)
       .maybeSingle()
-      .then(({ data }) => setYaTieneCuenta(!!data))
+      .then(({ data }: { data: { id: string } | null }) => setYaTieneCuenta(!!data))
   }, [beneficiarioEmail])
 
   const handleUpdateEstado = async (nuevoEstado: string) => {
@@ -324,12 +329,22 @@ function StatusChangePanel({
     toast.success("Credenciales copiadas al portapapeles")
   }
 
+  let allowedStates: string[] = []
+  if (userRol === "admin") {
+    allowedStates = ["INICIADO", "REVISADO", "EN_ESTUDIO_CREDITO", "APROBADO", "CANCELADO"]
+  } else if (userRol === "asesor") {
+    allowedStates = ["REVISADO"]
+  } else if (userRol === "analista") {
+    allowedStates = ["EN_ESTUDIO_CREDITO", "APROBADO", "CANCELADO"]
+  }
+
   const estados = [
-    { key: "SINCRONIZADO", label: "Sincronizado", icon: Eye, hoverClass: "hover:bg-blue-600 hover:text-white" },
-    { key: "EN_REVISION", label: "En Revision", icon: Eye, hoverClass: "hover:bg-purple-600 hover:text-white" },
+    { key: "INICIADO", label: "Iniciado", icon: Clock, hoverClass: "hover:bg-slate-600 hover:text-white" },
+    { key: "REVISADO", label: "En Revisión", icon: Eye, hoverClass: "hover:bg-blue-600 hover:text-white" },
+    { key: "EN_ESTUDIO_CREDITO", label: "Estudio Crédito", icon: Eye, hoverClass: "hover:bg-purple-600 hover:text-white" },
     { key: "APROBADO", label: "Aprobar", icon: CheckCircle, hoverClass: "hover:bg-green-600 hover:text-white" },
-    { key: "RECHAZADO", label: "Rechazar", icon: XCircle, hoverClass: "hover:bg-red-600 hover:text-white" },
-  ]
+    { key: "CANCELADO", label: "Cancelar", icon: XCircle, hoverClass: "hover:bg-red-600 hover:text-white" },
+  ].filter(e => allowedStates.includes(e.key))
 
   return (
     <div className="space-y-4">
@@ -454,6 +469,7 @@ function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
   )
 }
 
+
 // ==================== SERVER DETAIL VIEW ====================
 function ServerDetailView({
   data,
@@ -480,14 +496,17 @@ function ServerDetailView({
   const hasCoords = lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng)
 
   const photos = [
-    { label: "Foto 1", url: caracterizacion?.foto_1_url },
-    { label: "Foto 2", url: caracterizacion?.foto_2_url },
+    { label: "Foto del Beneficiario", url: caracterizacion?.foto_beneficiario_url },
+    { label: "Foto 1 del Predio", url: caracterizacion?.foto_1_url },
+    { label: "Foto 2 del Predio", url: caracterizacion?.foto_2_url },
+    { label: "Documento (Frontal)", url: caracterizacion?.foto_doc_frontal_url },
+    { label: "Documento (Reverso)", url: caracterizacion?.foto_doc_trasera_url },
   ].filter((p) => p.url)
 
   const firma = caracterizacion?.firma_productor_url
-  const est = getEstado(visita?.estado || "SINCRONIZADO")
+  const est = getEstado(visita?.estado || "INICIADO")
   const EstIcon = est.icon
-  const canManageStatus = profile?.rol === "admin" || profile?.rol === "asesor"
+  const canManageStatus = profile?.rol === "admin" || profile?.rol === "asesor" || profile?.rol === "analista"
 
   return (
     <div className="min-h-screen bg-background pb-12">
@@ -511,6 +530,26 @@ function ServerDetailView({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {((profile?.rol === "campesino" && !["CANCELADO", "RECHAZADO"].includes(visita?.estado)) || ["admin", "asesor"].includes(profile?.rol)) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => router.push(`/formulario/editar/${visita?.id}`)}
+              >
+                <PenTool className="h-4 w-4" />
+                <span className="hidden sm:inline">Editar</span>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => generateCaracterizacionPDF(pdfFromServerData(data))}
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">PDF</span>
+            </Button>
             <Badge variant="outline" className={est.color}>
               <EstIcon className="mr-1 h-3 w-3" />
               {est.label}
@@ -601,15 +640,16 @@ function ServerDetailView({
           </div>
         )}
 
-        {/* Status Management - for asesor/admin */}
+        {/* Status Management + QR - for asesor/admin */}
         {canManageStatus && (
           <div className="mb-6">
             <StatusChangePanel
               visitaId={visita?.id}
-              currentEstado={visita?.estado || "SINCRONIZADO"}
+              currentEstado={visita?.estado || "INICIADO"}
               beneficiarioEmail={beneficiario?.correo || null}
               beneficiarioNombre={nombre}
               beneficiarioTelefono={beneficiario?.telefono || null}
+              userRol={profile?.rol}
               onReload={onReload}
             />
           </div>
@@ -627,6 +667,16 @@ function ServerDetailView({
               <InfoRow label="Correo" value={beneficiario?.correo} />
               <InfoRow label="Ocupacion principal" value={beneficiario?.ocupacion_principal} />
             </div>
+            {(beneficiario?.nombre_contacto_secundario || beneficiario?.telefono_secundario) && (
+              <div className="mt-4 rounded-lg border border-border/50 bg-muted/20 p-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contacto Secundario</p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <InfoRow label="Nombre" value={beneficiario?.nombre_contacto_secundario} />
+                  <InfoRow label="Telefono" value={beneficiario?.telefono_secundario} />
+                  <InfoRow label="Parentesco" value={beneficiario?.parentesco_contacto_secundario} />
+                </div>
+              </div>
+            )}
           </SectionCard>
 
           {/* Predio */}
@@ -839,6 +889,15 @@ function LocalDetailView({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => generateCaracterizacionPDF(pdfFromLocalData(data))}
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">PDF</span>
+            </Button>
             <Badge variant="outline" className={est.color}>
               <EstIcon className="mr-1 h-3 w-3" />
               {est.label}

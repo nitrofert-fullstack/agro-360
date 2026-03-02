@@ -109,19 +109,28 @@ export default function LoginPage() {
             </div>
           </CardContent>
           
-          <CardFooter className="flex flex-col gap-4">
-            <Button 
-              type="submit" 
-              className="w-full" 
+          <CardFooter className="flex flex-col gap-3">
+            <Button
+              type="submit"
+              className="w-full"
               disabled={isSubmitting || loading}
             >
               {isSubmitting ? "Iniciando sesion..." : "Iniciar sesion"}
             </Button>
-            
-            <p className="text-center text-sm text-muted-foreground">
-              El acceso es solo por invitacion.{" "}
+
+            <div className="w-full rounded-lg border border-border bg-muted/30 p-3 text-center text-sm">
+              <p className="text-muted-foreground mb-1">
+                ¿Eres agricultor y aún no tienes cuenta?
+              </p>
+              <Link href="/registro" className="font-medium text-primary hover:underline">
+                Regístrate aquí
+              </Link>
+            </div>
+
+            <p className="text-center text-xs text-muted-foreground">
+              Asesores y admins:{" "}
               <Link href="/auth/invitation" className="text-primary hover:underline">
-                ¿Tienes un codigo?
+                acceso por invitación
               </Link>
             </p>
           </CardFooter>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 export async function GET(
   request: Request,
@@ -76,12 +77,18 @@ export async function GET(
     }
 
     if (beneficiario) {
-      const { data: fi } = await supabase
+      // Usar admin client para evitar problemas de RLS en informacion_financiera
+      const supabaseAdmin = createAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+      const { data: fiRows } = await supabaseAdmin
         .from('informacion_financiera')
         .select('*')
         .eq('id_beneficiario', beneficiario.id)
-        .single()
-      infoFinanciera = fi
+        .order('created_at', { ascending: false })
+        .limit(1)
+      infoFinanciera = fiRows?.[0] ?? null
     }
 
     return NextResponse.json({

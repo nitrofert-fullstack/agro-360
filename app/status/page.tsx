@@ -251,7 +251,7 @@ export default function StatusPage() {
               <p>Ahora puedes:</p>
               <ul className="list-inside list-disc space-y-1">
                 <li>Ir a /formulario para registrar caracterizaciones</li>
-                <li>Ir a /consultar para buscar predios</li>
+                <li>Ir a /dashboard para ver y gestionar predios</li>
                 <li>Loguarse para sincronizar datos</li>
               </ul>
             </CardContent>

@@ -19,7 +19,9 @@ import {
   LayoutGrid,
   Map,
   ChevronRight,
+  Plus,
 } from "lucide-react"
+import Link from "next/link"
 
 const MapViewer = dynamic(
   () => import("@/components/map-viewer").then((mod) => mod.MapViewer),
@@ -60,13 +62,18 @@ interface PredioCompleto {
 }
 
 const estadoConfig: Record<string, { label: string; color: string }> = {
-  SINCRONIZADO: { label: "Sincronizado", color: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
-  EN_REVISION: { label: "En Revision", color: "bg-purple-500/10 text-purple-600 border-purple-500/20" },
+  INICIADO: { label: "Iniciado", color: "bg-slate-500/10 text-slate-600 border-slate-500/20" },
+  REVISADO: { label: "En Revisión", color: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
+  EN_ESTUDIO_CREDITO: { label: "En Estudio Crédito", color: "bg-purple-500/10 text-purple-600 border-purple-500/20" },
   APROBADO: { label: "Aprobado", color: "bg-green-500/10 text-green-600 border-green-500/20" },
-  RECHAZADO: { label: "Rechazado", color: "bg-red-500/10 text-red-600 border-red-500/20" },
+  CANCELADO: { label: "Cancelado", color: "bg-red-500/10 text-red-600 border-red-500/20" },
+  // legado (compatibilidad con registros anteriores)
+  SINCRONIZADO: { label: "Registrado", color: "bg-slate-500/10 text-slate-600 border-slate-500/20" },
+  EN_REVISION: { label: "En Revisión", color: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
+  RECHAZADO: { label: "Cancelado", color: "bg-red-500/10 text-red-600 border-red-500/20" },
 }
 
-export function CampesinoDashboard({ userEmail, userName }: { userEmail: string; userName: string }) {
+export function CampesinoDashboard({ userEmail, userName, userNumDoc }: { userEmail: string; userName: string; userNumDoc?: string | null }) {
   const router = useRouter()
   const [predios, setPredios] = useState<PredioCompleto[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -74,18 +81,20 @@ export function CampesinoDashboard({ userEmail, userName }: { userEmail: string;
 
   useEffect(() => {
     loadPredios()
-  }, [userEmail])
+  }, [userEmail, userNumDoc])
 
   const loadPredios = async () => {
     const supabase = createClient()
     if (!supabase) return
 
     try {
-      // Buscar beneficiarios por email
-      const { data: beneficiarios } = await supabase
-        .from("beneficiarios")
-        .select("id")
-        .eq("correo", userEmail)
+      // Buscar beneficiarios: primero por número de documento (más confiable),
+      // fallback a correo si el perfil no tiene documento guardado
+      let benefQuery = supabase.from("beneficiarios").select("id")
+      benefQuery = userNumDoc
+        ? benefQuery.eq("numero_documento", userNumDoc)
+        : benefQuery.eq("correo", userEmail)
+      const { data: beneficiarios } = await benefQuery
 
       if (!beneficiarios || beneficiarios.length === 0) {
         setIsLoading(false)
@@ -140,9 +149,9 @@ export function CampesinoDashboard({ userEmail, userName }: { userEmail: string;
   )
   const mapCenter: [number, number] = prediosConCoords.length > 0
     ? [
-        prediosConCoords.reduce((sum, p) => sum + parseFloat(p.predio.latitud!), 0) / prediosConCoords.length,
-        prediosConCoords.reduce((sum, p) => sum + parseFloat(p.predio.longitud!), 0) / prediosConCoords.length,
-      ]
+      prediosConCoords.reduce((sum, p) => sum + parseFloat(p.predio.latitud!), 0) / prediosConCoords.length,
+      prediosConCoords.reduce((sum, p) => sum + parseFloat(p.predio.longitud!), 0) / prediosConCoords.length,
+    ]
     : [7.1254, -73.1198]
 
   if (isLoading) {
@@ -159,11 +168,22 @@ export function CampesinoDashboard({ userEmail, userName }: { userEmail: string;
   return (
     <div className="space-y-6">
       {/* Welcome + Stats */}
-      <div>
-        <h2 className="text-xl font-bold md:text-2xl">Bienvenido, {userName}</h2>
-        <p className="text-sm text-muted-foreground">
-          Aqui puede ver la informacion de sus terrenos registrados
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold md:text-2xl">Bienvenido, {userName}</h2>
+          <p className="text-sm text-muted-foreground">
+            Aqui puede ver la informacion de sus terrenos registrados
+          </p>
+        </div>
+        {/* Mostrar botón solo si todos los formularios están cancelados o no hay ninguno */}
+        {predios.length > 0 && predios.every(p => ['CANCELADO', 'RECHAZADO'].includes(p.visita.estado)) && (
+          <Button asChild size="sm">
+            <Link href="/formulario" className="gap-2 shrink-0">
+              <Plus className="h-4 w-4" />
+              Nuevo registro
+            </Link>
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -183,7 +203,7 @@ export function CampesinoDashboard({ userEmail, userName }: { userEmail: string;
               <p className="text-2xl font-bold">
                 {predios.filter((p) => p.visita.estado === "APROBADO").length}
               </p>
-              <p className="text-xs text-muted-foreground">Aprobados</p>
+              <p className="text-xs text-muted-foreground">Aprobado</p>
             </div>
           </CardContent>
         </Card>
@@ -192,9 +212,9 @@ export function CampesinoDashboard({ userEmail, userName }: { userEmail: string;
             <Eye className="h-8 w-8 text-blue-600" />
             <div>
               <p className="text-2xl font-bold">
-                {predios.filter((p) => p.visita.estado === "EN_REVISION" || p.visita.estado === "SINCRONIZADO").length}
+                {predios.filter((p) => ["REVISADO", "EN_ESTUDIO_CREDITO", "EN_REVISION", "SINCRONIZADO"].includes(p.visita.estado)).length}
               </p>
-              <p className="text-xs text-muted-foreground">En Revision</p>
+              <p className="text-xs text-muted-foreground">En Revisión</p>
             </div>
           </CardContent>
         </Card>
@@ -251,14 +271,20 @@ export function CampesinoDashboard({ userEmail, userName }: { userEmail: string;
         <div className="space-y-3">
           {predios.length === 0 ? (
             <Card className="py-12 text-center">
-              <CardContent>
-                <Sprout className="mx-auto mb-4 h-12 w-12 text-muted-foreground/30" />
+              <CardContent className="flex flex-col items-center gap-4">
+                <Sprout className="h-12 w-12 text-muted-foreground/30" />
                 <p className="text-muted-foreground">No tiene terrenos registrados aun</p>
+                <Button asChild>
+                  <Link href="/formulario" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Registrar mi terreno
+                  </Link>
+                </Button>
               </CardContent>
             </Card>
           ) : (
             predios.map((item, idx) => {
-              const est = estadoConfig[item.visita.estado] || estadoConfig.SINCRONIZADO
+              const est = estadoConfig[item.visita.estado] || estadoConfig.INICIADO
               const hasCoords = item.predio.latitud && item.predio.longitud
 
               return (

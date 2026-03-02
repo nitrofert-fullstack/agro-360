@@ -28,8 +28,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'userId y newRole son requeridos' }, { status: 400 })
     }
 
-    if (!['admin', 'asesor'].includes(newRole)) {
-      return NextResponse.json({ error: 'Rol inválido. Debe ser "admin" o "asesor"' }, { status: 400 })
+    const rolesValidos = ['admin', 'asesor', 'analista', 'campesino']
+    if (!rolesValidos.includes(newRole)) {
+      return NextResponse.json({ error: `Rol inválido. Válidos: ${rolesValidos.join(', ')}` }, { status: 400 })
     }
 
     // No permitir que el admin se cambie a sí mismo (previene quedar sin admin)
@@ -54,9 +55,12 @@ export async function POST(request: Request) {
 
     if (updateErr) throw updateErr
 
+    const rolLabel: Record<string, string> = {
+      admin: 'Administrador', asesor: 'Asesor', analista: 'Analista', campesino: 'Agricultor'
+    }
     return NextResponse.json({
       success: true,
-      mensaje: `Rol actualizado a "${newRole === 'admin' ? 'Administrador' : 'Asesor'}" correctamente`,
+      mensaje: `Rol actualizado a "${rolLabel[newRole] ?? newRole}" correctamente`,
     })
   } catch (err) {
     console.error('[ChangeRole] Error:', err)

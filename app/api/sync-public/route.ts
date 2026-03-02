@@ -58,6 +58,7 @@ async function ensureStorageBuckets(adminClient: SupabaseClient): Promise<void> 
     { name: 'fotos-productores', public: true },
     { name: 'firmas', public: true },
     { name: 'fotos-predios', public: true },
+    { name: 'documentos-identidad', public: true },
   ]
 
   const { data: existingBuckets } = await adminClient.storage.listBuckets()
@@ -72,6 +73,23 @@ async function ensureStorageBuckets(adminClient: SupabaseClient): Promise<void> 
       })
     }
   }
+}
+
+async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
+  const secret = process.env.TURNSTILE_SECRET_KEY
+  if (!secret) return true // Si no está configurado, no bloquear (dev)
+
+  const form = new URLSearchParams()
+  form.append('secret', secret)
+  form.append('response', token)
+  form.append('remoteip', ip)
+
+  const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    method: 'POST',
+    body: form,
+  })
+  const data = await res.json() as { success: boolean }
+  return data.success === true
 }
 
 export async function POST(request: Request) {
@@ -90,7 +108,19 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const { caracterizaciones } = body
+    const { caracterizaciones, turnstileToken } = body
+
+    // Verificar Turnstile (solo si la secret key está configurada)
+    const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('x-forwarded-for') || ''
+    if (process.env.TURNSTILE_SECRET_KEY && process.env.TURNSTILE_SECRET_KEY !== 'your-secret-key-here') {
+      if (!turnstileToken) {
+        return NextResponse.json({ error: 'Verificación de seguridad requerida' }, { status: 400 })
+      }
+      const valid = await verifyTurnstile(turnstileToken, ip)
+      if (!valid) {
+        return NextResponse.json({ error: 'Verificación de seguridad inválida' }, { status: 403 })
+      }
+    }
 
     if (!caracterizaciones || !Array.isArray(caracterizaciones)) {
       return NextResponse.json({ error: 'Datos invalidos' }, { status: 400 })
@@ -109,6 +139,25 @@ export async function POST(request: Request) {
         const docNum = c.beneficiario?.numeroDocumento || c.documentoProductor
         if (!docNum) {
           throw new Error('Número de documento del beneficiario es requerido')
+        }
+
+        // === IDEMPOTENCIA: verificar si este radicadoLocal ya fue sincronizado ===
+        const { data: visitaExistente } = await adminClient
+          .from('visitas')
+          .select('id, radicado_oficial')
+          .eq('radicado_local', c.radicadoLocal)
+          .maybeSingle()
+
+        if (visitaExistente) {
+          console.log(`[SyncPublic] ${c.radicadoLocal} ya existe en BD, retornando como sincronizado`)
+          results.push({
+            radicadoLocal: c.radicadoLocal,
+            radicadoOficial: visitaExistente.radicado_oficial,
+            estado: 'SINCRONIZADO',
+            mensaje: 'Ya estaba sincronizado previamente',
+            usuarioNuevo: false,
+          })
+          continue
         }
 
         const radicadoOficial = generateRadicadoOficial()
@@ -133,6 +182,9 @@ export async function POST(request: Request) {
               telefono: c.beneficiario?.telefono || null,
               correo: c.beneficiario?.email || null,
               ocupacion_principal: c.beneficiario?.ocupacionPrincipal || null,
+              nombre_contacto_secundario: c.beneficiario?.nombreContactoSecundario || null,
+              telefono_secundario: c.beneficiario?.telefonoSecundario || null,
+              parentesco_contacto_secundario: c.beneficiario?.parentescoContactoSecundario || null,
               updated_at: new Date().toISOString(),
             })
             .eq('id', existingBenef.id)
@@ -150,6 +202,9 @@ export async function POST(request: Request) {
               telefono: c.beneficiario?.telefono || null,
               correo: c.beneficiario?.email || null,
               ocupacion_principal: c.beneficiario?.ocupacionPrincipal || null,
+              nombre_contacto_secundario: c.beneficiario?.nombreContactoSecundario || null,
+              telefono_secundario: c.beneficiario?.telefonoSecundario || null,
+              parentesco_contacto_secundario: c.beneficiario?.parentescoContactoSecundario || null,
             })
             .select('id')
             .single()
@@ -250,32 +305,53 @@ export async function POST(request: Request) {
           })
         }
 
-        // === 7. INFORMACION FINANCIERA ===
+        // === 7. INFORMACION FINANCIERA (upsert por id_beneficiario) ===
         if (c.infoFinanciera) {
-          await adminClient.from('informacion_financiera').insert({
-            id_beneficiario: beneficiarioId,
+          const finData = {
             ingresos_mensuales_agropecuaria: c.infoFinanciera.ingresosMensualesAgropecuaria ?? null,
             ingresos_mensuales_otros: c.infoFinanciera.ingresosMensualesOtros ?? null,
             egresos_mensuales: c.infoFinanciera.egresosMensuales ?? null,
             activos_totales: c.infoFinanciera.activosTotales ?? null,
             activos_agropecuaria: c.infoFinanciera.activosAgropecuaria ?? null,
             pasivos_totales: c.infoFinanciera.pasivosTotales ?? null,
-          })
+          }
+          const { data: existingFin } = await adminClient
+            .from('informacion_financiera')
+            .select('id')
+            .eq('id_beneficiario', beneficiarioId)
+            .maybeSingle()
+
+          if (existingFin) {
+            await adminClient.from('informacion_financiera').update(finData).eq('id', existingFin.id)
+          } else {
+            await adminClient.from('informacion_financiera').insert({ id_beneficiario: beneficiarioId, ...finData })
+          }
         }
 
-        // === 8. VISITA (asesor_id es null para registros públicos) ===
+        // === 8. VISITA — asignar asesor activo aleatorio ===
+        const { data: asesoresActivos } = await adminClient
+          .from('profiles')
+          .select('id, nombre_completo')
+          .in('rol', ['asesor', 'admin'])
+          .eq('activo', true)
+
+        let asesorAsignado: { id: string; nombre_completo: string } | null = null
+        if (asesoresActivos && asesoresActivos.length > 0) {
+          asesorAsignado = asesoresActivos[Math.floor(Math.random() * asesoresActivos.length)] as { id: string; nombre_completo: string }
+        }
+
         const { data: newVisita, error: visitaErr } = await adminClient
           .from('visitas')
           .insert({
             fecha_visita: c.visita?.fechaVisita || new Date().toISOString().split('T')[0],
-            nombre_tecnico: c.visita?.nombreTecnico || 'Sin asesor',
+            nombre_tecnico: asesorAsignado?.nombre_completo || c.visita?.nombreTecnico || 'Sin asesor',
             codigo_formulario: c.visita?.codigoFormulario || null,
             version_formulario: c.visita?.versionFormulario || '1.0',
             fecha_emision_formulario: c.visita?.fechaEmisionFormulario || null,
             radicado_local: c.radicadoLocal,
             radicado_oficial: radicadoOficial,
-            estado: 'SINCRONIZADO',
-            asesor_id: null,
+            estado: 'INICIADO',
+            asesor_id: asesorAsignado?.id || null,
           })
           .select('id')
           .single()
@@ -291,14 +367,20 @@ export async function POST(request: Request) {
 
         // === 9. CARACTERIZACIONES (con fotos y firma) ===
         const timestamp = Date.now()
+        const fotoBeneficiarioRaw = c.archivos?.fotoBeneficiario || null
         const foto1Raw = c.archivos?.foto1Url || null
         const foto2Raw = c.archivos?.foto2Url || null
         const firmaRaw = c.archivos?.firmaProductorUrl || c.autorizacion?.firmaDigital || null
+        const fotoDocFrontalRaw = c.archivos?.fotoDocFrontalUrl || null
+        const fotoDocTraseraRaw = c.archivos?.fotoDocTraseraUrl || null
 
-        const [foto1Url, foto2Url, firmaUrl] = await Promise.all([
-          uploadBase64ToStorage(adminClient, foto1Raw, 'fotos-productores', `${c.radicadoLocal}/foto-1-${timestamp}.jpg`, 'image/jpeg'),
-          uploadBase64ToStorage(adminClient, foto2Raw, 'fotos-productores', `${c.radicadoLocal}/foto-2-${timestamp}.jpg`, 'image/jpeg'),
-          uploadBase64ToStorage(adminClient, firmaRaw, 'firmas', `${c.radicadoLocal}/firma-${timestamp}.png`, 'image/png'),
+        const [fotoBeneficiarioUrl, foto1Url, foto2Url, firmaUrl, fotoDocFrontalUrl, fotoDocTraseraUrl] = await Promise.all([
+          uploadBase64ToStorage(adminClient, fotoBeneficiarioRaw, 'fotos-productores', `${docNum}/foto-beneficiario-${timestamp}.jpg`, 'image/jpeg'),
+          uploadBase64ToStorage(adminClient, foto1Raw, 'fotos-productores', `${docNum}/foto-1-${timestamp}.jpg`, 'image/jpeg'),
+          uploadBase64ToStorage(adminClient, foto2Raw, 'fotos-productores', `${docNum}/foto-2-${timestamp}.jpg`, 'image/jpeg'),
+          uploadBase64ToStorage(adminClient, firmaRaw, 'firmas', `${docNum}/firma-${timestamp}.png`, 'image/png'),
+          uploadBase64ToStorage(adminClient, fotoDocFrontalRaw, 'documentos-identidad', `${docNum}/doc-frontal-${timestamp}.jpg`, 'image/jpeg'),
+          uploadBase64ToStorage(adminClient, fotoDocTraseraRaw, 'documentos-identidad', `${docNum}/doc-trasera-${timestamp}.jpg`, 'image/jpeg'),
         ])
 
         await adminClient.from('caracterizaciones').insert({
@@ -306,9 +388,12 @@ export async function POST(request: Request) {
           id_beneficiario: beneficiarioId,
           id_predio: predioId,
           observaciones: c.observaciones || null,
+          foto_beneficiario_url: fotoBeneficiarioUrl,
           foto_1_url: foto1Url,
           foto_2_url: foto2Url,
           firma_productor_url: firmaUrl,
+          foto_doc_frontal_url: fotoDocFrontalUrl,
+          foto_doc_trasera_url: fotoDocTraseraUrl,
           autorizacion_datos_personales: c.autorizacion?.autorizaTratamientoDatos ?? false,
           autorizacion_consulta_crediticia: c.autorizacion?.autorizaConsultaCrediticia ?? false,
         })
@@ -326,6 +411,7 @@ export async function POST(request: Request) {
         })
 
         // === CUENTA Y EMAIL AL PRODUCTOR (si tiene correo) ===
+        let usuarioNuevo = false
         if (correobenef) {
           try {
             // Verificar si ya tiene cuenta
@@ -336,6 +422,7 @@ export async function POST(request: Request) {
               .maybeSingle()
 
             if (!existingProfile) {
+              usuarioNuevo = true
               // Crear cuenta con contraseña temporal y enviar credenciales
               const tempPassword = `Agro${crypto.randomBytes(4).toString('hex').toUpperCase()}!`
 
@@ -353,6 +440,7 @@ export async function POST(request: Request) {
                   nombre_completo: nombrebenef,
                   rol: 'campesino',
                   activo: true,
+                  numero_documento: docNum,
                 })
 
                 const html = buildSyncNotificationEmail({
@@ -393,37 +481,35 @@ export async function POST(request: Request) {
           }
         }
 
-        // Notificación a todos los admins y asesores
-        try {
-          const { data: asesores } = await adminClient
-            .from('profiles')
-            .select('email')
-            .in('rol', ['admin', 'asesor'])
-            .eq('activo', true)
+        // Notificación solo al asesor asignado automáticamente
+        if (asesorAsignado) {
+          try {
+            const { data: asesorProfile } = await adminClient
+              .from('profiles')
+              .select('email')
+              .eq('id', asesorAsignado.id)
+              .maybeSingle()
 
-          if (asesores && asesores.length > 0) {
-            const html = buildNuevoRegistroEmail({
-              nombreProductor: nombrebenef,
-              numeroDocumento: docNum,
-              nombrePredio,
-              municipio,
-              radicadoOficial,
-              fechaRegistro,
-              appUrl,
-            })
-            await Promise.all(
-              asesores.map(a =>
-                sendEmail({
-                  to: a.email,
-                  subject: `Nuevo registro: ${nombrebenef} — Agro360`,
-                  html,
-                })
-              )
-            )
-            console.log(`[SyncPublic] Notificación enviada a ${asesores.length} asesor(es)/admin(s)`)
+            if (asesorProfile?.email) {
+              const html = buildNuevoRegistroEmail({
+                nombreProductor: nombrebenef,
+                numeroDocumento: docNum,
+                nombrePredio,
+                municipio,
+                radicadoOficial,
+                fechaRegistro,
+                appUrl,
+              })
+              await sendEmail({
+                to: asesorProfile.email,
+                subject: `Nuevo registro asignado: ${nombrebenef} — Agro360`,
+                html,
+              })
+              console.log(`[SyncPublic] Notificación enviada al asesor asignado: ${asesorProfile.email}`)
+            }
+          } catch (notifErr) {
+            console.error('[SyncPublic] Error enviando notificación al asesor asignado:', notifErr)
           }
-        } catch (notifErr) {
-          console.error('[SyncPublic] Error enviando notificación a asesores:', notifErr)
         }
 
         results.push({
@@ -431,6 +517,7 @@ export async function POST(request: Request) {
           radicadoOficial,
           estado: 'SINCRONIZADO',
           mensaje: 'Sincronizado correctamente',
+          usuarioNuevo,
         })
       } catch (err) {
         console.error(`[SyncPublic] Error procesando ${c.radicadoLocal}:`, err)

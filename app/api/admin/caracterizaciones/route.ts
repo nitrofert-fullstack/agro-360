@@ -9,7 +9,7 @@ const SELECT_QUERY = `
   visita:visitas(*)
 `
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient()
 
@@ -27,7 +27,7 @@ export async function GET() {
       .single()
 
     const rol = profile?.rol
-    if (rol !== 'admin' && rol !== 'asesor') {
+    if (!['admin', 'asesor', 'analista'].includes(rol)) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
@@ -38,33 +38,112 @@ export async function GET() {
       return NextResponse.json({ error: 'Configuración del servidor incompleta' }, { status: 500 })
     }
 
-    // Usamos el cliente admin para bypassear RLS y controlar el filtro manualmente
+    // Params de paginación y filtros
+    const { searchParams } = new URL(request.url)
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '50')), 100)
+    const search = (searchParams.get('search') || '').trim()
+    const estado = (searchParams.get('estado') || '').trim()
+    const offset = (page - 1) * limit
+
     const adminClient = createAdminClient(supabaseUrl, serviceRoleKey)
 
-    let query = adminClient
-      .from('caracterizaciones')
-      .select(SELECT_QUERY)
-      .order('created_at', { ascending: false })
-
+    // Construir conjunto de ids de visitas permitidas para el asesor
+    let allowedVisitaIds: string[] | null = null
     if (rol === 'asesor') {
-      // El asesor solo ve sus propios registros + los sin asesor asignado
       const { data: visitas } = await adminClient
         .from('visitas')
         .select('id')
         .or(`asesor_id.eq.${user.id},asesor_id.is.null`)
 
-      const visitaIds = (visitas || []).map((v: { id: string }) => v.id)
-
-      if (visitaIds.length === 0) {
-        // Sin registros para este asesor
-        return NextResponse.json({ data: [] })
+      allowedVisitaIds = (visitas || []).map((v: { id: string }) => v.id)
+      if (allowedVisitaIds.length === 0) {
+        return NextResponse.json({ data: [], total: 0, page, limit })
       }
-
-      query = query.in('id_visita', visitaIds) as typeof query
     }
-    // Si es admin, no se aplica ningún filtro — ve todo
 
-    const { data, error } = await query
+    // --- Resolver IDs de beneficiarios/predios que coinciden con la búsqueda ---
+    let searchBenefIds: string[] | null = null
+    let searchPredioIds: string[] | null = null
+
+    if (search) {
+      const [benefResult, predioResult] = await Promise.all([
+        adminClient
+          .from('beneficiarios')
+          .select('id')
+          .or(`nombres.ilike.%${search}%,apellidos.ilike.%${search}%,numero_documento.ilike.%${search}%`),
+        adminClient
+          .from('predios')
+          .select('id')
+          .or(`nombre_predio.ilike.%${search}%,municipio.ilike.%${search}%,vereda.ilike.%${search}%`),
+      ])
+      searchBenefIds = (benefResult.data || []).map((b: { id: string }) => b.id)
+      searchPredioIds = (predioResult.data || []).map((p: { id: string }) => p.id)
+
+      // Si no hay resultados en ninguna tabla, devolver vacío
+      if (searchBenefIds.length === 0 && searchPredioIds.length === 0) {
+        return NextResponse.json({ data: [], total: 0, page, limit })
+      }
+    }
+
+    // --- Resolver IDs de visitas que coinciden con el filtro de estado ---
+    let estadoVisitaIds: string[] | null = null
+    if (estado && estado !== 'todos' && estado !== 'sin_asesor') {
+      const { data: visitasEstado } = await adminClient
+        .from('visitas')
+        .select('id')
+        .ilike('estado', estado)
+      estadoVisitaIds = (visitasEstado || []).map((v: { id: string }) => v.id)
+      if (estadoVisitaIds.length === 0) {
+        return NextResponse.json({ data: [], total: 0, page, limit })
+      }
+    }
+
+    // --- Construir query principal ---
+    let query = adminClient
+      .from('caracterizaciones')
+      .select(SELECT_QUERY, { count: 'exact' })
+      .order('created_at', { ascending: false })
+
+    // Filtro por asesor (solo sus registros)
+    if (allowedVisitaIds !== null) {
+      query = query.in('id_visita', allowedVisitaIds) as typeof query
+    }
+
+    // Filtro por búsqueda (beneficiario OR predio)
+    if (searchBenefIds !== null && searchPredioIds !== null) {
+      const allMatchIds = [...new Set([...searchBenefIds, ...searchPredioIds])]
+      if (searchBenefIds.length > 0 && searchPredioIds.length > 0) {
+        query = query.or(`id_beneficiario.in.(${searchBenefIds.join(',')}),id_predio.in.(${searchPredioIds.join(',')})`) as typeof query
+      } else if (searchBenefIds.length > 0) {
+        query = query.in('id_beneficiario', searchBenefIds) as typeof query
+      } else {
+        query = query.in('id_predio', searchPredioIds) as typeof query
+      }
+    }
+
+    // Filtro por estado (vía visitas)
+    if (estadoVisitaIds !== null) {
+      query = query.in('id_visita', estadoVisitaIds) as typeof query
+    }
+
+    // Filtro "sin_asesor" — visitas con asesor_id null
+    if (estado === 'sin_asesor') {
+      const { data: sinAsesorVisitas } = await adminClient
+        .from('visitas')
+        .select('id')
+        .is('asesor_id', null)
+      const sinAsesorIds = (sinAsesorVisitas || []).map((v: { id: string }) => v.id)
+      if (sinAsesorIds.length === 0) {
+        return NextResponse.json({ data: [], total: 0, page, limit })
+      }
+      query = query.in('id_visita', sinAsesorIds) as typeof query
+    }
+
+    // Paginación
+    query = query.range(offset, offset + limit - 1) as typeof query
+
+    const { data, error, count } = await query
 
     if (error) throw error
 
@@ -84,7 +163,6 @@ export async function GET() {
       }
     }
 
-    // Aplanar relaciones anidadas igual que el componente actual
     const items = (data || []).map((c: any) => {
       const asesorProfile = c.visita?.asesor_id ? (profilesMap[c.visita.asesor_id] ?? null) : null
       return {
@@ -97,7 +175,7 @@ export async function GET() {
       }
     })
 
-    return NextResponse.json({ data: items })
+    return NextResponse.json({ data: items, total: count ?? 0, page, limit })
   } catch (err) {
     console.error('[AdminCaracterizaciones] Error:', err)
     return NextResponse.json(

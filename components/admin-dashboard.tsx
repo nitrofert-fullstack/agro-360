@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -54,10 +54,12 @@ import {
   Shield,
   Download,
   Printer,
+  PenTool,
 } from "lucide-react"
 import { ThemeToggle } from "./theme-toggle"
 import Link from "next/link"
 import { useAuth } from "@/hooks/use-auth"
+import { useVirtualizer } from "@tanstack/react-virtual"
 
 const MapViewer = dynamic(
   () => import("./map-viewer").then((mod) => mod.MapViewer),
@@ -172,14 +174,23 @@ interface CaracterizacionDB {
   } | null
 }
 
-type EstadoKey = "pendiente" | "pendiente_sincronizacion" | "sincronizado" | "aprobado" | "rechazado" | "en_revision" | "error_sincronizacion"
+type EstadoKey =
+  | "pendiente" | "pendiente_sincronizacion" | "sincronizado" | "aprobado" | "rechazado"
+  | "en_revision" | "error_sincronizacion"
+  | "iniciado" | "revisado" | "en_estudio_credito" | "cancelado"
 
 const estadoConfig: Record<EstadoKey, { label: string; color: string; icon: typeof Clock }> = {
+  // Nuevos estados BD
+  iniciado: { label: "Iniciado", color: "bg-slate-500/10 text-slate-500 border-slate-500/20", icon: Clock },
+  revisado: { label: "En Revisión", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Eye },
+  en_estudio_credito: { label: "En Estudio", color: "bg-purple-500/10 text-purple-500 border-purple-500/20", icon: Eye },
+  aprobado: { label: "Aprobado", color: "bg-green-500/10 text-green-500 border-green-500/20", icon: CheckCircle },
+  cancelado: { label: "Cancelado", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: XCircle },
+  // Legado
   pendiente: { label: "Pendiente", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", icon: Clock },
   pendiente_sincronizacion: { label: "Pend. Sync", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", icon: Clock },
   sincronizado: { label: "Sincronizado", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Eye },
   en_revision: { label: "En Revisión", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Eye },
-  aprobado: { label: "Aprobado", color: "bg-green-500/10 text-green-500 border-green-500/20", icon: CheckCircle },
   rechazado: { label: "Rechazado", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: XCircle },
   error_sincronizacion: { label: "Error", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: XCircle },
 }
@@ -204,7 +215,8 @@ interface Invitation {
 }
 
 export function AdminDashboard() {
-  const { isAdmin, user: currentUser } = useAuth()
+  const { isAdmin, user: currentUser, profile: currentProfile } = useAuth()
+  const isAnalista = currentProfile?.rol === 'analista'
   const [caracterizaciones, setCaracterizaciones] = useState<CaracterizacionDB[]>([])
   const [estadisticas, setEstadisticas] = useState({ total: 0, pendientes: 0, sincronizados: 0, aprobados: 0, rechazados: 0 })
   const [selectedCaracterizacion, setSelectedCaracterizacion] = useState<CaracterizacionDB | null>(null)
@@ -212,8 +224,12 @@ export function AdminDashboard() {
   const [showMap, setShowMap] = useState(false)
   const [filterEstado, setFilterEstado] = useState<string>("todos")
   const [searchQuery, setSearchQuery] = useState("")
-  const [currentPage, setCurrentPage] = useState(1)
-  const ITEMS_PER_PAGE = 10
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [totalCount, setTotalCount] = useState(0)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const parentRef = useRef<HTMLDivElement>(null)
+  const isInitialMount = useRef(true)
   const [observaciones, setObservaciones] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -233,6 +249,10 @@ export function AdminDashboard() {
   const [isAssigningAsesor, setIsAssigningAsesor] = useState(false)
   // Cambio de rol
   const [changingRoleUserId, setChangingRoleUserId] = useState<string | null>(null)
+  // Búsqueda y paginación de usuarios
+  const [userSearch, setUserSearch] = useState("")
+  const [userPage, setUserPage] = useState(1)
+  const USERS_PER_PAGE = 10
 
   const supabase = createClient()
 
@@ -244,29 +264,56 @@ export function AdminDashboard() {
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, "_blank")
   }
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true)
+  const loadData = useCallback(async ({
+    page: reqPage = 1,
+    search = '',
+    estado = 'todos',
+    append = false,
+  }: {
+    page?: number
+    search?: string
+    estado?: string
+    append?: boolean
+  } = {}) => {
+    if (append) {
+      setIsLoadingMore(true)
+    } else {
+      setIsLoading(true)
+    }
     try {
-      const res = await fetch('/api/admin/caracterizaciones')
+      const params = new URLSearchParams({ page: String(reqPage), limit: '50' })
+      if (search) params.set('search', search)
+      if (estado && estado !== 'todos') params.set('estado', estado)
+
+      const res = await fetch(`/api/admin/caracterizaciones?${params}`)
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Error al cargar caracterizaciones')
 
       const items: CaracterizacionDB[] = json.data || []
-      setCaracterizaciones(items)
+      const total: number = json.total ?? 0
 
-      // Stats
-      setEstadisticas({
-        total: items.length,
-        pendientes: items.filter(c => ['pendiente', 'pendiente_sincronizacion'].includes((c.estado || '').toLowerCase())).length,
-        sincronizados: items.filter(c => (c.estado || '').toLowerCase() === 'sincronizado').length,
-        aprobados: items.filter(c => (c.estado || '').toLowerCase() === 'aprobado').length,
-        rechazados: items.filter(c => (c.estado || '').toLowerCase() === 'rechazado').length,
-      })
+      setTotalCount(total)
+      setHasMore(items.length === 50)
+      setPage(reqPage)
+
+      if (append) {
+        setCaracterizaciones(prev => [...prev, ...items])
+      } else {
+        setCaracterizaciones(items)
+        setEstadisticas({
+          total,
+          pendientes: items.filter(c => ['pendiente', 'pendiente_sincronizacion', 'iniciado'].includes((c.visita?.estado || c.estado || '').toLowerCase())).length,
+          sincronizados: items.filter(c => ['sincronizado', 'revisado'].includes((c.visita?.estado || c.estado || '').toLowerCase())).length,
+          aprobados: items.filter(c => (c.visita?.estado || c.estado || '').toLowerCase() === 'aprobado').length,
+          rechazados: items.filter(c => ['rechazado', 'cancelado'].includes((c.visita?.estado || c.estado || '').toLowerCase())).length,
+        })
+      }
     } catch (err) {
       console.error('Error loading data:', err)
       toast.error('Error al cargar datos del servidor')
     } finally {
       setIsLoading(false)
+      setIsLoadingMore(false)
     }
   }, [])
 
@@ -414,10 +461,12 @@ export function AdminDashboard() {
       if (!res.ok) throw new Error(data.error || 'Error desconocido')
       toast.success(data.mensaje)
       setSelectedNewAsesorId("")
-      await loadData()
+      await loadData({ page: 1, search: searchQuery, estado: filterEstado, append: false })
       // Actualizar el registro seleccionado en el diálogo
       if (selectedCaracterizacion?.visita?.id === visitaId) {
-        const updated = (await (await fetch('/api/admin/caracterizaciones')).json()).data?.find(
+        const res2 = await fetch(`/api/admin/caracterizaciones?limit=1`)
+        const json2 = await res2.json()
+        const updated = (json2.data || []).find(
           (c: CaracterizacionDB) => c.visita?.id === visitaId
         )
         if (updated) setSelectedCaracterizacion(updated)
@@ -449,8 +498,9 @@ export function AdminDashboard() {
   }
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    loadData({ page: 1, search: '', estado: 'todos', append: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (activeSection === 'usuarios') {
@@ -458,34 +508,31 @@ export function AdminDashboard() {
     }
   }, [activeSection, loadUsers])
 
-  const filteredCaracterizaciones = caracterizaciones.filter((c) => {
-    const matchesEstado = filterEstado === "todos"
-      ? true
-      : filterEstado === "sin_asesor"
-        ? !c.visita?.asesor_id
-        : (c.estado || '').toLowerCase() === filterEstado
-    const nombre = `${c.beneficiario?.nombres || ''} ${c.beneficiario?.apellidos || ''}`.toLowerCase()
-    const documento = (c.beneficiario?.numero_documento || '').toLowerCase()
-    const nombrePredio = (c.predio?.nombre_predio || '').toLowerCase()
-    const municipio = (c.predio?.municipio || '').toLowerCase()
-    // radicado puede estar en el objeto directo o anidado en visita
-    const radicado = (
-      (c as any).radicado_oficial || (c as any).radicado_local ||
-      c.visita?.radicado_oficial || c.visita?.radicado_local || ''
-    ).toLowerCase()
-    const q = searchQuery.toLowerCase()
-    const matchesSearch = q === "" || nombre.includes(q) || documento.includes(q) || nombrePredio.includes(q) || municipio.includes(q) || radicado.includes(q)
-    return matchesEstado && matchesSearch
+  // Debounce: reload from server when search or estado filter changes
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+    const timer = setTimeout(() => {
+      loadData({ page: 1, search: searchQuery, estado: filterEstado, append: false })
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery, filterEstado])
+
+  const loadMore = () => {
+    if (!isLoadingMore && hasMore) {
+      loadData({ page: page + 1, search: searchQuery, estado: filterEstado, append: true })
+    }
+  }
+
+  // Virtual scroll
+  const virtualizer = useVirtualizer({
+    count: caracterizaciones.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 110,
+    overscan: 5,
   })
-
-  // Resetear a página 1 cuando cambian búsqueda o filtro de estado
-  useEffect(() => { setCurrentPage(1) }, [searchQuery, filterEstado])
-
-  const totalPages = Math.ceil(filteredCaracterizaciones.length / ITEMS_PER_PAGE)
-  const paginatedCaracterizaciones = filteredCaracterizaciones.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  )
 
   const handleUpdateEstado = async (id: string, nuevoEstado: string) => {
     setIsUpdating(true)
@@ -499,20 +546,15 @@ export function AdminDashboard() {
       if (!res.ok) throw new Error(data.error || 'Error desconocido')
 
       toast.success(`Estado actualizado a "${estadoConfig[nuevoEstado as EstadoKey]?.label || nuevoEstado}"`)
-      await loadData()
-
-      // Refresh selected
-      if (selectedCaracterizacion?.id === id) {
-        const updated = caracterizaciones.find(c => c.id === id)
-        if (updated) setSelectedCaracterizacion({ ...updated, estado: nuevoEstado })
-      }
+      setObservaciones("")
+      // Recargar datos — el estado actualizado vendrá del servidor (visitas.estado)
+      await loadData({ page: 1, search: searchQuery, estado: filterEstado, append: false })
     } catch (err) {
       console.error('Error updating estado:', err)
       toast.error('Error al actualizar el estado')
     } finally {
       setIsUpdating(false)
     }
-    setObservaciones("")
   }
 
   const openDetail = (c: CaracterizacionDB) => {
@@ -850,6 +892,20 @@ export function AdminDashboard() {
     }, 500)
   }
 
+  const filteredUsuarios = usuarios.filter(u => {
+    if (!userSearch.trim()) return true
+    const q = userSearch.toLowerCase()
+    return (
+      (u.nombre_completo || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q)
+    )
+  })
+  const userTotalPages = Math.max(1, Math.ceil(filteredUsuarios.length / USERS_PER_PAGE))
+  const paginatedUsuarios = filteredUsuarios.slice(
+    (userPage - 1) * USERS_PER_PAGE,
+    userPage * USERS_PER_PAGE
+  )
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -871,7 +927,7 @@ export function AdminDashboard() {
                 <span className="hidden sm:inline">Dashboard</span>
               </Link>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => { loadData(); if (activeSection === 'usuarios') loadUsers(); toast.info('Actualizando datos...') }} className="h-9 gap-2 bg-transparent px-2 md:px-3">
+            <Button variant="outline" size="sm" onClick={() => { loadData({ page: 1, search: searchQuery, estado: filterEstado }); if (activeSection === 'usuarios') loadUsers(); toast.info('Actualizando datos...') }} className="h-9 gap-2 bg-transparent px-2 md:px-3">
               <RefreshCw className="h-4 w-4" />
               <span className="hidden md:inline">Actualizar</span>
             </Button>
@@ -904,7 +960,7 @@ export function AdminDashboard() {
                       <FileText className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{estadisticas.total}</p>
+                      <p className="text-2xl font-bold">{totalCount || estadisticas.total}</p>
                       <p className="text-xs text-muted-foreground">Total</p>
                     </div>
                   </div>
@@ -983,15 +1039,17 @@ export function AdminDashboard() {
                 <FileText className="h-4 w-4" />
                 Caracterizaciones
               </Button>
-              <Button
-                variant={activeSection === 'usuarios' ? 'default' : 'ghost'}
-                size="sm"
-                className="w-full justify-start gap-2"
-                onClick={() => setActiveSection('usuarios')}
-              >
-                <Users className="h-4 w-4" />
-                Usuarios
-              </Button>
+              {!isAnalista && (
+                <Button
+                  variant={activeSection === 'usuarios' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="w-full justify-start gap-2"
+                  onClick={() => setActiveSection('usuarios')}
+                >
+                  <Users className="h-4 w-4" />
+                  Usuarios
+                </Button>
+              )}
             </div>
           </div>
         </aside>
@@ -1009,15 +1067,17 @@ export function AdminDashboard() {
               <FileText className="h-4 w-4" />
               Caracterizaciones
             </Button>
-            <Button
-              variant={activeSection === 'usuarios' ? 'default' : 'outline'}
-              size="sm"
-              className="gap-2"
-              onClick={() => setActiveSection('usuarios')}
-            >
-              <Users className="h-4 w-4" />
-              Usuarios
-            </Button>
+            {!isAnalista && (
+              <Button
+                variant={activeSection === 'usuarios' ? 'default' : 'outline'}
+                size="sm"
+                className="gap-2"
+                onClick={() => setActiveSection('usuarios')}
+              >
+                <Users className="h-4 w-4" />
+                Usuarios
+              </Button>
+            )}
           </div>
 
           {activeSection === 'caracterizaciones' && (
@@ -1041,27 +1101,27 @@ export function AdminDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="pendiente">Pendientes</SelectItem>
-                  <SelectItem value="sincronizado">Sincronizados</SelectItem>
-                  <SelectItem value="aprobado">Aprobados</SelectItem>
-                  <SelectItem value="rechazado">Rechazados</SelectItem>
+                  <SelectItem value="INICIADO">Iniciado</SelectItem>
+                  <SelectItem value="REVISADO">En Revisión</SelectItem>
+                  <SelectItem value="EN_ESTUDIO_CREDITO">En Estudio Crédito</SelectItem>
+                  <SelectItem value="APROBADO">Aprobado</SelectItem>
+                  <SelectItem value="CANCELADO">Cancelado</SelectItem>
                   {isAdmin && <SelectItem value="sin_asesor">Sin Asesor</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                {filteredCaracterizaciones.length} resultado(s)
-                {totalPages > 1 && ` · pág. ${currentPage}/${totalPages}`}
+                {caracterizaciones.length} cargados de {totalCount} total(es)
               </p>
-              {filteredCaracterizaciones.length > 0 && (
+              {caracterizaciones.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
                   className="gap-2"
                   onClick={() => {
                     const fecha = new Date().toISOString().split('T')[0]
-                    downloadCSV(filteredCaracterizaciones, `encuestas-${fecha}.csv`)
+                    downloadCSV(caracterizaciones, `encuestas-${fecha}.csv`)
                   }}
                 >
                   <Download className="h-4 w-4" />
@@ -1079,13 +1139,13 @@ export function AdminDashboard() {
                 <span className="text-sm text-muted-foreground">Cargando caracterizaciones...</span>
               </div>
             </div>
-          ) : filteredCaracterizaciones.length === 0 ? (
+          ) : caracterizaciones.length === 0 ? (
             <Card className="py-12 text-center">
               <CardContent>
                 <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
                 <h3 className="mb-2 text-lg font-medium">No hay caracterizaciones</h3>
                 <p className="text-sm text-muted-foreground">
-                  {caracterizaciones.length === 0
+                  {totalCount === 0
                     ? "Aun no se han sincronizado caracterizaciones al servidor"
                     : "No se encontraron resultados con los filtros aplicados"}
                 </p>
@@ -1093,118 +1153,106 @@ export function AdminDashboard() {
             </Card>
           ) : (
             <>
-            <div className="space-y-3">
-              {paginatedCaracterizaciones.map((c) => {
-                const config = getEstadoConfig(c.estado)
-                const Icon = config.icon
-                return (
-                  <Card key={c.id} className="transition-colors hover:bg-muted/30">
-                    <CardContent className="p-3 sm:p-4">
-                      <div className="flex items-start gap-3">
-                        {/* Icon — hidden on mobile */}
-                        <div className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                          <Users className="h-5 w-5 text-primary" />
-                        </div>
-
-                        {/* Main content */}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <h3 className="font-medium leading-tight">{getNombreCompleto(c)}</h3>
-                            <Badge variant="outline" className={`${config.color} shrink-0 text-[10px] px-1.5 py-0`}>
-                              <Icon className="mr-1 h-2.5 w-2.5" />
-                              {config.label}
-                            </Badge>
+            {/* Virtual scroll container */}
+            <div
+              ref={parentRef}
+              style={{ height: 'calc(100vh - 310px)', overflowY: 'auto' }}
+              className="rounded-md"
+            >
+              <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
+                {virtualizer.getVirtualItems().map((virtualRow) => {
+                  const c = caracterizaciones[virtualRow.index]
+                  if (!c) return null
+                  const config = getEstadoConfig(c.visita?.estado || c.estado)
+                  const Icon = config.icon
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={virtualizer.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualRow.start}px)`,
+                        paddingBottom: '12px',
+                      }}
+                    >
+                      <Card className="transition-colors hover:bg-muted/30">
+                        <CardContent className="p-3 sm:p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                              <Users className="h-5 w-5 text-primary" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <h3 className="font-medium leading-tight">{getNombreCompleto(c)}</h3>
+                                <Badge variant="outline" className={`${config.color} shrink-0 text-[10px] px-1.5 py-0`}>
+                                  <Icon className="mr-1 h-2.5 w-2.5" />
+                                  {config.label}
+                                </Badge>
+                              </div>
+                              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                {c.beneficiario?.numero_documento && (
+                                  <span className="flex items-center gap-1 font-mono">
+                                    <User className="h-3 w-3 shrink-0" />
+                                    {c.beneficiario.numero_documento}
+                                  </span>
+                                )}
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3 shrink-0" />
+                                  <span className="max-w-[110px] truncate sm:max-w-none">{c.predio?.nombre_predio || 'Sin predio'}</span>
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Map className="h-3 w-3 shrink-0" />
+                                  {c.predio?.municipio || 'Sin municipio'}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3 shrink-0" />
+                                  {new Date(c.created_at).toLocaleDateString()}
+                                </span>
+                                {!c.visita?.asesor_id && (
+                                  <span className="flex items-center gap-1 text-blue-500">
+                                    <User className="h-3 w-3 shrink-0" />
+                                    Sin asesor
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                              {c.predio?.latitud && c.predio?.longitud && (
+                                <Button variant="outline" size="sm" onClick={() => openMapView(c)} className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:gap-1 sm:px-3">
+                                  <Map className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline text-xs">Mapa</span>
+                                </Button>
+                              )}
+                              <Button variant="default" size="sm" onClick={() => openDetail(c)} className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:gap-1 sm:px-3">
+                                <Eye className="h-3.5 w-3.5" />
+                                <span className="hidden sm:inline text-xs">Ver</span>
+                              </Button>
+                            </div>
                           </div>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                            {c.beneficiario?.numero_documento && (
-                              <span className="flex items-center gap-1 font-mono">
-                                <User className="h-3 w-3 shrink-0" />
-                                {c.beneficiario.numero_documento}
-                              </span>
-                            )}
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3 shrink-0" />
-                              <span className="max-w-[110px] truncate sm:max-w-none">{c.predio?.nombre_predio || 'Sin predio'}</span>
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Map className="h-3 w-3 shrink-0" />
-                              {c.predio?.municipio || 'Sin municipio'}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3 shrink-0" />
-                              {new Date(c.created_at).toLocaleDateString()}
-                            </span>
-                            {!c.visita?.asesor_id && (
-                              <span className="flex items-center gap-1 text-blue-500">
-                                <User className="h-3 w-3 shrink-0" />
-                                Sin asesor
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Action buttons — stacked on mobile, row on desktop */}
-                        <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                          {c.predio?.latitud && c.predio?.longitud && (
-                            <Button variant="outline" size="sm" onClick={() => openMapView(c)} className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:gap-1 sm:px-3">
-                              <Map className="h-3.5 w-3.5" />
-                              <span className="hidden sm:inline text-xs">Mapa</span>
-                            </Button>
-                          )}
-                          <Button variant="default" size="sm" onClick={() => openDetail(c)} className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:gap-1 sm:px-3">
-                            <Eye className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline text-xs">Ver</span>
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
 
-            {/* Paginador */}
-            {totalPages > 1 && (
-              <div className="mt-4 flex items-center justify-between gap-2">
-                <p className="text-sm text-muted-foreground">
-                  Página {currentPage} de {totalPages} · {filteredCaracterizaciones.length} registros
-                </p>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(1)}
-                    className="hidden sm:flex"
-                  >
-                    «
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(p => p - 1)}
-                  >
-                    ‹ Anterior
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(p => p + 1)}
-                  >
-                    Siguiente ›
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(totalPages)}
-                    className="hidden sm:flex"
-                  >
-                    »
-                  </Button>
-                </div>
+            {/* Load more */}
+            {hasMore && (
+              <div className="mt-3 flex justify-center">
+                <Button variant="outline" onClick={loadMore} disabled={isLoadingMore} className="gap-2">
+                  {isLoadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isLoadingMore ? 'Cargando...' : `Cargar más (${totalCount - caracterizaciones.length} restantes)`}
+                </Button>
+              </div>
+            )}
+            {isLoadingMore && !hasMore && (
+              <div className="mt-3 flex justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
             )}
             </>
@@ -1227,7 +1275,7 @@ export function AdminDashboard() {
                   </Button>
                   <Button size="sm" onClick={() => { setShowInviteForm(!showInviteForm); setLastInviteResult(null) }} className="gap-2">
                     <Mail className="h-4 w-4" />
-                    Invitar Asesor
+                    Invitar Usuario
                   </Button>
                 </div>
               </div>
@@ -1267,6 +1315,7 @@ export function AdminDashboard() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="asesor">Asesor</SelectItem>
+                          <SelectItem value="analista">Analista</SelectItem>
                           <SelectItem value="campesino">Beneficiario / Campesino</SelectItem>
                           <SelectItem value="admin">Administrador</SelectItem>
                         </SelectContent>
@@ -1319,6 +1368,19 @@ export function AdminDashboard() {
                 </Card>
               )}
 
+              {/* Buscador de usuarios */}
+              {!isLoadingUsers && usuarios.length > 0 && (
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nombre o email..."
+                    value={userSearch}
+                    onChange={e => { setUserSearch(e.target.value); setUserPage(1) }}
+                    className="pl-9"
+                  />
+                </div>
+              )}
+
               {isLoadingUsers ? (
                 <div className="flex items-center justify-center py-20">
                   <div className="flex flex-col items-center gap-3">
@@ -1336,9 +1398,15 @@ export function AdminDashboard() {
                     </p>
                   </CardContent>
                 </Card>
+              ) : filteredUsuarios.length === 0 ? (
+                <Card className="py-8 text-center">
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">No se encontraron usuarios con "{userSearch}"</p>
+                  </CardContent>
+                </Card>
               ) : (
                 <div className="space-y-3">
-                  {usuarios.map((u) => {
+                  {paginatedUsuarios.map((u) => {
                     const invitation = getInvitationForEmail(u.email)
                     return (
                       <Card key={u.id} className={`transition-colors ${!u.activo ? 'opacity-60 border-red-500/20' : ''}`}>
@@ -1355,15 +1423,15 @@ export function AdminDashboard() {
                             <div className="flex flex-wrap items-center gap-2">
                               <h3 className="truncate font-medium">{u.nombre_completo || 'Sin nombre'}</h3>
                               <Badge variant="outline" className={
-                                u.rol === 'admin'
-                                  ? 'bg-orange-500/10 text-orange-500 border-orange-500/20'
-                                  : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                                u.rol === 'admin'    ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
+                                u.rol === 'analista' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
+                                u.rol === 'campesino'? 'bg-green-500/10 text-green-600 border-green-500/20' :
+                                                       'bg-blue-500/10 text-blue-500 border-blue-500/20'
                               }>
-                                {u.rol === 'admin' ? (
-                                  <><Shield className="mr-1 h-3 w-3" />Admin</>
-                                ) : (
-                                  <><User className="mr-1 h-3 w-3" />Asesor</>
-                                )}
+                                {u.rol === 'admin'     ? <><Shield className="mr-1 h-3 w-3" />Admin</> :
+                                 u.rol === 'analista'  ? <><Eye className="mr-1 h-3 w-3" />Analista</> :
+                                 u.rol === 'campesino' ? <><Sprout className="mr-1 h-3 w-3" />Agricultor</> :
+                                                         <><User className="mr-1 h-3 w-3" />Asesor</>}
                               </Badge>
                               {invitation && (
                                 <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-600 border-green-500/20">
@@ -1399,24 +1467,28 @@ export function AdminDashboard() {
                           </div>
 
                           <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
-                            {/* Cambiar rol — solo admin, no sobre sí mismo */}
+                            {/* Selector de rol — solo admin, no sobre sí mismo */}
                             {isAdmin && u.id !== currentUser?.id && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={changingRoleUserId === u.id}
-                                onClick={() => changeUserRole(u.id, u.rol === 'admin' ? 'asesor' : 'admin')}
-                                className={`gap-1.5 ${u.rol === 'admin' ? 'hover:bg-orange-50 hover:text-orange-600 hover:border-orange-300 dark:hover:bg-orange-950' : 'hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 dark:hover:bg-blue-950'}`}
-                              >
-                                {changingRoleUserId === u.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Shield className="h-4 w-4" />
+                              <div className="flex items-center gap-1">
+                                {changingRoleUserId === u.id && (
+                                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                                 )}
-                                <span className="hidden sm:inline">
-                                  {u.rol === 'admin' ? 'Quitar Admin' : 'Hacer Admin'}
-                                </span>
-                              </Button>
+                                <Select
+                                  value={u.rol}
+                                  onValueChange={(newRol) => changeUserRole(u.id, newRol)}
+                                  disabled={changingRoleUserId === u.id}
+                                >
+                                  <SelectTrigger className="h-8 w-32 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="admin">Administrador</SelectItem>
+                                    <SelectItem value="asesor">Asesor</SelectItem>
+                                    <SelectItem value="analista">Analista</SelectItem>
+                                    <SelectItem value="campesino">Agricultor</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             )}
                             {u.rol !== 'admin' && (
                               <Button
@@ -1443,6 +1515,33 @@ export function AdminDashboard() {
                       </Card>
                     )
                   })}
+
+                  {/* Paginación usuarios */}
+                  {userTotalPages > 1 && (
+                    <div className="flex items-center justify-between border-t border-border pt-4">
+                      <p className="text-sm text-muted-foreground">
+                        {filteredUsuarios.length} usuario{filteredUsuarios.length !== 1 ? 's' : ''} · Pág. {userPage} de {userTotalPages}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={userPage === 1}
+                          onClick={() => setUserPage(p => p - 1)}
+                        >
+                          Anterior
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={userPage === userTotalPages}
+                          onClick={() => setUserPage(p => p + 1)}
+                        >
+                          Siguiente
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1485,7 +1584,7 @@ export function AdminDashboard() {
 
       {/* Detail Dialog */}
       <Dialog open={showDetail} onOpenChange={setShowDetail}>
-        <DialogContent className="max-h-[95dvh] w-[calc(100vw-16px)] max-w-4xl overflow-hidden p-0 sm:w-full sm:max-h-[90vh]">
+        <DialogContent className="max-h-[95dvh] w-[calc(100vw-16px)] max-w-5xl overflow-hidden p-0 sm:w-full sm:max-h-[90vh]">
           <DialogHeader className="border-b border-border px-6 py-4">
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
@@ -1529,20 +1628,20 @@ export function AdminDashboard() {
                           Informacion del Productor
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <div className="flex justify-between">
+                      <CardContent className="space-y-2 text-sm [&>div>span:last-child]:min-w-0 [&>div>span:last-child]:break-words [&>div>span:last-child]:text-right">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Nombre:</span>
                           <span className="font-medium">{getNombreCompleto(selectedCaracterizacion)}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Documento:</span>
                           <span className="font-medium">{selectedCaracterizacion.beneficiario?.tipo_documento} {selectedCaracterizacion.beneficiario?.numero_documento}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Edad:</span>
                           <span>{selectedCaracterizacion.beneficiario?.edad || 'No especificada'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Ocupacion:</span>
                           <span>{selectedCaracterizacion.beneficiario?.ocupacion_principal || 'No especificada'}</span>
                         </div>
@@ -1556,20 +1655,20 @@ export function AdminDashboard() {
                           Contacto
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <div className="flex justify-between">
+                      <CardContent className="space-y-2 text-sm [&>div>span:last-child]:min-w-0 [&>div>span:last-child]:break-words [&>div>span:last-child]:text-right">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Telefono:</span>
                           <span className="font-medium">{selectedCaracterizacion.beneficiario?.telefono || 'No registrado'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Correo:</span>
                           <span>{selectedCaracterizacion.beneficiario?.correo || 'No registrado'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Municipio:</span>
                           <span>{selectedCaracterizacion.predio?.municipio || 'No especificado'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Vereda:</span>
                           <span>{selectedCaracterizacion.predio?.vereda || 'No especificada'}</span>
                         </div>
@@ -1583,16 +1682,16 @@ export function AdminDashboard() {
                           Registro
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <div className="flex justify-between">
+                      <CardContent className="space-y-2 text-sm [&>div>span:last-child]:min-w-0 [&>div>span:last-child]:break-words [&>div>span:last-child]:text-right">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Tecnico:</span>
                           <span className="font-medium">{selectedCaracterizacion.visita?.nombre_tecnico || selectedCaracterizacion.asesor?.nombre_completo || 'No registrado'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Fecha visita:</span>
                           <span>{selectedCaracterizacion.visita?.fecha_visita ? new Date(selectedCaracterizacion.visita.fecha_visita).toLocaleDateString() : 'No registrada'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Sincronizado:</span>
                           <span>{selectedCaracterizacion.fecha_sincronizacion ? new Date(selectedCaracterizacion.fecha_sincronizacion).toLocaleDateString() : 'Pendiente'}</span>
                         </div>
@@ -1636,29 +1735,29 @@ export function AdminDashboard() {
                           Datos del Predio
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <div className="flex justify-between">
+                      <CardContent className="space-y-2 text-sm [&>div>span:last-child]:min-w-0 [&>div>span:last-child]:break-words [&>div>span:last-child]:text-right">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Nombre:</span>
                           <span className="font-medium">{selectedCaracterizacion.predio?.nombre_predio || 'Sin nombre'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Area Total:</span>
                           <span>{selectedCaracterizacion.predio?.area_total ? `${selectedCaracterizacion.predio.area_total} ha` : 'No registrada'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Area Cultivada:</span>
                           <span>{selectedCaracterizacion.predio?.area_cultivada ? `${selectedCaracterizacion.predio.area_cultivada} ha` : 'No registrada'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Tenencia:</span>
                           <span>{selectedCaracterizacion.predio?.tipo_tenencia || 'No especificada'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Altitud:</span>
                           <span>{selectedCaracterizacion.predio?.altitud ? `${selectedCaracterizacion.predio.altitud} msnm` : 'No registrada'}</span>
                         </div>
                         {selectedCaracterizacion.predio?.latitud && selectedCaracterizacion.predio?.longitud && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between gap-x-3 min-w-0">
                             <span className="text-muted-foreground">Coordenadas:</span>
                             <span className="font-mono text-xs">
                               {selectedCaracterizacion.predio.latitud.toFixed(5)}, {selectedCaracterizacion.predio.longitud.toFixed(5)}
@@ -1675,28 +1774,28 @@ export function AdminDashboard() {
                           Caracteristicas del Predio
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <div className="flex justify-between">
+                      <CardContent className="space-y-2 text-sm [&>div>span:last-child]:min-w-0 [&>div>span:last-child]:break-words [&>div>span:last-child]:text-right">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Topografia:</span>
                           <span>{selectedCaracterizacion.caracterizacion_predio?.topografia || 'No especificada'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Cobertura vegetal:</span>
                           <span>{selectedCaracterizacion.caracterizacion_predio?.cobertura_vegetal || 'No especificada'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Acceso vial:</span>
                           <span>{selectedCaracterizacion.predio?.acceso_vial || selectedCaracterizacion.caracterizacion_predio?.ruta_acceso || 'No especificado'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Distancia cabecera:</span>
                           <span>{selectedCaracterizacion.predio?.distancia_cabecera ? `${selectedCaracterizacion.predio.distancia_cabecera} km` : 'No registrada'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Vive en predio:</span>
                           <span>{selectedCaracterizacion.predio?.vive_en_predio ? 'Si' : 'No'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Cultivos existentes:</span>
                           <span>{selectedCaracterizacion.predio?.cultivos_existentes || 'No especificados'}</span>
                         </div>
@@ -1714,28 +1813,28 @@ export function AdminDashboard() {
                           Area Productiva
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <div className="flex justify-between">
+                      <CardContent className="space-y-2 text-sm [&>div>span:last-child]:min-w-0 [&>div>span:last-child]:break-words [&>div>span:last-child]:text-right">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Cultivo principal:</span>
                           <span className="font-medium">{selectedCaracterizacion.area_productiva?.cultivo_principal || 'No registrado'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Area:</span>
                           <span>{selectedCaracterizacion.area_productiva?.area_cultivo_principal ? `${selectedCaracterizacion.area_productiva.area_cultivo_principal} ha` : 'No registrada'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Estado del cultivo:</span>
                           <span>{selectedCaracterizacion.area_productiva?.estado_cultivo || 'No especificado'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Destino produccion:</span>
                           <span>{selectedCaracterizacion.area_productiva?.destino_produccion || 'No especificado'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Donde comercializa:</span>
                           <span>{selectedCaracterizacion.area_productiva?.donde_comercializa || 'No especificado'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Ingreso mensual:</span>
                           <span>{selectedCaracterizacion.area_productiva?.ingreso_mensual_ventas ? `$${Number(selectedCaracterizacion.area_productiva.ingreso_mensual_ventas).toLocaleString()}` : 'No registrado'}</span>
                         </div>
@@ -1749,20 +1848,20 @@ export function AdminDashboard() {
                           Informacion Financiera
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <div className="flex justify-between">
+                      <CardContent className="space-y-2 text-sm [&>div>span:last-child]:min-w-0 [&>div>span:last-child]:break-words [&>div>span:last-child]:text-right">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Ingresos agropecuaria:</span>
                           <span>{selectedCaracterizacion.informacion_financiera?.ingresos_mensuales_agropecuaria ? `$${Number(selectedCaracterizacion.informacion_financiera.ingresos_mensuales_agropecuaria).toLocaleString()}` : 'No registrado'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Otros ingresos:</span>
                           <span>{selectedCaracterizacion.informacion_financiera?.ingresos_mensuales_otros ? `$${Number(selectedCaracterizacion.informacion_financiera.ingresos_mensuales_otros).toLocaleString()}` : 'No registrado'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Egresos:</span>
                           <span>{selectedCaracterizacion.informacion_financiera?.egresos_mensuales ? `$${Number(selectedCaracterizacion.informacion_financiera.egresos_mensuales).toLocaleString()}` : 'No registrado'}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between gap-x-3 min-w-0">
                           <span className="text-muted-foreground">Acceso credito:</span>
                           <span>{selectedCaracterizacion.informacion_financiera?.acceso_credito ? 'Si' : 'No'}</span>
                         </div>
@@ -1773,6 +1872,27 @@ export function AdminDashboard() {
 
                 <TabsContent value="acciones" className="m-0 p-6">
                   <div className="space-y-6">
+
+                    {/* Editar formulario — solo asesor (propio) y admin */}
+                    {(isAdmin || (currentProfile?.rol === 'asesor' && (!selectedCaracterizacion.visita?.asesor_id || selectedCaracterizacion.visita?.asesor_id === currentUser?.id))) && selectedCaracterizacion.visita?.id && (
+                      <Card className="border-primary/20 bg-primary/5">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="flex items-center gap-2 text-base">
+                            <PenTool className="h-4 w-4 text-primary" />
+                            Editar Formulario
+                          </CardTitle>
+                          <CardDescription>Modifica los datos del registro directamente en el formulario</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <Button asChild className="gap-2">
+                            <Link href={`/formulario/editar/${selectedCaracterizacion.visita.id}`}>
+                              <PenTool className="h-4 w-4" />
+                              Abrir Editor
+                            </Link>
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
 
                     {/* Exportar PDF */}
                     <Card>
@@ -1843,10 +1963,19 @@ export function AdminDashboard() {
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="flex flex-wrap gap-2">
-                          {(["pendiente", "sincronizado", "en_revision", "aprobado", "rechazado"] as const).map((est) => {
-                            const cfg = estadoConfig[est]
+                          {(["INICIADO", "REVISADO", "EN_ESTUDIO_CREDITO", "APROBADO", "CANCELADO"] as const)
+                            .filter(est => {
+                              const rol = currentProfile?.rol
+                              if (rol === 'admin') return true
+                              if (rol === 'asesor') return ['REVISADO'].includes(est)
+                              if (rol === 'analista') return ['EN_ESTUDIO_CREDITO', 'APROBADO', 'CANCELADO'].includes(est)
+                              return false
+                            })
+                            .map((est) => {
+                            const cfg = estadoConfig[est.toLowerCase() as EstadoKey] || estadoConfig.pendiente
                             const EstIcon = cfg.icon
-                            const isCurrent = (selectedCaracterizacion.estado || '').toLowerCase() === est
+                            const currentEstado = (selectedCaracterizacion.visita?.estado || selectedCaracterizacion.estado || '').toUpperCase()
+                            const isCurrent = currentEstado === est
                             return (
                               <Button
                                 key={est}
@@ -1854,7 +1983,7 @@ export function AdminDashboard() {
                                 size="sm"
                                 onClick={() => handleUpdateEstado(selectedCaracterizacion.id, est)}
                                 disabled={isUpdating || isCurrent}
-                                className={`gap-2 ${est === 'aprobado' && !isCurrent ? 'hover:bg-green-600 hover:text-white' : ''} ${est === 'rechazado' && !isCurrent ? 'hover:bg-red-600 hover:text-white' : ''}`}
+                                className={`gap-2 ${est === 'APROBADO' && !isCurrent ? 'hover:bg-green-600 hover:text-white' : ''} ${est === 'CANCELADO' && !isCurrent ? 'hover:bg-red-600 hover:text-white' : ''}`}
                               >
                                 <EstIcon className="h-4 w-4" />
                                 {cfg.label}
@@ -1885,7 +2014,7 @@ export function AdminDashboard() {
                                 .update({ observaciones, updated_at: new Date().toISOString() })
                                 .eq('id', selectedCaracterizacion.id)
                               toast.success('Observaciones guardadas')
-                              await loadData()
+                              await loadData({ page: 1, search: searchQuery, estado: filterEstado })
                             } catch {
                               toast.error('Error al guardar observaciones')
                             }

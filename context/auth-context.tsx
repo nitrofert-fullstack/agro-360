@@ -9,8 +9,9 @@ interface Profile {
   email: string
   nombre_completo: string
   telefono: string | null
-  rol: 'admin' | 'asesor' | 'campesino'
+  rol: 'admin' | 'asesor' | 'campesino' | 'analista'
   activo: boolean
+  numero_documento: string | null
 }
 
 interface AuthContextValue {
@@ -75,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       telefono: user.user_metadata?.telefono || null,
       rol: user.user_metadata?.rol || 'asesor',
       activo: true,
+      numero_documento: user.user_metadata?.numero_documento || null,
     })
   }, [supabase])
 
@@ -88,7 +90,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         // getSession() lee de las cookies/localStorage — sin petición de red
         const { data: { session }, error } = await supabase.auth.getSession()
-        if (error) throw error
+        if (error) {
+          // Si el refresh token guardado es inválido, limpiarlo y arrancar sin sesión
+          if (error.message?.includes('Refresh Token') || (error as { code?: string }).code === 'refresh_token_not_found') {
+            await supabase.auth.signOut()
+            setState(prev => ({ ...prev, user: null, session: null, loading: false }))
+            return
+          }
+          throw error
+        }
 
         // Parar el loading INMEDIATAMENTE — getSession() lee de localStorage sin red
         setState(prev => ({
@@ -115,30 +125,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Escuchar cambios de auth (login, logout, refresco de token)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, session: Session | null) => {
-        if (session?.user) {
-          await fetchProfile(session.user)
-        } else {
+      (event: AuthChangeEvent, session: Session | null) => {
+        // TOKEN_REFRESHED con sesión nula = refresh token inválido → limpiar
+        if (event === 'TOKEN_REFRESHED' && !session) {
+          supabase.auth.signOut()
           setProfile(null)
+          setState(prev => ({ ...prev, user: null, session: null, loading: false }))
+          return
         }
 
+        // Actualizar estado INMEDIATAMENTE sin bloquear en fetchProfile
         setState(prev => ({
           ...prev,
           user: session?.user ?? null,
           session,
           loading: false,
         }))
+
+        // Cargar perfil solo en eventos relevantes (no en TOKEN_REFRESHED ni PASSWORD_RECOVERY)
+        if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION')) {
+          fetchProfile(session.user)
+        } else if (!session) {
+          setProfile(null)
+        }
       }
     )
 
-    // Refrescar sesión cuando el usuario vuelve a la pestaña (previene expiración silenciosa)
+    // Refrescar sesión cuando el usuario vuelve a la pestaña (solo si el token expira pronto)
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible') {
         try {
           const { data: { session } } = await supabase.auth.getSession()
-          if (session) {
-            // Forzar refresco del token si está próximo a vencer o ya venció
-            await supabase.auth.refreshSession()
+          if (session?.expires_at) {
+            const nowSec = Math.floor(Date.now() / 1000)
+            const CINCO_MIN = 5 * 60
+            // Solo refrescar si faltan menos de 5 minutos para que expire
+            if (session.expires_at - nowSec < CINCO_MIN) {
+              const { error } = await supabase.auth.refreshSession()
+              // Si el refresh token ya no es válido, cerrar sesión limpiamente
+              if (error && (error.message?.includes('Refresh Token') || (error as { code?: string }).code === 'refresh_token_not_found')) {
+                await supabase.auth.signOut()
+                setProfile(null)
+                setState(prev => ({ ...prev, user: null, session: null, loading: false }))
+              }
+            }
           }
         } catch {
           // Silenciar: el onAuthStateChange manejará el estado resultante
@@ -200,18 +230,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (!supabase) return { error: 'Supabase not configured' }
-    setState(prev => ({ ...prev, loading: true }))
+    // Limpiar estado local INMEDIATAMENTE — no esperar respuesta del servidor
+    setProfile(null)
+    setState(prev => ({ ...prev, user: null, session: null, loading: false }))
+    try { localStorage.removeItem('auth_session_backup') } catch { /* ignorar */ }
+    // Invalidar sesión en el servidor (best-effort: si falla, el estado local ya está limpio)
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      setProfile(null)
-      try { localStorage.removeItem('auth_session_backup') } catch { /* ignorar */ }
-      return { error: null }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Error al cerrar sesión'
-      setState(prev => ({ ...prev, error: msg, loading: false }))
-      return { error: msg }
+      await supabase.auth.signOut()
+    } catch {
+      // Silenciar — el estado local ya se limpió arriba
     }
+    return { error: null }
   }, [supabase])
 
   const resetPassword = useCallback(async (email: string) => {

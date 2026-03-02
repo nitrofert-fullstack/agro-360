@@ -51,12 +51,10 @@ export function UserProfile() {
     : user?.email?.[0].toUpperCase() || "U"
 
   const handleLogout = async () => {
+    if (isLoggingOut) return
     setIsLoggingOut(true)
-    const { error } = await signOut()
-    if (!error) {
-      router.push("/auth/login")
-    }
-    setIsLoggingOut(false)
+    await signOut()
+    router.push("/auth/login")
   }
 
   return (
@@ -81,7 +79,7 @@ export function UserProfile() {
               {profile?.nombre_completo || user?.email?.split("@")[0]}
             </span>
             <span className="text-xs text-muted-foreground">
-              {profile?.rol === "admin" ? "Administrador" : "Asesor"}
+              {profile?.rol === "admin" ? "Administrador" : profile?.rol === "analista" ? "Analista" : "Asesor"}
             </span>
           </div>
         </Button>

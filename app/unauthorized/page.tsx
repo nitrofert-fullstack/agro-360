@@ -24,23 +24,22 @@ export default function UnauthorizedPage() {
             Debes iniciar sesion
           </h2>
           <p className="text-muted-foreground">
-            Esta seccion requiere que estes autenticado como asesor.
+            Esta seccion requiere autenticacion.
             Por favor inicia sesion para continuar.
           </p>
         </div>
-        
+
         {/* Mensaje informativo */}
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 text-left">
           <p className="text-sm text-amber-700 dark:text-amber-400">
-            Si eres un campesino y quieres consultar tu informacion, 
-            puedes hacerlo desde la seccion de <Link href="/consultar" className="underline font-medium">consultas</Link> sin necesidad de iniciar sesion.
+            Si ya tienes una cuenta, inicia sesion con tus credenciales de acceso.
           </p>
         </div>
         
         {/* Acciones */}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Button asChild variant="default" className="gap-2">
-            <Link href="/login">
+            <Link href="/auth/login">
               <LogIn className="h-4 w-4" />
               Iniciar sesion
             </Link>

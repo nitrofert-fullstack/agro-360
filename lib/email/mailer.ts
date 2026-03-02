@@ -154,8 +154,8 @@ export function buildConfirmacionRegistroEmail({
           Puedes revisar el estado de tu solicitud en el portal usando tu número de documento: <strong>${numeroDocumento}</strong>
         </p>
       </div>
-      <a href="${appUrl}/consultar" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-size:15px;font-weight:600">
-        Consultar mi solicitud
+      <a href="${appUrl}/dashboard" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-size:15px;font-weight:600">
+        Ver mi solicitud
       </a>
     </div>
     <div style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb">
@@ -332,7 +332,13 @@ export function buildEstadoNotificationEmail({
   appUrl: string
 }): string {
   const estadoConfig: Record<string, { label: string; color: string; bg: string; border: string; icon: string }> = {
-    aprobado:     { label: 'Aprobado',     color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', icon: '✓' },
+    // Estados actuales de BD
+    iniciado:           { label: 'Iniciado',              color: '#475569', bg: '#f8fafc', border: '#e2e8f0', icon: '○' },
+    revisado:           { label: 'Revisado',              color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe', icon: '👁' },
+    en_estudio_credito: { label: 'En Estudio de Crédito', color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe', icon: '📋' },
+    aprobado:           { label: 'Aprobado',              color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', icon: '✓' },
+    cancelado:          { label: 'Cancelado',             color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: '✗' },
+    // Estados legado
     rechazado:    { label: 'Rechazado',    color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: '✗' },
     en_revision:  { label: 'En Revisión',  color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe', icon: '👁' },
     sincronizado: { label: 'Sincronizado', color: '#0369a1', bg: '#f0f9ff', border: '#bae6fd', icon: '↑' },
@@ -364,7 +370,7 @@ export function buildEstadoNotificationEmail({
         <p style="color:#374151;font-size:13px;font-weight:600;margin:0 0 6px">Observaciones del técnico:</p>
         <p style="color:#555;font-size:13px;margin:0">${observaciones}</p>
       </div>` : ''}
-      <a href="${appUrl}/consultar" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-size:15px;font-weight:600">
+      <a href="${appUrl}/dashboard" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-size:15px;font-weight:600">
         Ver mi solicitud
       </a>
     </div>

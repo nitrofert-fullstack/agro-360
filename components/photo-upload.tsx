@@ -50,6 +50,25 @@ function resizeImage(file: File, maxWidth: number, maxHeight: number, quality: n
   })
 }
 
+function estimateSizeMB(dataUrl: string): number {
+  // base64 encodes 3 bytes per 4 chars; subtract ~37 chars for the data URI prefix
+  const base64 = dataUrl.split(',')[1] || ''
+  return (base64.length * 0.75) / (1024 * 1024)
+}
+
+async function compressImage(file: File): Promise<{ dataUrl: string; sizeMB: number; warn: boolean }> {
+  // Try progressively lower quality until ≤2MB (ideal) or give up at 0.4
+  const qualities = [0.85, 0.75, 0.65, 0.55, 0.45, 0.4]
+  let dataUrl = ''
+  for (const q of qualities) {
+    dataUrl = await resizeImage(file, 1280, 1280, q)
+    const sizeMB = estimateSizeMB(dataUrl)
+    if (sizeMB <= 2) return { dataUrl, sizeMB, warn: false }
+  }
+  const sizeMB = estimateSizeMB(dataUrl)
+  return { dataUrl, sizeMB, warn: true }
+}
+
 export function PhotoUpload({
   onPhotoCapture,
   currentPhoto = null,
@@ -60,6 +79,7 @@ export function PhotoUpload({
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentPhoto)
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sizeWarning, setSizeWarning] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const [cameraMode, setCameraMode] = useState(false)
@@ -131,18 +151,31 @@ export function PhotoUpload({
       return
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      setError('La imagen es demasiado grande. Maximo 10MB')
+    // Límite duro: >15MB no tiene sentido ni comprimir
+    if (file.size > 15 * 1024 * 1024) {
+      setError('La imagen es demasiado grande. Máximo 15MB para subir')
       return
     }
 
     setIsProcessing(true)
     setError(null)
+    setSizeWarning(null)
 
     try {
-      const dataUrl = await resizeImage(file, 1280, 1280, 0.85)
+      const { dataUrl, sizeMB, warn } = await compressImage(file)
+
+      // Bloquear si después de comprimir al máximo sigue pasando 5MB
+      if (sizeMB > 5) {
+        setError(`La imagen no pudo comprimirse lo suficiente (${sizeMB.toFixed(1)}MB). Por favor usa una foto de menor resolución.`)
+        return
+      }
+
       setPreviewUrl(dataUrl)
       onPhotoCapture(dataUrl)
+
+      if (warn) {
+        setSizeWarning(`Imagen optimizada: ${sizeMB.toFixed(1)}MB (ideal <2MB). Se subirá igual.`)
+      }
     } catch (err) {
       console.error('[v0] Error processing image:', err)
       setError('Error al procesar la imagen')
@@ -155,6 +188,7 @@ export function PhotoUpload({
     setPreviewUrl(null)
     onPhotoCapture(null)
     setError(null)
+    setSizeWarning(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -173,7 +207,7 @@ export function PhotoUpload({
                 Toma una foto o sube una imagen
               </p>
               <p className="text-xs text-muted-foreground">
-                {'Maximo 10MB - JPG, PNG o WebP'}
+                {'Ideal <2MB · Máx 5MB · JPG, PNG o WebP'}
               </p>
             </div>
             <div className="flex gap-2">
@@ -256,6 +290,7 @@ export function PhotoUpload({
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
       {error && <p className="text-xs text-destructive">{error}</p>}
+      {sizeWarning && <p className="text-xs text-amber-600">{sizeWarning}</p>}
 
       {isProcessing && !cameraMode && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

@@ -4,7 +4,8 @@
       "Bash(npx tsc:*)",
       "Bash(Select-String -NotMatch \"characterization-form\\\\.tsx|location-picker\\\\.tsx|map-viewer\\\\.tsx\")",
       "Bash(npx next build:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }

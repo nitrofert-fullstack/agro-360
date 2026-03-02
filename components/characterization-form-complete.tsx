@@ -12,7 +12,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { LocationPicker } from "./location-picker"
 import { SignaturePad } from "./signature-pad"
 import { PhotoUpload } from "./photo-upload"
-import { saveCaracterizacion, exportToJSON, generateRadicadoLocal } from "@/lib/db/indexed-db"
+import { saveCaracterizacion, generateRadicadoLocal } from "@/lib/db/indexed-db"
+import { generateCaracterizacionPDF, pdfFromFormData } from "@/lib/generate-pdf"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import {
   User,
@@ -45,6 +46,7 @@ import { UserProfile } from "./user-profile"
 import { useAuth } from "@/hooks/use-auth"
 import { toast } from "sonner"
 import Link from "next/link"
+import { Turnstile } from "@marsidev/react-turnstile"
 
 // Municipios de Santander (sin duplicados)
 const municipiosSantander = [...new Set([
@@ -99,6 +101,12 @@ interface FormData {
     telefono: string
     correo: string
     ocupacionPrincipal: string
+  }
+  // 2b. Contacto secundario / acudiente
+  contactoSecundario: {
+    nombre: string
+    telefono: string
+    parentesco: string
   }
   // 3. Datos del predio
   predio: {
@@ -183,6 +191,8 @@ interface FormData {
     foto1Url: string
     foto2Url: string
     firmaProductorUrl: string
+    fotoDocFrontalUrl: string
+    fotoDocTraseraUrl: string
   }
   // 10. Autorizaciones
   autorizaciones: {
@@ -211,6 +221,11 @@ const initialFormData: FormData = {
     telefono: "",
     correo: "",
     ocupacionPrincipal: "",
+  },
+  contactoSecundario: {
+    nombre: "",
+    telefono: "",
+    parentesco: "",
   },
   predio: {
     nombrePredio: "",
@@ -286,6 +301,8 @@ const initialFormData: FormData = {
     foto1Url: "",
     foto2Url: "",
     firmaProductorUrl: "",
+    fotoDocFrontalUrl: "",
+    fotoDocTraseraUrl: "",
   },
   autorizaciones: {
     autorizacionDatosPersonales: false,
@@ -335,18 +352,88 @@ const soloNumeros = (e: React.KeyboardEvent<HTMLInputElement>) => {
   }
 }
 
-export function CharacterizationFormComplete() {
+export function CharacterizationFormComplete({
+  initialData,
+  isEdit = false,
+  visitaId,
+}: {
+  initialData?: Partial<FormData>
+  isEdit?: boolean
+  visitaId?: string
+} = {}) {
   const router = useRouter()
   const { user, profile, isAuthenticated } = useAuth()
   const isAsesor = isAuthenticated && (profile?.rol === 'asesor' || profile?.rol === 'admin')
   const { isOnline } = useOnlineStatus()
   const [currentStep, setCurrentStep] = useState(1)
-  const [formData, setFormData] = useState<FormData>(initialFormData)
+  const [formData, setFormData] = useState<FormData>(() => {
+    if (initialData) {
+      // Merge con deep fusion base para asegurar la estructura
+      return { ...initialFormData, ...initialData } as FormData
+    }
+    return initialFormData
+  })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<ValidationErrors>({})
   const [showErrors, setShowErrors] = useState(false)
   const [submittedData, setSubmittedData] = useState<{ radicado: string; sincronizado: boolean } | null>(null)
   const [edadManual, setEdadManual] = useState(false)
+
+  // Turnstile token (solo requerido para usuarios no autenticados como asesor)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const captchaValid = isAsesor || !!turnstileToken
+
+  // Autocompletar desde documento previo (solo cuando está logueado)
+  const [buscandoDocumento, setBuscandoDocumento] = useState(false)
+  const buscarBeneficiarioPorDocumento = async (documento: string) => {
+    if (!isAuthenticated || documento.length < 6) return
+    setBuscandoDocumento(true)
+    try {
+      const res = await fetch(`/api/beneficiario?documento=${encodeURIComponent(documento)}`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (!data.encontrado) return
+      const b = data.beneficiario
+      setFormData(prev => ({
+        ...prev,
+        beneficiario: {
+          ...prev.beneficiario,
+          tipoDocumento: b.tipoDocumento || prev.beneficiario.tipoDocumento,
+          nombres: b.nombres || prev.beneficiario.nombres,
+          apellidos: b.apellidos || prev.beneficiario.apellidos,
+          // Estimar fecha de nacimiento desde la edad (1 de julio = punto medio del año)
+          fechaNacimiento: b.edad
+            ? `${new Date().getFullYear() - b.edad}-07-01`
+            : prev.beneficiario.fechaNacimiento,
+          edad: b.edad ?? prev.beneficiario.edad,
+          telefono: b.telefono || prev.beneficiario.telefono,
+          correo: b.correo || prev.beneficiario.correo,
+          ocupacionPrincipal: b.ocupacionPrincipal || prev.beneficiario.ocupacionPrincipal,
+        },
+        contactoSecundario: {
+          nombre: b.contactoSecundario?.nombre || prev.contactoSecundario.nombre,
+          telefono: b.contactoSecundario?.telefono || prev.contactoSecundario.telefono,
+          parentesco: b.contactoSecundario?.parentesco || prev.contactoSecundario.parentesco,
+        },
+        ...(b.ultimoPredio && {
+          predio: {
+            ...prev.predio,
+            municipio: b.ultimoPredio.municipio || prev.predio.municipio,
+            departamento: b.ultimoPredio.departamento || prev.predio.departamento,
+            vereda: b.ultimoPredio.vereda || prev.predio.vereda,
+          },
+        }),
+      }))
+      toast.info('Datos autocompletados', {
+        description: 'Se encontró un registro previo con este documento y se completaron los campos.',
+        duration: 4000,
+      })
+    } catch {
+      // Silenciar errores de red
+    } finally {
+      setBuscandoDocumento(false)
+    }
+  }
 
   // Auto-llenar nombre del técnico si el usuario autenticado es asesor o admin
   useEffect(() => {
@@ -395,14 +482,14 @@ export function CharacterizationFormComplete() {
   // Validacion por paso
   const validateStep = (step: number): ValidationErrors => {
     const stepErrors: ValidationErrors = {}
-    
+
     switch (step) {
       case 1: // Datos Visita
         if (!formData.visita.fechaVisita) stepErrors['visita.fechaVisita'] = 'La fecha de visita es requerida'
         // nombreTecnico solo requerido si hay un asesor logueado (se auto-completa)
         // Si el usuario llena el formulario solo, el campo es opcional
         break
-        
+
       case 2: // Beneficiario
         if (!formData.beneficiario.nombres.trim()) stepErrors['beneficiario.nombres'] = 'Los nombres son requeridos'
         if (!formData.beneficiario.apellidos.trim()) stepErrors['beneficiario.apellidos'] = 'Los apellidos son requeridos'
@@ -411,7 +498,7 @@ export function CharacterizationFormComplete() {
         if (!validatePhone(formData.beneficiario.telefono)) stepErrors['beneficiario.telefono'] = 'Telefono invalido (7-10 digitos)'
         if (formData.beneficiario.correo && !validateEmail(formData.beneficiario.correo)) stepErrors['beneficiario.correo'] = 'Correo electronico invalido'
         break
-        
+
       case 3: // Predio
         if (!formData.predio.nombrePredio.trim()) stepErrors['predio.nombrePredio'] = 'El nombre del predio es requerido'
         if (!formData.predio.municipio) stepErrors['predio.municipio'] = 'El municipio es requerido'
@@ -419,11 +506,11 @@ export function CharacterizationFormComplete() {
         if (!formData.predio.tipoTenencia) stepErrors['predio.tipoTenencia'] = 'El tipo de tenencia es requerido'
         if (formData.predio.areaTotalHectareas !== null && formData.predio.areaTotalHectareas < 0) stepErrors['predio.areaTotalHectareas'] = 'El area no puede ser negativa'
         break
-        
+
       case 4: // Caracterizacion
         if (!formData.caracterizacion.topografia) stepErrors['caracterizacion.topografia'] = 'La topografia es requerida'
         break
-        
+
       case 5: // Agua y Riesgos
         // Al menos una fuente de agua debe estar seleccionada
         const tieneAgua = formData.abastecimientoAgua.nacimientoManantial ||
@@ -436,27 +523,27 @@ export function CharacterizationFormComplete() {
           formData.abastecimientoAgua.otraFuente.trim()
         if (!tieneAgua) stepErrors['abastecimientoAgua'] = 'Debe seleccionar al menos una fuente de agua'
         break
-        
+
       case 6: // Area Productiva
         if (!formData.areaProductiva.sistemaProductivo.trim()) stepErrors['areaProductiva.sistemaProductivo'] = 'El sistema productivo es requerido'
         break
-        
+
       case 7: // Info Financiera
         // Campos opcionales pero si se llenan deben ser numeros positivos
         if (formData.infoFinanciera.ingresosMensualesAgropecuaria !== null && formData.infoFinanciera.ingresosMensualesAgropecuaria < 0) {
           stepErrors['infoFinanciera.ingresosMensualesAgropecuaria'] = 'Los ingresos no pueden ser negativos'
         }
         break
-        
+
       case 8: // Fotos y Firma
         if (!formData.archivos.firmaProductorUrl) stepErrors['archivos.firmaProductorUrl'] = 'La firma del productor es requerida'
         break
-        
+
       case 9: // Autorizacion
         if (!formData.autorizaciones.autorizacionDatosPersonales) stepErrors['autorizaciones.autorizacionDatosPersonales'] = 'Debe autorizar el tratamiento de datos personales'
         break
     }
-    
+
     return stepErrors
   }
 
@@ -519,14 +606,11 @@ export function CharacterizationFormComplete() {
     return { valid: Object.keys(allErrors).length === 0, firstErrorStep, errors: allErrors }
   }
 
-  // Enviar formulario
+  // Enviar formulario — cualquiera puede guardar (público → sync-public, asesor → sync)
   const handleSubmit = async () => {
-    // Solo asesores autenticados pueden guardar
-    if (!isAsesor) {
-      toast.error("Debes iniciar sesión como asesor para guardar", {
-        description: "Inicia sesión con tu cuenta de asesor y vuelve a intentarlo",
-      })
-      router.push(`/auth/login?redirectTo=/formulario`)
+    // Validar captcha (solo para usuarios no autenticados como asesor)
+    if (!captchaValid) {
+      toast.error('Verificación incorrecta', { description: 'Por favor responde correctamente la pregunta de seguridad.' })
       return
     }
 
@@ -555,7 +639,7 @@ export function CharacterizationFormComplete() {
         asesorId: user?.id,
         asesorEmail: user?.email,
         observaciones: formData.observaciones,
-        
+
         // 1. Datos de la visita (tabla visitas)
         visita: {
           fechaVisita: formData.visita.fechaVisita,
@@ -570,7 +654,7 @@ export function CharacterizationFormComplete() {
           objetivo: 'Caracterizacion predial',
           observaciones: formData.observaciones,
         },
-        
+
         // 2. Datos del beneficiario (tabla beneficiarios)
         beneficiario: {
           tipoDocumento: formData.beneficiario.tipoDocumento,
@@ -583,8 +667,12 @@ export function CharacterizationFormComplete() {
           telefono: formData.beneficiario.telefono || undefined,
           email: formData.beneficiario.correo || undefined,
           ocupacionPrincipal: formData.beneficiario.ocupacionPrincipal || undefined,
+          // Contacto secundario
+          nombreContactoSecundario: formData.contactoSecundario.nombre || undefined,
+          telefonoSecundario: formData.contactoSecundario.telefono || undefined,
+          parentescoContactoSecundario: formData.contactoSecundario.parentesco || undefined,
         },
-        
+
         // 3. Datos del predio (tabla predios)
         predio: {
           nombrePredio: formData.predio.nombrePredio,
@@ -609,7 +697,7 @@ export function CharacterizationFormComplete() {
           tieneVivienda: formData.predio.tieneVivienda,
           cultivosExistentes: formData.predio.cultivosExistentes,
         },
-        
+
         // 4. Caracterizacion del predio (tabla caracterizacion_predio)
         caracterizacion: {
           rutaAcceso: formData.caracterizacion.rutaAcceso,
@@ -623,7 +711,7 @@ export function CharacterizationFormComplete() {
           coberturaPastos: formData.caracterizacion.coberturaPastos,
           coberturaRastrojo: formData.caracterizacion.coberturaRastrojo,
         },
-        
+
         // 5. Agua y riesgos (tablas abastecimiento_agua y riesgos_predio)
         aguaRiesgos: {
           // Abastecimiento agua
@@ -660,7 +748,7 @@ export function CharacterizationFormComplete() {
             formData.riesgos.otrosRiesgos ? { tipo: formData.riesgos.otrosRiesgos, nivel: 'Medio' } : null,
           ].filter((r): r is { tipo: string; nivel: string } => r !== null),
         },
-        
+
         // 6. Area productiva (tabla area_productiva)
         areaProductiva: {
           sistemaProductivo: formData.areaProductiva.sistemaProductivo,
@@ -673,7 +761,7 @@ export function CharacterizationFormComplete() {
           dondeComercializa: formData.areaProductiva.dondeComercializa,
           ingresoMensualVentas: formData.areaProductiva.ingresoMensualVentas ?? undefined,
         },
-        
+
         // 7. Informacion financiera (tabla informacion_financiera)
         infoFinanciera: {
           ingresosMensuales: String(formData.infoFinanciera.ingresosMensualesAgropecuaria || 0),
@@ -686,15 +774,17 @@ export function CharacterizationFormComplete() {
           fuentesIngreso: ['Actividad agropecuaria'],
           accesoCredito: false,
         },
-        
+
         // 8. Archivos
         archivos: {
           fotoBeneficiario: formData.archivos.fotoBeneficiario,
           foto1Url: formData.archivos.foto1Url,
           foto2Url: formData.archivos.foto2Url,
           firmaProductorUrl: formData.archivos.firmaProductorUrl,
+          fotoDocFrontalUrl: formData.archivos.fotoDocFrontalUrl,
+          fotoDocTraseraUrl: formData.archivos.fotoDocTraseraUrl,
         },
-        
+
         // 9. Autorizacion
         autorizacion: {
           autorizaTratamientoDatos: formData.autorizaciones.autorizacionDatosPersonales,
@@ -703,7 +793,7 @@ export function CharacterizationFormComplete() {
           fechaAutorizacion: new Date().toISOString(),
         },
       }
-      
+
       // Online-first: intentar enviar directo al servidor
       if (isOnline) {
         try {
@@ -711,22 +801,59 @@ export function CharacterizationFormComplete() {
           const payload = {
             ...dataToSave,
             radicadoLocal: tempRadicado,
-            estado: 'PENDIENTE_SINCRONIZACION',
+            estado: isEdit ? 'INICIADO' : 'PENDIENTE_SINCRONIZACION',
             fechaRegistro: new Date().toISOString(),
             fechaActualizacion: new Date().toISOString(),
             intentosSincronizacion: 0,
           }
-          const res = await fetch('/api/sync', {
+
+          if (isEdit && visitaId) {
+            // Logica de Actualizacion
+            const res = await fetch('/api/actualizar-formulario', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ visitaId, datos: dataToSave }),
+            })
+            if (res.ok) {
+              toast.success("Formulario actualizado correctamente", {
+                description: "Se han guardado los cambios.",
+                duration: 6000,
+              })
+              setSubmittedData({ radicado: formData.visita.codigoFormulario || tempRadicado, sincronizado: true })
+              // Redirigir al dashboard despues de editar
+              setTimeout(() => {
+                router.push("/dashboard")
+              }, 2000)
+              return
+            } else {
+              const err = await res.json()
+              throw new Error(err.error || "Error al actualizar formulario")
+            }
+          }
+
+          // Asesores usan /api/sync (autenticado), el publico usa /api/sync-public
+          const endpoint = isAsesor ? '/api/sync' : '/api/sync-public'
+          const res = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ caracterizaciones: [payload] }),
+            body: JSON.stringify({
+              caracterizaciones: [payload],
+              ...(!isAsesor && { turnstileToken }),
+            }),
           })
           if (res.ok) {
             const result = await res.json()
-            const radicadoOficial = result.resultados?.[0]?.radicadoOficial || tempRadicado
-            toast.success("Caracterizacion guardada y sincronizada", {
-              description: `Radicado oficial: ${radicadoOficial}`,
-              duration: 5000,
+            const r0 = result.resultados?.[0]
+            const radicadoOficial = r0?.radicadoOficial || tempRadicado
+            const tienCorreo = !!formData.beneficiario.correo
+            const emailMsg = tienCorreo
+              ? r0?.usuarioNuevo
+                ? 'Recibirás un correo con tus credenciales de acceso.'
+                : 'Recibirás un correo de confirmación. Usa tus credenciales existentes para ingresar.'
+              : ''
+            toast.success("Formulario enviado correctamente", {
+              description: `Radicado: ${radicadoOficial}. ${emailMsg}`.trim(),
+              duration: 6000,
             })
             setSubmittedData({ radicado: radicadoOficial, sincronizado: true })
             return
@@ -737,10 +864,10 @@ export function CharacterizationFormComplete() {
         }
       }
 
-      // Offline fallback
+      // Offline fallback: solo si no hay internet
       const saved = await saveCaracterizacion(dataToSave)
-      toast.success("Caracterizacion guardada exitosamente", {
-        description: "Guardada sin conexión. Se sincronizará cuando uses el botón de sincronizar con internet.",
+      toast.success("Formulario guardado localmente", {
+        description: "Sin conexión a internet. Se enviará al servidor cuando haya conexión.",
         duration: 4000,
       })
       setSubmittedData({ radicado: saved.radicadoLocal, sincronizado: false })
@@ -879,6 +1006,50 @@ export function CharacterizationFormComplete() {
               )}
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
+                  <Label htmlFor="numeroDocumento" className="flex items-center gap-2">
+                    Numero Documento <span className="text-red-500">*</span>
+                    {buscandoDocumento && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                  </Label>
+                  <Input
+                    id="numeroDocumento"
+                    inputMode="numeric"
+                    value={formData.beneficiario.numeroDocumento}
+                    onChange={(e) => updateField("beneficiario", "numeroDocumento", e.target.value.replace(/\D/g, ''))}
+                    onBlur={(e) => buscarBeneficiarioPorDocumento(e.target.value)}
+                    onKeyDown={soloNumeros}
+                    placeholder="Solo digitos (6-12 digitos)"
+                    className={`h-11 ${errors['beneficiario.numeroDocumento'] ? 'border-red-500' : ''}`}
+                  />
+                  {isAuthenticated && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Info className="h-3 w-3" />
+                      Si el agricultor tiene registros previos, los campos se autocompletarán al salir de este campo.
+                    </p>
+                  )}
+                  {errors['beneficiario.numeroDocumento'] && <p className="text-sm text-red-500">{errors['beneficiario.numeroDocumento']}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tipoDocumento">Tipo Documento <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={formData.beneficiario.tipoDocumento}
+                    onValueChange={(value) => updateField("beneficiario", "tipoDocumento", value)}
+                  >
+                    <SelectTrigger className={`h-11 ${errors['beneficiario.tipoDocumento'] ? 'border-red-500' : ''}`}>
+                      <SelectValue placeholder="Seleccione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CC">Cedula de Ciudadania</SelectItem>
+                      <SelectItem value="CE">Cedula de Extranjeria</SelectItem>
+                      <SelectItem value="TI">Tarjeta de Identidad</SelectItem>
+                      <SelectItem value="PAS">Pasaporte</SelectItem>
+                      <SelectItem value="NIT">NIT</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors['beneficiario.tipoDocumento'] && <p className="text-sm text-red-500">{errors['beneficiario.tipoDocumento']}</p>}
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
                   <Label htmlFor="nombres">Nombres <span className="text-red-500">*</span></Label>
                   <Input
                     id="nombres"
@@ -901,40 +1072,6 @@ export function CharacterizationFormComplete() {
                   {errors['beneficiario.apellidos'] && <p className="text-sm text-red-500">{errors['beneficiario.apellidos']}</p>}
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="tipoDocumento">Tipo Documento <span className="text-red-500">*</span></Label>
-                  <Select
-                    value={formData.beneficiario.tipoDocumento}
-                    onValueChange={(value) => updateField("beneficiario", "tipoDocumento", value)}
-                  >
-                    <SelectTrigger className={`h-11 ${errors['beneficiario.tipoDocumento'] ? 'border-red-500' : ''}`}>
-                      <SelectValue placeholder="Seleccione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CC">Cedula de Ciudadania</SelectItem>
-                      <SelectItem value="CE">Cedula de Extranjeria</SelectItem>
-                      <SelectItem value="TI">Tarjeta de Identidad</SelectItem>
-                      <SelectItem value="PAS">Pasaporte</SelectItem>
-                      <SelectItem value="NIT">NIT</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors['beneficiario.tipoDocumento'] && <p className="text-sm text-red-500">{errors['beneficiario.tipoDocumento']}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="numeroDocumento">Numero Documento <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="numeroDocumento"
-                    inputMode="numeric"
-                    value={formData.beneficiario.numeroDocumento}
-                    onChange={(e) => updateField("beneficiario", "numeroDocumento", e.target.value.replace(/\D/g, ''))}
-                    onKeyDown={soloNumeros}
-                    placeholder="Solo digitos (6-12 digitos)"
-                    className={`h-11 ${errors['beneficiario.numeroDocumento'] ? 'border-red-500' : ''}`}
-                  />
-                  {errors['beneficiario.numeroDocumento'] && <p className="text-sm text-red-500">{errors['beneficiario.numeroDocumento']}</p>}
-                </div>
-              </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="fechaNacimiento">Fecha de Nacimiento</Label>
@@ -952,37 +1089,16 @@ export function CharacterizationFormComplete() {
                   <Label htmlFor="edad">Edad (años)</Label>
                   <Input
                     id="edad"
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    max="120"
-                    value={formData.beneficiario.edad ?? ""}
-                    onChange={(e) => {
-                      setEdadManual(true)
-                      updateField("beneficiario", "edad", e.target.value ? parseInt(e.target.value) : null)
-                    }}
-                    onKeyDown={soloNumeros}
-                    placeholder="Anos"
-                    className="h-11"
+                    value={formData.beneficiario.edad !== null ? `${formData.beneficiario.edad} años` : ""}
+                    readOnly
+                    placeholder="Se calcula automáticamente"
+                    className="h-11 bg-muted cursor-not-allowed text-muted-foreground"
                   />
-                  {formData.beneficiario.fechaNacimiento && !edadManual && (
+                  {formData.beneficiario.fechaNacimiento && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <Info className="h-3 w-3" />
-                      Calculada desde la fecha de nacimiento. Puedes editarla.
+                      Calculada automáticamente desde la fecha de nacimiento.
                     </p>
-                  )}
-                  {edadManual && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEdadManual(false)
-                        const edad = calcularEdad(formData.beneficiario.fechaNacimiento)
-                        if (edad !== null) updateField("beneficiario", "edad", edad)
-                      }}
-                      className="text-xs text-primary hover:underline flex items-center gap-1"
-                    >
-                      Recalcular desde fecha de nacimiento
-                    </button>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -1012,6 +1128,10 @@ export function CharacterizationFormComplete() {
                     className={`h-11 ${errors['beneficiario.correo'] ? 'border-red-500' : ''}`}
                   />
                   {errors['beneficiario.correo'] && <p className="text-sm text-red-500">{errors['beneficiario.correo']}</p>}
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Info className="h-3 w-3" />
+                    Al proporcionar el correo recibirás credenciales de acceso al sistema.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ocupacionPrincipal">Ocupación Principal</Label>
@@ -1022,6 +1142,50 @@ export function CharacterizationFormComplete() {
                     placeholder="Ej: Agricultor"
                     className="h-11"
                   />
+                </div>
+              </div>
+
+              {/* Contacto secundario / Acudiente */}
+              <div className="rounded-lg border border-border/50 bg-muted/20 p-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <h4 className="text-sm font-medium">Contacto Secundario / Acudiente <span className="text-xs font-normal text-muted-foreground">(Opcional)</span></h4>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="contactoNombre">Nombre completo</Label>
+                    <Input
+                      id="contactoNombre"
+                      value={formData.contactoSecundario.nombre}
+                      onChange={(e) => updateField("contactoSecundario", "nombre", e.target.value)}
+                      placeholder="Nombre del contacto secundario"
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contactoParentesco">Parentesco</Label>
+                    <Input
+                      id="contactoParentesco"
+                      value={formData.contactoSecundario.parentesco}
+                      onChange={(e) => updateField("contactoSecundario", "parentesco", e.target.value)}
+                      placeholder="Ej: Cónyuge, Hijo, Hermano"
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="contactoTelefono">Teléfono del contacto</Label>
+                    <Input
+                      id="contactoTelefono"
+                      inputMode="numeric"
+                      value={formData.contactoSecundario.telefono}
+                      onChange={(e) => updateField("contactoSecundario", "telefono", e.target.value.replace(/\D/g, ''))}
+                      onKeyDown={soloNumeros}
+                      placeholder="7-10 dígitos"
+                      className="h-11"
+                    />
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -1245,7 +1409,7 @@ export function CharacterizationFormComplete() {
                   rows={3}
                 />
               </div>
-              
+
               {/* Mapa de ubicación */}
               <div className="space-y-2">
                 <Label>Ubicación del Predio</Label>
@@ -1376,7 +1540,7 @@ export function CharacterizationFormComplete() {
                   {errors['caracterizacion.topografia'] && <p className="text-sm text-red-500">{errors['caracterizacion.topografia']}</p>}
                 </div>
               </div>
-              
+
               {/* Cobertura vegetal */}
               <div className="space-y-3">
                 <Label>Cobertura Vegetal</Label>
@@ -1516,7 +1680,7 @@ export function CharacterizationFormComplete() {
                   />
                 </div>
               </div>
-              
+
               {/* Riesgos */}
               <div className="space-y-3">
                 <Label className="text-base font-medium flex items-center gap-2">
@@ -1727,7 +1891,7 @@ export function CharacterizationFormComplete() {
                     type="number"
                     inputMode="numeric"
                     min="0"
-                    value={formData.infoFinanciera.ingresosMensualesAgropecuaria || ""}
+                    value={formData.infoFinanciera.ingresosMensualesAgropecuaria ?? ""}
                     onChange={(e) => updateField("infoFinanciera", "ingresosMensualesAgropecuaria", e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="Mensuales"
                     className="h-11"
@@ -1740,7 +1904,7 @@ export function CharacterizationFormComplete() {
                     type="number"
                     inputMode="numeric"
                     min="0"
-                    value={formData.infoFinanciera.ingresosMensualesOtros || ""}
+                    value={formData.infoFinanciera.ingresosMensualesOtros ?? ""}
                     onChange={(e) => updateField("infoFinanciera", "ingresosMensualesOtros", e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="Mensuales"
                     className="h-11"
@@ -1753,7 +1917,7 @@ export function CharacterizationFormComplete() {
                     type="number"
                     inputMode="numeric"
                     min="0"
-                    value={formData.infoFinanciera.egresosMensuales || ""}
+                    value={formData.infoFinanciera.egresosMensuales ?? ""}
                     onChange={(e) => updateField("infoFinanciera", "egresosMensuales", e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="Mensuales"
                     className="h-11"
@@ -1768,7 +1932,7 @@ export function CharacterizationFormComplete() {
                     type="number"
                     inputMode="numeric"
                     min="0"
-                    value={formData.infoFinanciera.activosTotales || ""}
+                    value={formData.infoFinanciera.activosTotales ?? ""}
                     onChange={(e) => updateField("infoFinanciera", "activosTotales", e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="Total de activos"
                     className="h-11"
@@ -1781,7 +1945,7 @@ export function CharacterizationFormComplete() {
                     type="number"
                     inputMode="numeric"
                     min="0"
-                    value={formData.infoFinanciera.activosAgropecuaria || ""}
+                    value={formData.infoFinanciera.activosAgropecuaria ?? ""}
                     onChange={(e) => updateField("infoFinanciera", "activosAgropecuaria", e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="Activos agropecuarios"
                     className="h-11"
@@ -1794,7 +1958,7 @@ export function CharacterizationFormComplete() {
                     type="number"
                     inputMode="numeric"
                     min="0"
-                    value={formData.infoFinanciera.pasivosTotales || ""}
+                    value={formData.infoFinanciera.pasivosTotales ?? ""}
                     onChange={(e) => updateField("infoFinanciera", "pasivosTotales", e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="Total de deudas"
                     className="h-11"
@@ -1856,6 +2020,29 @@ export function CharacterizationFormComplete() {
                     currentPhoto={formData.archivos.foto2Url}
                     label="Foto 2"
                   />
+                </div>
+              </div>
+
+              {/* Fotos del documento de identidad */}
+              <div className="space-y-3">
+                <Label className="text-base font-medium">Documento de Identidad</Label>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="space-y-3">
+                    <Label className="text-sm text-muted-foreground">Frontal del documento</Label>
+                    <PhotoUpload
+                      onPhotoCapture={(dataUrl) => updateField("archivos", "fotoDocFrontalUrl", dataUrl)}
+                      currentPhoto={formData.archivos.fotoDocFrontalUrl}
+                      label="Foto frontal del documento"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-sm text-muted-foreground">Reverso del documento</Label>
+                    <PhotoUpload
+                      onPhotoCapture={(dataUrl) => updateField("archivos", "fotoDocTraseraUrl", dataUrl)}
+                      currentPhoto={formData.archivos.fotoDocTraseraUrl}
+                      label="Foto reverso del documento"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1924,7 +2111,7 @@ export function CharacterizationFormComplete() {
                       Autorizacion de Tratamiento de Datos Personales <span className="text-red-500">*</span>
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Autorizo el tratamiento de mis datos personales conforme a la Ley 1581 de 2012 
+                      Autorizo el tratamiento de mis datos personales conforme a la Ley 1581 de 2012
                       y demas normas concordantes, para los fines del proyecto Agro360.
                     </p>
                     {errors['autorizaciones.autorizacionDatosPersonales'] && <p className="text-sm text-red-500 mt-2">{errors['autorizaciones.autorizacionDatosPersonales']}</p>}
@@ -1942,7 +2129,7 @@ export function CharacterizationFormComplete() {
                       Autorización de Consulta Crediticia
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Autorizo la consulta de mi historial crediticio en las centrales de riesgo 
+                      Autorizo la consulta de mi historial crediticio en las centrales de riesgo
                       para la evaluación de posibles beneficios del programa.
                     </p>
                   </div>
@@ -1961,10 +2148,30 @@ export function CharacterizationFormComplete() {
                 </div>
               </div>
 
+              {/* Verificación de seguridad Cloudflare Turnstile (solo para no asesores) */}
+              {!isAsesor && (
+                <div className="rounded-lg border border-border/50 bg-muted/30 p-4 space-y-3">
+                  <Label className="font-medium flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-primary" />
+                    Verificación de seguridad <span className="text-red-500">*</span>
+                  </Label>
+                  <Turnstile
+                    siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""}
+                    onSuccess={(token) => setTurnstileToken(token)}
+                    onExpire={() => setTurnstileToken(null)}
+                    onError={() => setTurnstileToken(null)}
+                    options={{ theme: "auto", language: "es" }}
+                  />
+                  {!turnstileToken && (
+                    <p className="text-xs text-muted-foreground">Completa la verificación para poder enviar el formulario.</p>
+                  )}
+                </div>
+              )}
+
               {/* Botón de envío */}
               <Button
                 onClick={handleSubmit}
-                disabled={isSubmitting || !formData.autorizaciones.autorizacionDatosPersonales}
+                disabled={isSubmitting || !formData.autorizaciones.autorizacionDatosPersonales || !captchaValid}
                 className="w-full h-12 text-base"
               >
                 {isSubmitting ? (
@@ -1990,21 +2197,13 @@ export function CharacterizationFormComplete() {
 
   // Pantalla de éxito — renderizada inline (funciona sin conexión)
   if (submittedData) {
-    const handleDownloadBackup = async () => {
-      try {
-        const jsonString = await exportToJSON()
-        const blob = new Blob([jsonString], { type: 'application/json' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `backup-Agro360-${new Date().toISOString().split('T')[0]}.json`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-      } catch (err) {
-        console.error('Error creating backup:', err)
-      }
+    const handleDownloadPDF = () => {
+      const pdfData = pdfFromFormData(
+        formData,
+        submittedData.radicado,
+        submittedData.sincronizado ? 'SINCRONIZADO' : 'PENDIENTE_SINCRONIZACION'
+      )
+      generateCaracterizacionPDF(pdfData)
     }
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
@@ -2046,17 +2245,39 @@ export function CharacterizationFormComplete() {
               </div>
 
               {submittedData.sincronizado ? (
-                <Alert className="border-green-500/20 bg-green-500/5">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-foreground">
-                    Registro sincronizado con el servidor. El radicado oficial ya está disponible en el sistema.
-                  </AlertDescription>
-                </Alert>
+                <div className="space-y-3">
+                  <Alert className="border-green-500/20 bg-green-500/5">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-foreground">
+                      Tu registro fue recibido por el servidor y está disponible en el sistema.
+                    </AlertDescription>
+                  </Alert>
+                  {!isAuthenticated && formData.beneficiario.correo && (
+                    <Alert className="border-primary/20 bg-primary/5">
+                      <Info className="h-4 w-4 text-primary" />
+                      <AlertDescription className="text-foreground">
+                        Se enviará un correo a <strong>{formData.beneficiario.correo}</strong> con tus credenciales de acceso para consultar tus registros.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {!isAuthenticated && !formData.beneficiario.correo && (
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        Para acceder a tus registros en el futuro,{" "}
+                        <Link href="/registro" className="text-primary underline font-medium">
+                          crea una cuenta de agricultor
+                        </Link>{" "}
+                        con el mismo correo que usarías.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
               ) : (
                 <Alert>
                   <Cloud className="h-4 w-4" />
                   <AlertDescription>
-                    Sin conexión. El registro está guardado localmente y se sincronizará cuando uses el botón de sincronizar con internet.
+                    Sin conexión a internet. El registro está guardado en este dispositivo. Cuando haya conexión, un asesor podrá sincronizarlo con el servidor.
                   </AlertDescription>
                 </Alert>
               )}
@@ -2070,11 +2291,11 @@ export function CharacterizationFormComplete() {
                   Nuevo Formulario
                 </button>
                 <button
-                  onClick={handleDownloadBackup}
+                  onClick={handleDownloadPDF}
                   className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted/50"
                 >
                   <Download className="h-4 w-4" />
-                  Descargar Respaldo
+                  Descargar PDF
                 </button>
                 <Link
                   href="/dashboard"
@@ -2144,18 +2365,16 @@ export function CharacterizationFormComplete() {
                 <button
                   key={step.id}
                   onClick={() => goToStep(step.id)}
-                  className={`flex flex-col items-center gap-1 min-w-[60px] p-2 rounded-lg transition-colors ${
-                    isActive ? "bg-primary/10" : isCompleted ? "bg-muted" : ""
-                  }`}
+                  className={`flex flex-col items-center gap-1 min-w-[60px] p-2 rounded-lg transition-colors ${isActive ? "bg-primary/10" : isCompleted ? "bg-muted" : ""
+                    }`}
                 >
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
-                      isActive
+                    className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${isActive
                         ? "bg-primary text-primary-foreground"
                         : isCompleted
                           ? "bg-primary/20 text-primary"
                           : "bg-muted text-muted-foreground"
-                    }`}
+                      }`}
                   >
                     <Icon className="h-4 w-4" />
                   </div>
@@ -2171,19 +2390,6 @@ export function CharacterizationFormComplete() {
 
       {/* Content */}
       <main className="mx-auto max-w-5xl px-4 py-6">
-        {/* Banner: login requerido para guardar */}
-        {!isAuthenticated && (
-          <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800/60 dark:bg-amber-900/20 dark:text-amber-300">
-            <Lock className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              Puedes diligenciar el formulario, pero{" "}
-              <strong>debes iniciar sesión como asesor para guardarlo</strong>.{" "}
-              <Link href="/auth/login?redirectTo=/formulario" className="font-semibold underline underline-offset-2 hover:no-underline">
-                Iniciar sesión
-              </Link>
-            </span>
-          </div>
-        )}
         {isAsesor && (
           <div className="mb-4 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800/60 dark:bg-green-900/20 dark:text-green-300">
             <Lock className="mt-0.5 h-4 w-4 shrink-0" />

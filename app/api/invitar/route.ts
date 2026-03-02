@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     }
 
     // Usar el rol recibido, validarlo y fallback a campesino
-    const rolesValidos = ['admin', 'asesor', 'campesino']
+    const rolesValidos = ['admin', 'asesor', 'campesino', 'analista']
     const rol = rolesValidos.includes(rolParam) ? rolParam : 'campesino'
 
     // Generar credenciales temporales

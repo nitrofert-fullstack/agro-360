@@ -6,18 +6,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/hooks/use-auth"
-import { 
-  MapPin, 
-  FileText, 
-  Shield, 
-  Leaf, 
-  BarChart3, 
+import {
+  MapPin,
+  FileText,
+  Shield,
+  Leaf,
+  BarChart3,
   Users,
   ArrowRight,
   Map,
   Sprout,
   Mountain,
-  Search,
   LogIn,
   LayoutDashboard
 } from "lucide-react"
@@ -47,12 +46,6 @@ export default function Home() {
             </div>
           </div>
           <nav className="flex items-center gap-1 md:gap-2">
-            <Button asChild variant="ghost" size="sm" className="hidden md:flex gap-2">
-              <Link href="/consultar">
-                <Search className="h-4 w-4" />
-                Consultar
-              </Link>
-            </Button>
             {!loading && (
               isAuthenticated ? (
                 <Button asChild variant="default" size="sm" className="gap-2">
@@ -94,12 +87,6 @@ export default function Home() {
                 <FileText className="h-5 w-5" />
                 Iniciar Caracterizacion
                 <ArrowRight className="h-4 w-4" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg" className="gap-2 bg-transparent">
-              <Link href="/consultar">
-                <Search className="h-5 w-5" />
-                Consultar Radicado
               </Link>
             </Button>
           </div>
@@ -299,9 +286,6 @@ export default function Home() {
             <div>
               <h4 className="mb-3 text-sm font-semibold text-foreground">Navegacion</h4>
               <div className="flex flex-col gap-2">
-                <Link href="/consultar" className="text-sm text-muted-foreground hover:text-foreground">
-                  Consultar Radicado
-                </Link>
                 <Link href="/auth/login" className="text-sm text-muted-foreground hover:text-foreground">
                   Acceso Asesores
                 </Link>

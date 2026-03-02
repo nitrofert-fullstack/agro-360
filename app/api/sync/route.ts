@@ -66,6 +66,7 @@ async function ensureStorageBuckets(adminClient: SupabaseClient): Promise<void> 
     { name: 'fotos-productores', public: true },
     { name: 'firmas', public: true },
     { name: 'fotos-predios', public: true },
+    { name: 'documentos-identidad', public: true },
   ]
 
   const { data: existingBuckets } = await adminClient.storage.listBuckets()
@@ -177,6 +178,9 @@ export async function POST(request: Request) {
               telefono: c.beneficiario?.telefono || null,
               correo: c.beneficiario?.email || null,
               ocupacion_principal: c.beneficiario?.ocupacionPrincipal || null,
+              nombre_contacto_secundario: c.beneficiario?.nombreContactoSecundario || null,
+              telefono_secundario: c.beneficiario?.telefonoSecundario || null,
+              parentesco_contacto_secundario: c.beneficiario?.parentescoContactoSecundario || null,
               updated_at: new Date().toISOString(),
             })
             .eq('id', existingBenef.id)
@@ -196,6 +200,9 @@ export async function POST(request: Request) {
               telefono: c.beneficiario?.telefono || null,
               correo: c.beneficiario?.email || null,
               ocupacion_principal: c.beneficiario?.ocupacionPrincipal || null,
+              nombre_contacto_secundario: c.beneficiario?.nombreContactoSecundario || null,
+              telefono_secundario: c.beneficiario?.telefonoSecundario || null,
+              parentesco_contacto_secundario: c.beneficiario?.parentescoContactoSecundario || null,
             })
             .select('id')
             .single()
@@ -365,7 +372,7 @@ export async function POST(request: Request) {
             fecha_emision_formulario: c.visita?.fechaEmisionFormulario || null,
             radicado_local: c.radicadoLocal,
             radicado_oficial: radicadoOficial,
-            estado: 'SINCRONIZADO',
+            estado: 'INICIADO',
             asesor_id: user.id,
           })
           .select('id')
@@ -384,14 +391,20 @@ export async function POST(request: Request) {
         // === 10. CARACTERIZACIONES (tabla: caracterizaciones - relacional principal) ===
         // Subir fotos y firma a Storage si son base64 (data URLs exceden VARCHAR(500))
         const timestamp = Date.now()
+        const fotoBeneficiarioRaw = c.archivos?.fotoBeneficiario || null
         const foto1Raw = c.archivos?.foto1Url || null
         const foto2Raw = c.archivos?.foto2Url || null
         const firmaRaw = c.archivos?.firmaProductorUrl || c.autorizacion?.firmaDigital || null
+        const fotoDocFrontalRaw = c.archivos?.fotoDocFrontalUrl || null
+        const fotoDocTraseraRaw = c.archivos?.fotoDocTraseraUrl || null
 
-        const [foto1Url, foto2Url, firmaUrl] = await Promise.all([
-          uploadBase64ToStorage(supabase, foto1Raw, 'fotos-productores', `${c.radicadoLocal}/foto-1-${timestamp}.jpg`, 'image/jpeg'),
-          uploadBase64ToStorage(supabase, foto2Raw, 'fotos-productores', `${c.radicadoLocal}/foto-2-${timestamp}.jpg`, 'image/jpeg'),
-          uploadBase64ToStorage(supabase, firmaRaw, 'firmas', `${c.radicadoLocal}/firma-${timestamp}.png`, 'image/png'),
+        const [fotoBeneficiarioUrl, foto1Url, foto2Url, firmaUrl, fotoDocFrontalUrl, fotoDocTraseraUrl] = await Promise.all([
+          uploadBase64ToStorage(supabase, fotoBeneficiarioRaw, 'fotos-productores', `${docNum}/foto-beneficiario-${timestamp}.jpg`, 'image/jpeg'),
+          uploadBase64ToStorage(supabase, foto1Raw, 'fotos-productores', `${docNum}/foto-1-${timestamp}.jpg`, 'image/jpeg'),
+          uploadBase64ToStorage(supabase, foto2Raw, 'fotos-productores', `${docNum}/foto-2-${timestamp}.jpg`, 'image/jpeg'),
+          uploadBase64ToStorage(supabase, firmaRaw, 'firmas', `${docNum}/firma-${timestamp}.png`, 'image/png'),
+          uploadBase64ToStorage(supabase, fotoDocFrontalRaw, 'documentos-identidad', `${docNum}/doc-frontal-${timestamp}.jpg`, 'image/jpeg'),
+          uploadBase64ToStorage(supabase, fotoDocTraseraRaw, 'documentos-identidad', `${docNum}/doc-trasera-${timestamp}.jpg`, 'image/jpeg'),
         ])
 
         const { error: caracMainErr } = await supabase
@@ -401,9 +414,12 @@ export async function POST(request: Request) {
             id_beneficiario: beneficiarioId,
             id_predio: predioId,
             observaciones: c.observaciones || null,
+            foto_beneficiario_url: fotoBeneficiarioUrl,
             foto_1_url: foto1Url,
             foto_2_url: foto2Url,
             firma_productor_url: firmaUrl,
+            foto_doc_frontal_url: fotoDocFrontalUrl,
+            foto_doc_trasera_url: fotoDocTraseraUrl,
             autorizacion_datos_personales: c.autorizacion?.autorizaTratamientoDatos ?? false,
             autorizacion_consulta_crediticia: c.autorizacion?.autorizaConsultaCrediticia ?? false,
           })
@@ -453,6 +469,7 @@ export async function POST(request: Request) {
                     nombre_completo: nombrebenef,
                     rol: 'campesino',
                     activo: true,
+                    numero_documento: docNum,
                   })
 
                   const html = buildSyncNotificationEmail({

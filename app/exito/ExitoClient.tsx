@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { CheckCircle, Home, Plus, Cloud, Download, Leaf, Search } from "lucide-react"
+import { CheckCircle, Home, Plus, Cloud, Download, Leaf } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -10,7 +10,8 @@ import { ConnectionStatus } from "@/components/connection-status"
 import { SyncButton } from "@/components/sync-button"
 import { useAuth } from "@/hooks/use-auth"
 import { useOnlineStatus } from "@/hooks/use-online-status"
-import { exportToJSON } from "@/lib/db/indexed-db"
+import { getCaracterizacionByRadicado } from "@/lib/db/indexed-db"
+import { generateCaracterizacionPDF, pdfFromLocalData } from "@/lib/generate-pdf"
 
 export default function ExitoPage() {
   const searchParams = useSearchParams()
@@ -18,20 +19,18 @@ export default function ExitoPage() {
   const synced = searchParams.get("synced") === "1"
   const { isAuthenticated } = useAuth()
   const { isOnline } = useOnlineStatus()
-  const handleDownloadBackup = async () => {
+  const handleDownloadPDF = async () => {
     try {
-      const jsonString = await exportToJSON()
-      const blob = new Blob([jsonString], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `backup-Agro360-${new Date().toISOString().split("T")[0]}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      if (radicado) {
+        const local = await getCaracterizacionByRadicado(radicado)
+        if (local) {
+          generateCaracterizacionPDF(pdfFromLocalData(local))
+          return
+        }
+      }
+      alert('No se encontraron datos para generar el PDF')
     } catch (error) {
-      console.error("Error creating backup:", error)
+      console.error("Error generating PDF:", error)
     }
   }
 
@@ -66,19 +65,6 @@ export default function ExitoPage() {
           </CardHeader>
           
           <CardContent className="space-y-6">
-            {/* Consulta por documento */}
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-left">
-              <div className="mb-2 flex items-center gap-2">
-                <Search className="h-4 w-4 text-primary" />
-                <p className="text-sm font-medium">Consulta el estado de tu solicitud</p>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Puedes consultar el estado de tu caracterizacion usando tu{" "}
-                <span className="font-semibold text-foreground">numero de documento</span>{" "}
-                en la seccion de consultas.
-              </p>
-            </div>
-
             {/* Radicado — solo referencia */}
             {radicado && (
               <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
@@ -132,9 +118,9 @@ export default function ExitoPage() {
                   Nuevo Formulario
                 </Link>
               </Button>
-              <Button variant="outline" onClick={handleDownloadBackup} className="gap-2">
+              <Button variant="outline" onClick={handleDownloadPDF} className="gap-2">
                 <Download className="h-4 w-4" />
-                Descargar Respaldo
+                Descargar PDF
               </Button>
               <Button variant="outline" asChild>
                 <Link href="/dashboard" className="gap-2">
