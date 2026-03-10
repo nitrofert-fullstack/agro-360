@@ -58,12 +58,12 @@ export default function ExitoPage() {
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10">
               <CheckCircle className="h-10 w-10 text-green-500" />
             </div>
-            <CardTitle className="text-2xl">Caracterizacion Registrada</CardTitle>
+            <CardTitle className="text-2xl">Caracterización Registrada</CardTitle>
             <CardDescription>
               El formulario se ha guardado correctamente en tu dispositivo
             </CardDescription>
           </CardHeader>
-          
+
           <CardContent className="space-y-6">
             {/* Radicado — solo referencia */}
             {radicado && (
@@ -78,7 +78,7 @@ export default function ExitoPage() {
               <Alert>
                 <Cloud className="h-4 w-4" />
                 <AlertDescription>
-                  Estas sin conexion. Tu formulario esta guardado localmente y se enviara al servidor automaticamente cuando recuperes internet.
+                  Estás sin conexión. Tu formulario está guardado localmente y se enviará al servidor automáticamente cuando recuperes internet.
                 </AlertDescription>
               </Alert>
             )}
@@ -87,7 +87,7 @@ export default function ExitoPage() {
               <Alert className="border-green-500/20 bg-green-500/10">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-700 dark:text-green-400">
-                  Tu registro fue enviado al servidor exitosamente. El equipo tecnico lo revisara pronto.
+                  Tu registro fue enviado al servidor exitosamente. El equipo técnico lo revisará pronto.
                 </AlertDescription>
               </Alert>
             )}
@@ -96,7 +96,7 @@ export default function ExitoPage() {
               <Alert className="border-yellow-500/20 bg-yellow-500/5">
                 <Cloud className="h-4 w-4 text-yellow-600" />
                 <AlertDescription className="text-yellow-700 dark:text-yellow-400">
-                  Tu registro esta guardado localmente. Se intentara enviar al servidor automaticamente en breve.
+                  Tu registro está guardado localmente. Se intentará enviar al servidor automáticamente en breve.
                 </AlertDescription>
               </Alert>
             )}
@@ -105,7 +105,7 @@ export default function ExitoPage() {
               <Alert className="border-green-500/20 bg-green-500/10">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-700 dark:text-green-400">
-                  Puedes sincronizar ahora con el boton de arriba o hacerlo mas tarde.
+                  Puedes sincronizar ahora con el botón de arriba o hacerlo más tarde.
                 </AlertDescription>
               </Alert>
             )}
@@ -132,13 +132,13 @@ export default function ExitoPage() {
 
             {/* Info box */}
             <div className="rounded-lg bg-muted/50 p-4 text-left">
-              <h4 className="mb-2 font-medium">Proximos pasos:</h4>
+              <h4 className="mb-2 font-medium">Próximos pasos:</h4>
               <ul className="space-y-1 text-sm text-muted-foreground">
-                <li>1. Tu registro se envia automaticamente al servidor cuando hay internet</li>
-                <li>2. Un tecnico revisara y aprobara tu solicitud</li>
-                <li>3. Si proporcionaste correo, recibiras una confirmacion por email</li>
-                <li>4. Cuando sea aprobada, recibiras tus credenciales de acceso</li>
-                <li>5. Mientras tanto, consulta el estado por tu numero de documento</li>
+                <li>1. Tu registro se envía automáticamente al servidor cuando hay internet</li>
+                <li>2. Un técnico revisará y aprobará tu solicitud</li>
+                <li>3. Si proporcionaste correo, recibirás una confirmación por email</li>
+                <li>4. Cuando sea aprobada, recibirás tus credenciales de acceso</li>
+                <li>5. Mientras tanto, consulta el estado por tu número de documento</li>
               </ul>
             </div>
           </CardContent>

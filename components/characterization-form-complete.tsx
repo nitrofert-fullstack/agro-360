@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -98,6 +99,8 @@ interface FormData {
     numeroDocumento: string
     fechaNacimiento: string
     edad: number | null
+    genero: string
+    personasACargo: number | null
     telefono: string
     correo: string
     ocupacionPrincipal: string
@@ -218,6 +221,8 @@ const initialFormData: FormData = {
     numeroDocumento: "",
     fechaNacimiento: "",
     edad: null,
+    genero: "",
+    personasACargo: null,
     telefono: "",
     correo: "",
     ocupacionPrincipal: "",
@@ -374,6 +379,7 @@ export function CharacterizationFormComplete({
     return initialFormData
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const submitLock = useRef(false)
   const [errors, setErrors] = useState<ValidationErrors>({})
   const [showErrors, setShowErrors] = useState(false)
   const [submittedData, setSubmittedData] = useState<{ radicado: string; sincronizado: boolean } | null>(null)
@@ -401,11 +407,10 @@ export function CharacterizationFormComplete({
           tipoDocumento: b.tipoDocumento || prev.beneficiario.tipoDocumento,
           nombres: b.nombres || prev.beneficiario.nombres,
           apellidos: b.apellidos || prev.beneficiario.apellidos,
-          // Estimar fecha de nacimiento desde la edad (1 de julio = punto medio del año)
-          fechaNacimiento: b.edad
-            ? `${new Date().getFullYear() - b.edad}-07-01`
-            : prev.beneficiario.fechaNacimiento,
+          fechaNacimiento: b.fechaNacimiento || prev.beneficiario.fechaNacimiento,
           edad: b.edad ?? prev.beneficiario.edad,
+          genero: b.genero || prev.beneficiario.genero,
+          personasACargo: b.personasACargo ?? prev.beneficiario.personasACargo,
           telefono: b.telefono || prev.beneficiario.telefono,
           correo: b.correo || prev.beneficiario.correo,
           ocupacionPrincipal: b.ocupacionPrincipal || prev.beneficiario.ocupacionPrincipal,
@@ -494,9 +499,9 @@ export function CharacterizationFormComplete({
         if (!formData.beneficiario.nombres.trim()) stepErrors['beneficiario.nombres'] = 'Los nombres son requeridos'
         if (!formData.beneficiario.apellidos.trim()) stepErrors['beneficiario.apellidos'] = 'Los apellidos son requeridos'
         if (!formData.beneficiario.tipoDocumento) stepErrors['beneficiario.tipoDocumento'] = 'El tipo de documento es requerido'
-        if (!validateDocument(formData.beneficiario.numeroDocumento)) stepErrors['beneficiario.numeroDocumento'] = 'Numero de documento invalido (6-12 digitos)'
-        if (!validatePhone(formData.beneficiario.telefono)) stepErrors['beneficiario.telefono'] = 'Telefono invalido (7-10 digitos)'
-        if (formData.beneficiario.correo && !validateEmail(formData.beneficiario.correo)) stepErrors['beneficiario.correo'] = 'Correo electronico invalido'
+        if (!validateDocument(formData.beneficiario.numeroDocumento)) stepErrors['beneficiario.numeroDocumento'] = 'Número de documento inválido (6-12 dígitos)'
+        if (!validatePhone(formData.beneficiario.telefono)) stepErrors['beneficiario.telefono'] = 'Teléfono inválido (7-10 dígitos)'
+        if (formData.beneficiario.correo && !validateEmail(formData.beneficiario.correo)) stepErrors['beneficiario.correo'] = 'Correo electrónico inválido'
         break
 
       case 3: // Predio
@@ -505,10 +510,11 @@ export function CharacterizationFormComplete({
         if (!formData.predio.vereda.trim()) stepErrors['predio.vereda'] = 'La vereda es requerida'
         if (!formData.predio.tipoTenencia) stepErrors['predio.tipoTenencia'] = 'El tipo de tenencia es requerido'
         if (formData.predio.areaTotalHectareas !== null && formData.predio.areaTotalHectareas < 0) stepErrors['predio.areaTotalHectareas'] = 'El area no puede ser negativa'
+        if (!formData.predio.tipoUbicacion) stepErrors['predio.ubicacion'] = 'Debes marcar la ubicación del predio en el mapa'
         break
 
       case 4: // Caracterizacion
-        if (!formData.caracterizacion.topografia) stepErrors['caracterizacion.topografia'] = 'La topografia es requerida'
+        if (!formData.caracterizacion.topografia) stepErrors['caracterizacion.topografia'] = 'La topografía es requerida'
         break
 
       case 5: // Agua y Riesgos
@@ -608,8 +614,11 @@ export function CharacterizationFormComplete({
 
   // Enviar formulario — cualquiera puede guardar (público → sync-public, asesor → sync)
   const handleSubmit = async () => {
+    if (submitLock.current) return
+    submitLock.current = true
     // Validar captcha (solo para usuarios no autenticados como asesor)
     if (!captchaValid) {
+      submitLock.current = false
       toast.error('Verificación incorrecta', { description: 'Por favor responde correctamente la pregunta de seguridad.' })
       return
     }
@@ -663,10 +672,13 @@ export function CharacterizationFormComplete({
           segundoNombre: formData.beneficiario.nombres.split(' ').filter(Boolean)[1] || undefined,
           primerApellido: formData.beneficiario.apellidos.split(' ').filter(Boolean)[0] || '',
           segundoApellido: formData.beneficiario.apellidos.split(' ').filter(Boolean)[1] || undefined,
+          fechaNacimiento: formData.beneficiario.fechaNacimiento || undefined,
           edad: formData.beneficiario.edad ?? undefined,
           telefono: formData.beneficiario.telefono || undefined,
           email: formData.beneficiario.correo || undefined,
           ocupacionPrincipal: formData.beneficiario.ocupacionPrincipal || undefined,
+          genero: formData.beneficiario.genero || undefined,
+          personasACargo: formData.beneficiario.personasACargo ?? undefined,
           // Contacto secundario
           nombreContactoSecundario: formData.contactoSecundario.nombre || undefined,
           telefonoSecundario: formData.contactoSecundario.telefono || undefined,
@@ -741,8 +753,8 @@ export function CharacterizationFormComplete({
           helada: formData.riesgos.helada,
           otrosRiesgos: formData.riesgos.otrosRiesgos || undefined,
           riesgos: [
-            formData.riesgos.inundacion ? { tipo: 'Inundacion', nivel: 'Medio' } : null,
-            formData.riesgos.sequia ? { tipo: 'Sequia', nivel: 'Medio' } : null,
+            formData.riesgos.inundacion ? { tipo: 'Inundación', nivel: 'Medio' } : null,
+            formData.riesgos.sequia ? { tipo: 'Sequía', nivel: 'Medio' } : null,
             formData.riesgos.viento ? { tipo: 'Viento', nivel: 'Medio' } : null,
             formData.riesgos.helada ? { tipo: 'Helada', nivel: 'Medio' } : null,
             formData.riesgos.otrosRiesgos ? { tipo: formData.riesgos.otrosRiesgos, nivel: 'Medio' } : null,
@@ -878,6 +890,7 @@ export function CharacterizationFormComplete({
       })
     } finally {
       setIsSubmitting(false)
+      submitLock.current = false
     }
   }
 
@@ -913,7 +926,7 @@ export function CharacterizationFormComplete({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="nombreTecnico" className="flex items-center gap-2">
-                    Nombre del Tecnico / Asesor
+                    Nombre del Asesor
                     {isAsesor ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/40 dark:text-green-400">
                         <Lock className="h-3 w-3" />
@@ -934,7 +947,7 @@ export function CharacterizationFormComplete({
                   {isAsesor ? (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <Info className="h-3 w-3" />
-                      Nombre cargado automaticamente desde tu perfil de asesor.
+                      Nombre cargado automáticamente.
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -945,13 +958,18 @@ export function CharacterizationFormComplete({
                   {errors['visita.nombreTecnico'] && <p className="text-sm text-red-500">{errors['visita.nombreTecnico']}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="codigoFormulario">Código Formulario</Label>
+                  <Label htmlFor="codigoFormulario" className="flex items-center gap-2">
+                    Código Formulario
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/40 dark:text-green-400">
+                      <Lock className="h-3 w-3" />
+                      Auto-generado
+                    </span>
+                  </Label>
                   <Input
                     id="codigoFormulario"
-                    value={formData.visita.codigoFormulario}
-                    onChange={(e) => updateField("visita", "codigoFormulario", e.target.value)}
-                    placeholder="Ej: FORM-001"
-                    className="h-11"
+                    value={formData.visita.codigoFormulario || "Se asignará al guardar"}
+                    readOnly
+                    className="h-11 cursor-default bg-muted/50 text-muted-foreground"
                   />
                 </div>
               </div>
@@ -1089,17 +1107,21 @@ export function CharacterizationFormComplete({
                   <Label htmlFor="edad">Edad (años)</Label>
                   <Input
                     id="edad"
-                    value={formData.beneficiario.edad !== null ? `${formData.beneficiario.edad} años` : ""}
-                    readOnly
-                    placeholder="Se calcula automáticamente"
-                    className="h-11 bg-muted cursor-not-allowed text-muted-foreground"
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    max="120"
+                    value={formData.beneficiario.edad !== null ? formData.beneficiario.edad : ""}
+                    onChange={(e) => {
+                      setEdadManual(true)
+                      updateField("beneficiario", "edad", e.target.value !== "" ? parseInt(e.target.value) : null)
+                    }}
+                    placeholder="Ej: 45"
+                    className="h-11"
                   />
-                  {formData.beneficiario.fechaNacimiento && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Info className="h-3 w-3" />
-                      Calculada automáticamente desde la fecha de nacimiento.
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {formData.beneficiario.fechaNacimiento ? "Calculada desde la fecha de nacimiento (editable)" : "Ingrese la edad manualmente"}
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="telefono">Telefono <span className="text-red-500">*</span></Label>
@@ -1117,7 +1139,41 @@ export function CharacterizationFormComplete({
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="correo">Correo Electronico</Label>
+                  <Label htmlFor="genero">Género</Label>
+                  <Select
+                    value={formData.beneficiario.genero}
+                    onValueChange={(value) => updateField("beneficiario", "genero", value)}
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Seleccione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Masculino">Masculino</SelectItem>
+                      <SelectItem value="Femenino">Femenino</SelectItem>
+                      <SelectItem value="Otro">Otro</SelectItem>
+                      <SelectItem value="Prefiero no decir">Prefiero no decir</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="personasACargo">Personas a cargo</Label>
+                  <Input
+                    id="personasACargo"
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    max="20"
+                    value={formData.beneficiario.personasACargo ?? ""}
+                    onChange={(e) => updateField("beneficiario", "personasACargo", e.target.value !== "" ? parseInt(e.target.value) : null)}
+                    placeholder="Ej: 3"
+                    className="h-11"
+                  />
+                  <p className="text-xs text-muted-foreground">Número de personas que dependen económicamente del beneficiario</p>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="correo">Correo Electrónico</Label>
                   <Input
                     id="correo"
                     type="email"
@@ -1300,7 +1356,7 @@ export function CharacterizationFormComplete({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Propia">Propia</SelectItem>
-                      <SelectItem value="Posesion">Posesion</SelectItem>
+                      <SelectItem value="Posesion">Posesión</SelectItem>
                       <SelectItem value="Arriendo">Arriendo</SelectItem>
                       <SelectItem value="Otro">Otro</SelectItem>
                     </SelectContent>
@@ -1412,7 +1468,9 @@ export function CharacterizationFormComplete({
 
               {/* Mapa de ubicación */}
               <div className="space-y-2">
-                <Label>Ubicación del Predio</Label>
+                <Label>
+                  Ubicación del Predio <span className="text-destructive">*</span>
+                </Label>
                 <LocationPicker
                   onLocationChange={(loc) => {
                     setFormData(prev => ({
@@ -1433,6 +1491,9 @@ export function CharacterizationFormComplete({
                     tipoUbicacion: formData.predio.tipoUbicacion || "punto",
                   }}
                 />
+                {errors['predio.ubicacion'] && (
+                  <p className="text-sm text-destructive">{errors['predio.ubicacion']}</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1523,7 +1584,7 @@ export function CharacterizationFormComplete({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="topografia">Topografia <span className="text-red-500">*</span></Label>
+                  <Label htmlFor="topografia">Topografía <span className="text-red-500">*</span></Label>
                   <Select
                     value={formData.caracterizacion.topografia}
                     onValueChange={(value) => updateField("caracterizacion", "topografia", value)}
@@ -1534,7 +1595,7 @@ export function CharacterizationFormComplete({
                     <SelectContent>
                       <SelectItem value="0-25% Plana">0-25% Plana</SelectItem>
                       <SelectItem value="26-50% Inclinada">26-50% Inclinada</SelectItem>
-                      <SelectItem value="51%> Pendiente">51%{'>'} Pendiente</SelectItem>
+                      <SelectItem value="51%> Pendiente">{">"} 51% Pendiente pronunciada</SelectItem>
                     </SelectContent>
                   </Select>
                   {errors['caracterizacion.topografia'] && <p className="text-sm text-red-500">{errors['caracterizacion.topografia']}</p>}
@@ -1824,23 +1885,13 @@ export function CharacterizationFormComplete({
                   />
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="flex items-center gap-3 pt-2">
-                  <Checkbox
-                    id="tieneInfraestructuraProcesamiento"
-                    checked={formData.areaProductiva.tieneInfraestructuraProcesamiento}
-                    onCheckedChange={(checked) => updateField("areaProductiva", "tieneInfraestructuraProcesamiento", checked)}
-                  />
-                  <Label htmlFor="tieneInfraestructuraProcesamiento">Tiene infraestructura de procesamiento</Label>
-                </div>
-                <div className="flex items-center gap-3 pt-2">
-                  <Checkbox
-                    id="interesadoPrograma"
-                    checked={formData.areaProductiva.interesadoPrograma}
-                    onCheckedChange={(checked) => updateField("areaProductiva", "interesadoPrograma", checked)}
-                  />
-                  <Label htmlFor="interesadoPrograma">Interesado en Agro360</Label>
-                </div>
+              <div className="flex items-center gap-3 pt-2">
+                <Checkbox
+                  id="tieneInfraestructuraProcesamiento"
+                  checked={formData.areaProductiva.tieneInfraestructuraProcesamiento}
+                  onCheckedChange={(checked) => updateField("areaProductiva", "tieneInfraestructuraProcesamiento", checked)}
+                />
+                <Label htmlFor="tieneInfraestructuraProcesamiento">Tiene infraestructura de procesamiento</Label>
               </div>
               {formData.areaProductiva.tieneInfraestructuraProcesamiento && (
                 <div className="space-y-2">
@@ -1878,14 +1929,14 @@ export function CharacterizationFormComplete({
                 </div>
                 <div>
                   <CardTitle className="text-lg">Información Financiera</CardTitle>
-                  <CardDescription>Ingresos, egresos y activos</CardDescription>
+                  <CardDescription>Ingresos, egresos y activos — todos los valores deben ser <strong>mensuales</strong></CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="ingresosMensualesAgropecuaria">Ingresos Agropecuarios ($)</Label>
+                  <Label htmlFor="ingresosMensualesAgropecuaria">Ingresos Agropecuarios/mes ($)</Label>
                   <Input
                     id="ingresosMensualesAgropecuaria"
                     type="number"
@@ -1898,7 +1949,7 @@ export function CharacterizationFormComplete({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ingresosMensualesOtros">Otros Ingresos ($)</Label>
+                  <Label htmlFor="ingresosMensualesOtros">Otros Ingresos/mes ($)</Label>
                   <Input
                     id="ingresosMensualesOtros"
                     type="number"
@@ -1911,7 +1962,7 @@ export function CharacterizationFormComplete({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="egresosMensuales">Egresos Mensuales ($)</Label>
+                  <Label htmlFor="egresosMensuales">Egresos/mes ($)</Label>
                   <Input
                     id="egresosMensuales"
                     type="number"
@@ -2120,9 +2171,31 @@ export function CharacterizationFormComplete({
 
                 <div className="flex items-start gap-3">
                   <Checkbox
+                    id="interesadoPrograma"
+                    checked={formData.areaProductiva.interesadoPrograma}
+                    onCheckedChange={(checked) => {
+                      updateField("areaProductiva", "interesadoPrograma", checked)
+                      updateField("autorizaciones", "autorizacionConsultaCrediticia", checked)
+                    }}
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="interesadoPrograma" className="font-medium">
+                      Requiere acompañamiento para el trámite de financiación
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      El productor está interesado en opciones de financiación para su actividad agropecuaria y requiere acompañamiento para el trámite de financiación.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <Checkbox
                     id="autorizacionConsultaCrediticia"
                     checked={formData.autorizaciones.autorizacionConsultaCrediticia}
-                    onCheckedChange={(checked) => updateField("autorizaciones", "autorizacionConsultaCrediticia", checked)}
+                    onCheckedChange={(checked) => {
+                      updateField("autorizaciones", "autorizacionConsultaCrediticia", checked)
+                      updateField("areaProductiva", "interesadoPrograma", checked)
+                    }}
                   />
                   <div className="space-y-1">
                     <Label htmlFor="autorizacionConsultaCrediticia" className="font-medium">
@@ -2210,9 +2283,7 @@ export function CharacterizationFormComplete({
         <header className="border-b border-border bg-card/80 backdrop-blur-md">
           <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4">
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                <Sprout className="h-5 w-5 text-primary" />
-              </div>
+              <Image src="/icons/icon-192x192.png" alt="Agro360" width={36} height={36} className="rounded-lg" />
               <span className="text-lg font-semibold">Agro360</span>
             </Link>
             <div className="flex items-center gap-3">
@@ -2318,9 +2389,7 @@ export function CharacterizationFormComplete({
       <header className="sticky top-0 z-50 border-b border-border/40 bg-background/95 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-              <Sprout className="h-5 w-5 text-primary" />
-            </div>
+            <Image src="/icons/icon-192x192.png" alt="Agro360" width={36} height={36} className="rounded-lg" />
             <div>
               <h1 className="text-lg font-semibold">Agro360</h1>
               <p className="text-xs text-muted-foreground">Caracterización Predial</p>
@@ -2370,10 +2439,10 @@ export function CharacterizationFormComplete({
                 >
                   <div
                     className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${isActive
-                        ? "bg-primary text-primary-foreground"
-                        : isCompleted
-                          ? "bg-primary/20 text-primary"
-                          : "bg-muted text-muted-foreground"
+                      ? "bg-primary text-primary-foreground"
+                      : isCompleted
+                        ? "bg-primary/20 text-primary"
+                        : "bg-muted text-muted-foreground"
                       }`}
                   >
                     <Icon className="h-4 w-4" />

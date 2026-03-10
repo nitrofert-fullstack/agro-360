@@ -16,6 +16,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
+  // Verificar rol: campesinos solo pueden consultar su propio documento
+  const { data: userProfile } = await supabase
+    .from('profiles')
+    .select('rol, numero_documento')
+    .eq('id', user.id)
+    .single()
+
+  if (userProfile?.rol === 'campesino') {
+    const ownDoc = (userProfile as any).numero_documento
+    if (!ownDoc || ownDoc !== documento) {
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+    }
+  }
+
   // 1. Buscar el beneficiario por número de documento
   const { data: beneficiario, error } = await supabase
     .from('beneficiarios')
@@ -24,7 +38,10 @@ export async function GET(request: Request) {
       tipo_documento,
       nombres,
       apellidos,
+      fecha_nacimiento,
       edad,
+      genero,
+      personas_a_cargo,
       telefono,
       correo,
       ocupacion_principal,
@@ -60,7 +77,10 @@ export async function GET(request: Request) {
       tipoDocumento: beneficiario.tipo_documento || 'CC',
       nombres: beneficiario.nombres || '',
       apellidos: beneficiario.apellidos || '',
+      fechaNacimiento: (beneficiario as any).fecha_nacimiento || '',
       edad: beneficiario.edad ?? null,
+      genero: (beneficiario as any).genero || '',
+      personasACargo: (beneficiario as any).personas_a_cargo ?? null,
       telefono: beneficiario.telefono || '',
       correo: beneficiario.correo || '',
       ocupacionPrincipal: beneficiario.ocupacion_principal || '',

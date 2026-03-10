@@ -17,7 +17,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'visitaId y estado son requeridos' }, { status: 400 })
     }
 
-    const estadosValidos = ['INICIADO', 'REVISADO', 'EN_ESTUDIO_CREDITO', 'APROBADO', 'CANCELADO']
+    // Nota: este endpoint actualiza la caracterización asociada a la visita
+
+    const estadosValidos = ['REVISADO', 'EN_ESTUDIO_CREDITO', 'APROBADO', 'CANCELADO']
     if (!estadosValidos.includes(estado)) {
       return NextResponse.json({ error: `Estado invalido. Validos: ${estadosValidos.join(', ')}` }, { status: 400 })
     }
@@ -36,28 +38,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `El rol ${profile?.rol} no puede asignar el estado ${estado}` }, { status: 403 })
     }
 
-    // Actualizar estado de la visita
-    const { error: visitaErr } = await supabase
-      .from('visitas')
-      .update({
-        estado,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', visitaId)
-
-    if (visitaErr) {
-      return NextResponse.json({ error: `Error actualizando visita: ${visitaErr.message}` }, { status: 500 })
+    // Actualizar estado (y opcionalmente observaciones) en caracterizaciones
+    const updatePayload: Record<string, unknown> = {
+      estado,
+      updated_at: new Date().toISOString(),
+    }
+    if (observaciones !== undefined) {
+      updatePayload.observaciones = observaciones
     }
 
-    // Si hay observaciones, actualizar la caracterizacion
-    if (observaciones !== undefined) {
-      await supabase
-        .from('caracterizaciones')
-        .update({
-          observaciones,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id_visita', visitaId)
+    const { error: caracErr } = await supabase
+      .from('caracterizaciones')
+      .update(updatePayload)
+      .eq('id_visita', visitaId)
+
+    if (caracErr) {
+      return NextResponse.json({ error: `Error actualizando caracterización: ${caracErr.message}` }, { status: 500 })
     }
 
     // Enviar email de notificación al beneficiario
@@ -71,18 +67,25 @@ export async function POST(request: Request) {
 
         const { data: carac } = await adminClient
           .from('caracterizaciones')
-          .select(`
-            visita:visitas(radicado_oficial),
-            beneficiario:beneficiarios(nombres, apellidos, correo)
-          `)
+          .select('id_beneficiario')
           .eq('id_visita', visitaId)
           .single()
 
-        const correo = (carac?.beneficiario as any)?.correo
-        const nombres = (carac?.beneficiario as any)?.nombres || ''
-        const apellidos = (carac?.beneficiario as any)?.apellidos || ''
+        const { data: visita } = await adminClient
+          .from('visitas')
+          .select('radicado_oficial')
+          .eq('id', visitaId)
+          .single()
+
+        const { data: beneficiario } = carac?.id_beneficiario
+          ? await adminClient.from('beneficiarios').select('nombres, apellidos, correo').eq('id', carac.id_beneficiario).single()
+          : { data: null }
+
+        const correo = (beneficiario as any)?.correo
+        const nombres = (beneficiario as any)?.nombres || ''
+        const apellidos = (beneficiario as any)?.apellidos || ''
         const nombreCompleto = `${nombres} ${apellidos}`.trim() || 'Productor'
-        const radicadoOficial = (carac?.visita as any)?.radicado_oficial || visitaId
+        const radicadoOficial = (visita as any)?.radicado_oficial || visitaId
 
         if (correo) {
           const html = buildEstadoNotificationEmail({

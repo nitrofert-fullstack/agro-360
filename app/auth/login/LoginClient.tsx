@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Leaf, Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react"
+import Image from "next/image"
+import { Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,7 +16,11 @@ export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { signIn, loading } = useAuth()
-  const redirectTo = searchParams.get('redirectTo') || '/dashboard'
+  // Validar redirectTo: solo rutas internas relativas (evitar open redirect)
+  const rawRedirect = searchParams.get('redirectTo') || '/dashboard'
+  const redirectTo = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') && !rawRedirect.startsWith('/\\')
+    ? rawRedirect
+    : '/dashboard'
   
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -42,10 +47,10 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-            <Leaf className="h-7 w-7 text-primary" />
+          <div className="mx-auto mb-4">
+            <Image src="/icons/icon-192x192.png" alt="Agro360" width={56} height={56} className="rounded-xl" />
           </div>
-          <CardTitle className="text-2xl">Iniciar Sesion</CardTitle>
+          <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
           <CardDescription>
             Ingresa tus credenciales para acceder al sistema
           </CardDescription>
@@ -61,7 +66,7 @@ export default function LoginPage() {
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="email">Correo electronico</Label>
+              <Label htmlFor="email">Correo electrónico</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -115,7 +120,7 @@ export default function LoginPage() {
               className="w-full"
               disabled={isSubmitting || loading}
             >
-              {isSubmitting ? "Iniciando sesion..." : "Iniciar sesion"}
+              {isSubmitting ? "Iniciando sesión..." : "Iniciar sesión"}
             </Button>
 
             <div className="w-full rounded-lg border border-border bg-muted/30 p-3 text-center text-sm">

@@ -336,10 +336,10 @@ export function buildEstadoNotificationEmail({
     iniciado:           { label: 'Iniciado',              color: '#475569', bg: '#f8fafc', border: '#e2e8f0', icon: '○' },
     revisado:           { label: 'Revisado',              color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe', icon: '👁' },
     en_estudio_credito: { label: 'En Estudio de Crédito', color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe', icon: '📋' },
-    aprobado:           { label: 'Aprobado',              color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', icon: '✓' },
-    cancelado:          { label: 'Cancelado',             color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: '✗' },
+    aprobado:           { label: 'Viable',                color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', icon: '✓' },
+    cancelado:          { label: 'No Viable',             color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: '✗' },
     // Estados legado
-    rechazado:    { label: 'Rechazado',    color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: '✗' },
+    rechazado:    { label: 'No Viable',    color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: '✗' },
     en_revision:  { label: 'En Revisión',  color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe', icon: '👁' },
     sincronizado: { label: 'Sincronizado', color: '#0369a1', bg: '#f0f9ff', border: '#bae6fd', icon: '↑' },
     pendiente:    { label: 'Pendiente',    color: '#b45309', bg: '#fffbeb', border: '#fde68a', icon: '○' },

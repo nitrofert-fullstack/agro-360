@@ -27,23 +27,15 @@ export default async function FormularioPage() {
 
       if (beneficiarios && beneficiarios.length > 0) {
         const benefIds = beneficiarios.map((b: { id: string }) => b.id)
-        const { data: caracterizaciones } = await supabase
+        const { data: caracterizacionesActivas } = await supabase
           .from("caracterizaciones")
-          .select("id_visita")
+          .select("id")
           .in("id_beneficiario", benefIds)
+          .not("estado", "in", '("RECHAZADO","CANCELADO")')
 
-        if (caracterizaciones && caracterizaciones.length > 0) {
-          const visitaIds = caracterizaciones.map((c: { id_visita: string }) => c.id_visita)
-          const { data: visitasActivas } = await supabase
-            .from("visitas")
-            .select("id, estado")
-            .in("id", visitaIds)
-            .not("estado", "in", '("RECHAZADO","CANCELADO")')
-
-          if (visitasActivas && visitasActivas.length > 0) {
-            // Ya tiene un formulario activo, se redirige al dashboard
-            redirect("/dashboard")
-          }
+        if (caracterizacionesActivas && caracterizacionesActivas.length > 0) {
+          // Ya tiene un formulario activo, se redirige al dashboard
+          redirect("/dashboard")
         }
       }
     }

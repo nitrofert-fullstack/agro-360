@@ -68,27 +68,21 @@ export async function POST(request: Request) {
 
     const visitaId = caracBase.id_visita
 
-    // 2. Actualizar el estado en la tabla visitas (fuente de verdad del estado)
-    const { error: visitaErr } = await adminClient
-      .from('visitas')
-      .update({
-        estado: nuevoEstado,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', visitaId)
-
-    if (visitaErr) throw visitaErr
-
-    // 3. Actualizar observaciones en caracterizaciones si se proveen
-    if (observaciones !== undefined) {
-      await adminClient
-        .from('caracterizaciones')
-        .update({
-          observaciones,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
+    // 2. Actualizar estado (y opcionalmente observaciones) en caracterizaciones
+    const updatePayload: Record<string, unknown> = {
+      estado: nuevoEstado,
+      updated_at: new Date().toISOString(),
     }
+    if (observaciones !== undefined) {
+      updatePayload.observaciones = observaciones
+    }
+
+    const { error: caracUpdateErr } = await adminClient
+      .from('caracterizaciones')
+      .update(updatePayload)
+      .eq('id', id)
+
+    if (caracUpdateErr) throw caracUpdateErr
 
     // 4. Enviar email de notificación al beneficiario (queries separadas para evitar errores de schema cache)
     try {

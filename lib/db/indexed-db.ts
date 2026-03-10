@@ -33,6 +33,8 @@ export interface CaracterizacionLocal {
     primerApellido: string
     segundoApellido?: string
     edad?: number
+    genero?: string
+    personasACargo?: number
     telefono?: string
     email?: string
     ocupacionPrincipal?: string

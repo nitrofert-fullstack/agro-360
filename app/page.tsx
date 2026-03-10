@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +11,6 @@ import {
   MapPin,
   FileText,
   Shield,
-  Leaf,
   BarChart3,
   Users,
   ArrowRight,
@@ -37,12 +37,10 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-2 md:gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary md:h-10 md:w-10">
-              <Leaf className="h-5 w-5 text-primary-foreground md:h-6 md:w-6" />
-            </div>
+            <Image src="/icons/icon-192x192.png" alt="Agro360" width={40} height={40} className="rounded-lg" />
             <div>
               <h1 className="text-base font-bold text-foreground md:text-lg">Agro360</h1>
-              <p className="hidden text-xs text-muted-foreground sm:block">Caracterizacion Predial</p>
+              <p className="hidden text-xs text-muted-foreground sm:block">Caracterización Predial</p>
             </div>
           </div>
           <nav className="flex items-center gap-1 md:gap-2">
@@ -58,7 +56,7 @@ export default function Home() {
                 <Button asChild variant="default" size="sm" className="gap-2">
                   <Link href="/auth/login">
                     <LogIn className="h-4 w-4" />
-                    <span className="hidden sm:inline">Iniciar Sesion</span>
+                    <span className="hidden sm:inline">Iniciar Sesión</span>
                   </Link>
                 </Button>
               )
@@ -75,17 +73,17 @@ export default function Home() {
             <MapPin className="h-8 w-8 text-primary" />
           </div>
           <h2 className="mx-auto max-w-3xl text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-            Sistema de Caracterizacion Predial para Santander
+            Sistema de Caracterización Predial para Santander
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground">
-            Plataforma integral para el registro, analisis y monitoreo de predios agricolas 
-            utilizando tecnologia satelital NDVI y herramientas geoespaciales avanzadas.
+            Plataforma integral para el registro, análisis y monitoreo de predios agrícolas
+            utilizando tecnología satelital NDVI y herramientas geoespaciales avanzadas.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Button asChild size="lg" className="gap-2">
               <Link href="/formulario">
                 <FileText className="h-5 w-5" />
-                Iniciar Caracterizacion
+                Iniciar Caracterización
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
@@ -108,15 +106,15 @@ export default function Home() {
               <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-green-500/10">
                 <Sprout className="h-6 w-6 text-green-500" />
               </div>
-              <CardTitle className="text-lg">Indice NDVI</CardTitle>
+              <CardTitle className="text-lg">Índice NDVI</CardTitle>
               <CardDescription>
-                Monitoreo de vegetacion en tiempo real con datos satelitales NASA MODIS
+                Monitoreo de vegetación en tiempo real con datos satelitales NASA MODIS
               </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Visualiza la salud de los cultivos con mapas de vegetacion coloreados 
-                que muestran desde zonas aridas hasta vegetacion densa.
+                Visualiza la salud de los cultivos con mapas de vegetación coloreados
+                que muestran desde zonas áridas hasta vegetación densa.
               </p>
             </CardContent>
           </Card>
@@ -126,14 +124,14 @@ export default function Home() {
               <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10">
                 <Mountain className="h-6 w-6 text-blue-500" />
               </div>
-              <CardTitle className="text-lg">Capas Climaticas</CardTitle>
+              <CardTitle className="text-lg">Capas Climáticas</CardTitle>
               <CardDescription>
-                Temperatura y precipitacion actualizadas con OpenWeatherMap
+                Temperatura y precipitación actualizadas con OpenWeatherMap
               </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Analiza las condiciones climaticas de cada predio para tomar 
+                Analiza las condiciones climáticas de cada predio para tomar
                 decisiones informadas sobre cultivos y riesgos.
               </p>
             </CardContent>
@@ -144,14 +142,14 @@ export default function Home() {
               <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-purple-500/10">
                 <FileText className="h-6 w-6 text-purple-500" />
               </div>
-              <CardTitle className="text-lg">Caracterizacion Digital</CardTitle>
+              <CardTitle className="text-lg">Caracterización Digital</CardTitle>
               <CardDescription>
-                Formulario completo basado en estandares del sector agropecuario
+                Formulario completo basado en estándares del sector agropecuario
               </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Registra informacion del productor, predio, produccion y aspectos 
+                Registra información del productor, predio, producción y aspectos
                 financieros de forma estructurada y segura.
               </p>
             </CardContent>
@@ -162,15 +160,15 @@ export default function Home() {
               <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/10">
                 <MapPin className="h-6 w-6 text-orange-500" />
               </div>
-              <CardTitle className="text-lg">Geolocalizacion</CardTitle>
+              <CardTitle className="text-lg">Geolocalización</CardTitle>
               <CardDescription>
-                Marca puntos o dibuja poligonos para delimitar predios
+                Marca puntos o dibuja polígonos para delimitar predios
               </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Herramientas de dibujo interactivas para definir con precision 
-                los limites de cada predio agricola.
+                Herramientas de dibujo interactivas para definir con precisión
+                los límites de cada predio agrícola.
               </p>
             </CardContent>
           </Card>
@@ -180,15 +178,15 @@ export default function Home() {
               <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-cyan-500/10">
                 <BarChart3 className="h-6 w-6 text-cyan-500" />
               </div>
-              <CardTitle className="text-lg">Analisis de Areas</CardTitle>
+              <CardTitle className="text-lg">Análisis de Áreas</CardTitle>
               <CardDescription>
-                Calculo automatico de areas, perimetros y estadisticas
+                Cálculo automático de áreas, perímetros y estadísticas
               </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Dibuja zonas en el mapa y obtiene mediciones precisas para 
-                planificacion y analisis de terrenos.
+                Dibuja zonas en el mapa y obtén mediciones precisas para
+                planificación y análisis de terrenos.
               </p>
             </CardContent>
           </Card>
@@ -198,14 +196,14 @@ export default function Home() {
               <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-red-500/10">
                 <Shield className="h-6 w-6 text-red-500" />
               </div>
-              <CardTitle className="text-lg">Gestion Administrativa</CardTitle>
+              <CardTitle className="text-lg">Gestión Administrativa</CardTitle>
               <CardDescription>
-                Panel para revision, aprobacion y seguimiento de solicitudes
+                Panel para revisión, aprobación y seguimiento de solicitudes
               </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Los administradores pueden revisar caracterizaciones, analizar 
+                Los administradores pueden revisar caracterizaciones, analizar
                 predios con herramientas NDVI y aprobar solicitudes.
               </p>
             </CardContent>
@@ -230,8 +228,8 @@ export default function Home() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Complete el formulario de caracterizacion con ayuda de un tecnico. 
-                Marque la ubicacion de su predio y envie su solicitud para revision.
+                Complete el formulario de caracterización con ayuda de un asesor.
+                Marque la ubicación de su predio y envíe su solicitud para revisión.
               </p>
               <Button asChild className="w-full gap-2">
                 <Link href="/formulario">
@@ -256,7 +254,7 @@ export default function Home() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Acceda al panel de administracion para revisar caracterizaciones, 
+                Acceda al panel de administración para revisar caracterizaciones,
                 analizar predios con NDVI y aprobar o rechazar solicitudes.
               </p>
               <Button asChild variant="outline" className="w-full gap-2 bg-transparent">
@@ -276,15 +274,15 @@ export default function Home() {
           <div className="grid gap-8 md:grid-cols-4">
             <div className="md:col-span-2">
               <div className="flex items-center gap-2">
-                <Leaf className="h-5 w-5 text-primary" />
+                <Image src="/icons/icon-192x192.png" alt="Agro360" width={20} height={20} className="rounded" />
                 <span className="text-sm font-bold">Agro360</span>
               </div>
               <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-                Sistema de caracterizacion predial para el sector agropecuario de Santander, Colombia.
+                Sistema de caracterización predial para el sector agropecuario de Santander, Colombia.
               </p>
             </div>
             <div>
-              <h4 className="mb-3 text-sm font-semibold text-foreground">Navegacion</h4>
+              <h4 className="mb-3 text-sm font-semibold text-foreground">Navegación</h4>
               <div className="flex flex-col gap-2">
                 <Link href="/auth/login" className="text-sm text-muted-foreground hover:text-foreground">
                   Acceso Asesores
@@ -295,7 +293,7 @@ export default function Home() {
               <h4 className="mb-3 text-sm font-semibold text-foreground">Cuenta</h4>
               <div className="flex flex-col gap-2">
                 <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground">
-                  Iniciar Sesion
+                  Iniciar Sesión
                 </Link>
                 <Link href="/registro" className="text-sm text-muted-foreground hover:text-foreground">
                   Crear Cuenta

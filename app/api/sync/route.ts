@@ -26,6 +26,11 @@ async function uploadBase64ToStorage(
   if (!matches) return null
 
   const base64Data = matches[2]
+  // Límite de 8 MB por archivo (base64 ~33% overhead → ~6 MB real)
+  if (base64Data.length > 10_485_760) {
+    console.warn('[Sync] Archivo base64 excede el límite de 8 MB, ignorando')
+    return null
+  }
   const buffer = Buffer.from(base64Data, 'base64')
 
   const { data: uploadData, error: uploadError } = await supabase.storage
@@ -53,7 +58,7 @@ function generateRadicadoOficial(): string {
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const day = String(now.getDate()).padStart(2, '0')
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase()
+  const random = crypto.randomBytes(4).toString('hex').toUpperCase()
   return `RAD-${year}${month}${day}-${random}`
 }
 
@@ -97,7 +102,7 @@ export async function POST(request: Request) {
 
     if (authError || !user) {
       return NextResponse.json(
-        { error: 'No autorizado. Debes iniciar sesion para sincronizar.' },
+        { error: 'No autorizado. Debes iniciar sesión para sincronizar.' },
         { status: 401 }
       )
     }
@@ -107,7 +112,7 @@ export async function POST(request: Request) {
 
     if (!caracterizaciones || !Array.isArray(caracterizaciones)) {
       return NextResponse.json(
-        { error: 'Datos invalidos' },
+        { error: 'Datos inválidos' },
         { status: 400 }
       )
     }
@@ -172,12 +177,15 @@ export async function POST(request: Request) {
             .from('beneficiarios')
             .update({
               tipo_documento: c.beneficiario?.tipoDocumento || 'CC',
-              nombres: `${c.beneficiario?.primerNombre || ''} ${c.beneficiario?.segundoNombre || ''}`.trim(),
-              apellidos: `${c.beneficiario?.primerApellido || ''} ${c.beneficiario?.segundoApellido || ''}`.trim(),
+              nombres: [c.beneficiario?.primerNombre, c.beneficiario?.segundoNombre].filter(Boolean).join(' ').trim() || 'Sin nombre',
+              apellidos: [c.beneficiario?.primerApellido, c.beneficiario?.segundoApellido].filter(Boolean).join(' ').trim() || 'Sin apellido',
+              fecha_nacimiento: c.beneficiario?.fechaNacimiento || null,
               edad: c.beneficiario?.edad ?? null,
               telefono: c.beneficiario?.telefono || null,
               correo: c.beneficiario?.email || null,
               ocupacion_principal: c.beneficiario?.ocupacionPrincipal || null,
+              genero: c.beneficiario?.genero || null,
+              personas_a_cargo: c.beneficiario?.personasACargo ?? null,
               nombre_contacto_secundario: c.beneficiario?.nombreContactoSecundario || null,
               telefono_secundario: c.beneficiario?.telefonoSecundario || null,
               parentesco_contacto_secundario: c.beneficiario?.parentescoContactoSecundario || null,
@@ -194,12 +202,15 @@ export async function POST(request: Request) {
             .insert({
               tipo_documento: c.beneficiario?.tipoDocumento || 'CC',
               numero_documento: docNum,
-              nombres: `${c.beneficiario?.primerNombre || ''} ${c.beneficiario?.segundoNombre || ''}`.trim(),
-              apellidos: `${c.beneficiario?.primerApellido || ''} ${c.beneficiario?.segundoApellido || ''}`.trim(),
+              nombres: [c.beneficiario?.primerNombre, c.beneficiario?.segundoNombre].filter(Boolean).join(' ').trim() || 'Sin nombre',
+              apellidos: [c.beneficiario?.primerApellido, c.beneficiario?.segundoApellido].filter(Boolean).join(' ').trim() || 'Sin apellido',
+              fecha_nacimiento: c.beneficiario?.fechaNacimiento || null,
               edad: c.beneficiario?.edad ?? null,
               telefono: c.beneficiario?.telefono || null,
               correo: c.beneficiario?.email || null,
               ocupacion_principal: c.beneficiario?.ocupacionPrincipal || null,
+              genero: c.beneficiario?.genero || null,
+              personas_a_cargo: c.beneficiario?.personasACargo ?? null,
               nombre_contacto_secundario: c.beneficiario?.nombreContactoSecundario || null,
               telefono_secundario: c.beneficiario?.telefonoSecundario || null,
               parentesco_contacto_secundario: c.beneficiario?.parentescoContactoSecundario || null,
@@ -372,7 +383,6 @@ export async function POST(request: Request) {
             fecha_emision_formulario: c.visita?.fechaEmisionFormulario || null,
             radicado_local: c.radicadoLocal,
             radicado_oficial: radicadoOficial,
-            estado: 'INICIADO',
             asesor_id: user.id,
           })
           .select('id')
@@ -398,7 +408,7 @@ export async function POST(request: Request) {
         const fotoDocFrontalRaw = c.archivos?.fotoDocFrontalUrl || null
         const fotoDocTraseraRaw = c.archivos?.fotoDocTraseraUrl || null
 
-        const [fotoBeneficiarioUrl, foto1Url, foto2Url, firmaUrl, fotoDocFrontalUrl, fotoDocTraseraUrl] = await Promise.all([
+        const uploadResults = await Promise.allSettled([
           uploadBase64ToStorage(supabase, fotoBeneficiarioRaw, 'fotos-productores', `${docNum}/foto-beneficiario-${timestamp}.jpg`, 'image/jpeg'),
           uploadBase64ToStorage(supabase, foto1Raw, 'fotos-productores', `${docNum}/foto-1-${timestamp}.jpg`, 'image/jpeg'),
           uploadBase64ToStorage(supabase, foto2Raw, 'fotos-productores', `${docNum}/foto-2-${timestamp}.jpg`, 'image/jpeg'),
@@ -406,6 +416,7 @@ export async function POST(request: Request) {
           uploadBase64ToStorage(supabase, fotoDocFrontalRaw, 'documentos-identidad', `${docNum}/doc-frontal-${timestamp}.jpg`, 'image/jpeg'),
           uploadBase64ToStorage(supabase, fotoDocTraseraRaw, 'documentos-identidad', `${docNum}/doc-trasera-${timestamp}.jpg`, 'image/jpeg'),
         ])
+        const [fotoBeneficiarioUrl, foto1Url, foto2Url, firmaUrl, fotoDocFrontalUrl, fotoDocTraseraUrl] = uploadResults.map(r => r.status === 'fulfilled' ? r.value : null)
 
         const { error: caracMainErr } = await supabase
           .from('caracterizaciones')
@@ -422,6 +433,7 @@ export async function POST(request: Request) {
             foto_doc_trasera_url: fotoDocTraseraUrl,
             autorizacion_datos_personales: c.autorizacion?.autorizaTratamientoDatos ?? false,
             autorizacion_consulta_crediticia: c.autorizacion?.autorizaConsultaCrediticia ?? false,
+            estado: 'INICIADO',
           })
 
         if (caracMainErr) throw new Error(`Error creando caracterización: ${caracMainErr.message}`)
@@ -485,7 +497,7 @@ export async function POST(request: Request) {
                     subject: 'Tu caracterización agropecuaria fue registrada — Agro360',
                     html,
                   })
-                  console.log(`[Sync] Cuenta creada y email enviado a ${correobenef}`)
+                  console.log(`[Sync] Cuenta creada y email de bienvenida enviado`)
                 }
               } else {
                 // Ya tiene cuenta — enviar confirmación de radicado (sin credenciales)
@@ -501,12 +513,30 @@ export async function POST(request: Request) {
                   subject: 'Tu caracterización fue registrada — Agro360',
                   html,
                 })
-                console.log(`[Sync] Confirmación enviada a ${correobenef} (ya tenía cuenta)`)
+                console.log(`[Sync] Confirmación de radicado enviada (cuenta existente)`)
               }
             }
           } catch (emailErr) {
-            // El error de email no debe detener la sincronización
-            console.error('[Sync] Error enviando email al beneficiario:', emailErr)
+            // El error de email no detiene la sincronización — reintento único tras 3s
+            console.error('[Sync] Error enviando email (intento 1):', emailErr)
+            setTimeout(async () => {
+              try {
+                await sendEmail({
+                  to: correobenef,
+                  subject: 'Tu caracterización fue registrada — Agro360',
+                  html: buildConfirmacionRegistroEmail({
+                    nombreCompleto: nombrebenef,
+                    radicadoOficial,
+                    numeroDocumento: docNum,
+                    nombrePredio,
+                    appUrl,
+                  }),
+                })
+                console.log(`[Sync] Email reenviado correctamente a ${correobenef}`)
+              } catch (retryErr) {
+                console.error('[Sync] ALERTA: Email falló en reintento — revisar config SMTP:', retryErr)
+              }
+            }, 3000)
           }
         }
 

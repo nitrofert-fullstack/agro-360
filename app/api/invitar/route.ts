@@ -12,7 +12,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    // Solo admins pueden crear cuentas
+    const { data: callerProfile } = await supabase
+      .from('profiles')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (callerProfile?.rol !== 'admin') {
+      return NextResponse.json({ error: 'Solo administradores pueden crear cuentas' }, { status: 403 })
+    }
+
     const { email, nombreCompleto, visitaId, telefono, rol: rolParam } = await request.json()
+
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!email || !emailRegex.test(email)) {
+      return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
+    }
 
     if (!email || !nombreCompleto) {
       return NextResponse.json({ error: 'email y nombreCompleto son requeridos' }, { status: 400 })
@@ -104,14 +121,6 @@ export async function POST(request: Request) {
       usado: method === 'admin',
       expires_at: expiresAt.toISOString(),
     })
-
-    // Si hay visitaId, marcar la visita como aprobada
-    if (visitaId) {
-      await supabase.from('visitas').update({
-        estado: 'APROBADO',
-        updated_at: new Date().toISOString(),
-      }).eq('id', visitaId)
-    }
 
     // Enviar email con credenciales si se creó la cuenta directamente
     let emailEnviado = false

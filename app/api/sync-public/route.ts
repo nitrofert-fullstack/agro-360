@@ -49,7 +49,7 @@ function generateRadicadoOficial(): string {
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const day = String(now.getDate()).padStart(2, '0')
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase()
+  const random = crypto.randomBytes(4).toString('hex').toUpperCase()
   return `RAD-${year}${month}${day}-${random}`
 }
 
@@ -77,7 +77,14 @@ async function ensureStorageBuckets(adminClient: SupabaseClient): Promise<void> 
 
 async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
   const secret = process.env.TURNSTILE_SECRET_KEY
-  if (!secret) return true // Si no está configurado, no bloquear (dev)
+  // En producción, la key es obligatoria
+  if (!secret || secret === 'your-secret-key-here') {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[Turnstile] TURNSTILE_SECRET_KEY no configurada en producción')
+      return false
+    }
+    return true // Solo saltar en desarrollo
+  }
 
   const form = new URLSearchParams()
   form.append('secret', secret)
@@ -176,12 +183,15 @@ export async function POST(request: Request) {
             .from('beneficiarios')
             .update({
               tipo_documento: c.beneficiario?.tipoDocumento || 'CC',
-              nombres: `${c.beneficiario?.primerNombre || ''} ${c.beneficiario?.segundoNombre || ''}`.trim(),
-              apellidos: `${c.beneficiario?.primerApellido || ''} ${c.beneficiario?.segundoApellido || ''}`.trim(),
+              nombres: [c.beneficiario?.primerNombre, c.beneficiario?.segundoNombre].filter(Boolean).join(' ').trim() || 'Sin nombre',
+              apellidos: [c.beneficiario?.primerApellido, c.beneficiario?.segundoApellido].filter(Boolean).join(' ').trim() || 'Sin apellido',
+              fecha_nacimiento: c.beneficiario?.fechaNacimiento || null,
               edad: c.beneficiario?.edad ?? null,
               telefono: c.beneficiario?.telefono || null,
               correo: c.beneficiario?.email || null,
               ocupacion_principal: c.beneficiario?.ocupacionPrincipal || null,
+              genero: c.beneficiario?.genero || null,
+              personas_a_cargo: c.beneficiario?.personasACargo ?? null,
               nombre_contacto_secundario: c.beneficiario?.nombreContactoSecundario || null,
               telefono_secundario: c.beneficiario?.telefonoSecundario || null,
               parentesco_contacto_secundario: c.beneficiario?.parentescoContactoSecundario || null,
@@ -196,12 +206,15 @@ export async function POST(request: Request) {
             .insert({
               tipo_documento: c.beneficiario?.tipoDocumento || 'CC',
               numero_documento: docNum,
-              nombres: `${c.beneficiario?.primerNombre || ''} ${c.beneficiario?.segundoNombre || ''}`.trim(),
-              apellidos: `${c.beneficiario?.primerApellido || ''} ${c.beneficiario?.segundoApellido || ''}`.trim(),
+              nombres: [c.beneficiario?.primerNombre, c.beneficiario?.segundoNombre].filter(Boolean).join(' ').trim() || 'Sin nombre',
+              apellidos: [c.beneficiario?.primerApellido, c.beneficiario?.segundoApellido].filter(Boolean).join(' ').trim() || 'Sin apellido',
+              fecha_nacimiento: c.beneficiario?.fechaNacimiento || null,
               edad: c.beneficiario?.edad ?? null,
               telefono: c.beneficiario?.telefono || null,
               correo: c.beneficiario?.email || null,
               ocupacion_principal: c.beneficiario?.ocupacionPrincipal || null,
+              genero: c.beneficiario?.genero || null,
+              personas_a_cargo: c.beneficiario?.personasACargo ?? null,
               nombre_contacto_secundario: c.beneficiario?.nombreContactoSecundario || null,
               telefono_secundario: c.beneficiario?.telefonoSecundario || null,
               parentesco_contacto_secundario: c.beneficiario?.parentescoContactoSecundario || null,
@@ -350,7 +363,6 @@ export async function POST(request: Request) {
             fecha_emision_formulario: c.visita?.fechaEmisionFormulario || null,
             radicado_local: c.radicadoLocal,
             radicado_oficial: radicadoOficial,
-            estado: 'INICIADO',
             asesor_id: asesorAsignado?.id || null,
           })
           .select('id')
@@ -374,7 +386,7 @@ export async function POST(request: Request) {
         const fotoDocFrontalRaw = c.archivos?.fotoDocFrontalUrl || null
         const fotoDocTraseraRaw = c.archivos?.fotoDocTraseraUrl || null
 
-        const [fotoBeneficiarioUrl, foto1Url, foto2Url, firmaUrl, fotoDocFrontalUrl, fotoDocTraseraUrl] = await Promise.all([
+        const uploadResults = await Promise.allSettled([
           uploadBase64ToStorage(adminClient, fotoBeneficiarioRaw, 'fotos-productores', `${docNum}/foto-beneficiario-${timestamp}.jpg`, 'image/jpeg'),
           uploadBase64ToStorage(adminClient, foto1Raw, 'fotos-productores', `${docNum}/foto-1-${timestamp}.jpg`, 'image/jpeg'),
           uploadBase64ToStorage(adminClient, foto2Raw, 'fotos-productores', `${docNum}/foto-2-${timestamp}.jpg`, 'image/jpeg'),
@@ -382,6 +394,7 @@ export async function POST(request: Request) {
           uploadBase64ToStorage(adminClient, fotoDocFrontalRaw, 'documentos-identidad', `${docNum}/doc-frontal-${timestamp}.jpg`, 'image/jpeg'),
           uploadBase64ToStorage(adminClient, fotoDocTraseraRaw, 'documentos-identidad', `${docNum}/doc-trasera-${timestamp}.jpg`, 'image/jpeg'),
         ])
+        const [fotoBeneficiarioUrl, foto1Url, foto2Url, firmaUrl, fotoDocFrontalUrl, fotoDocTraseraUrl] = uploadResults.map(r => r.status === 'fulfilled' ? r.value : null)
 
         await adminClient.from('caracterizaciones').insert({
           id_visita: visitaId,
@@ -396,6 +409,7 @@ export async function POST(request: Request) {
           foto_doc_trasera_url: fotoDocTraseraUrl,
           autorizacion_datos_personales: c.autorizacion?.autorizaTratamientoDatos ?? false,
           autorizacion_consulta_crediticia: c.autorizacion?.autorizaConsultaCrediticia ?? false,
+          estado: 'INICIADO',
         })
 
         // === 10. EMAILS ===

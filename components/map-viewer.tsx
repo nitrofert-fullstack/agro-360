@@ -508,15 +508,18 @@ export function MapViewer({
         iconAnchor: [10, 10],
       })
 
-      L.default.marker(SANTANDER_CENTER, { icon: customIcon })
-        .addTo(map)
-        .bindPopup(
-          `<div style="text-align: center; padding: 8px;">
-            <strong style="font-size: 14px;">Bucaramanga</strong><br/>
-            <span style="color: #666;">Santander, Colombia</span><br/>
-            <span style="font-size: 11px;">7.1254 N, 73.1198 W</span>
-          </div>`
-        )
+      // Solo mostrar marcador de referencia de Bucaramanga en modo exploración general
+      if (!markerPosition && (!markers || markers.length === 0)) {
+        L.default.marker(SANTANDER_CENTER, { icon: customIcon })
+          .addTo(map)
+          .bindPopup(
+            `<div style="text-align: center; padding: 8px;">
+              <strong style="font-size: 14px;">Bucaramanga</strong><br/>
+              <span style="color: #666;">Santander, Colombia</span><br/>
+              <span style="font-size: 11px;">7.1254 N, 73.1198 W</span>
+            </div>`
+          )
+      }
 
       const drawnItems = new L.default.FeatureGroup()
       map.addLayer(drawnItems)
@@ -775,6 +778,19 @@ export function MapViewer({
       layer.setOpacity(key === activeLayer ? opacity : 0)
     })
   }, [activeLayer, opacity])
+
+  // Auto-setear selectedPredio cuando se pasan markerPosition + polygonCoords como props directos
+  // (caso: modal de admin que no usa el array markers[])
+  useEffect(() => {
+    if (!markerPosition) return
+    setSelectedPredio({
+      id: `direct-${markerPosition[0]}-${markerPosition[1]}`,
+      name: 'Predio',
+      coords: polygonCoords ?? [],
+      position: markerPosition,
+    })
+    setShowNdviPanel(true)
+  }, [markerPosition?.[0], markerPosition?.[1]])
 
   // Auto-fetch NDVI MODIS (NASA) cuando se selecciona un predio
   useEffect(() => {

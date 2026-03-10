@@ -48,6 +48,8 @@ export default function EditarFormularioPage() {
                         numeroDocumento: serverData.beneficiario?.numero_documento || "",
                         fechaNacimiento: serverData.beneficiario?.fecha_nacimiento || "",
                         edad: serverData.beneficiario?.edad ?? null,
+                        genero: serverData.beneficiario?.genero || "",
+                        personasACargo: serverData.beneficiario?.personas_a_cargo ?? null,
                         telefono: serverData.beneficiario?.telefono || "",
                         correo: serverData.beneficiario?.correo || "",
                         ocupacionPrincipal: serverData.beneficiario?.ocupacion_principal || "",
@@ -71,7 +73,13 @@ export default function EditarFormularioPage() {
                         coordenadaY: serverData.predio?.coordenada_y || "",
                         latitud: serverData.predio?.latitud ?? 7.1254,
                         longitud: serverData.predio?.longitud ?? -73.1198,
-                        poligono: typeof serverData.predio?.poligono === 'string' ? JSON.parse(serverData.predio.poligono) : serverData.predio?.poligono,
+                        poligono: (() => { try { return typeof serverData.predio?.poligono === 'string' ? JSON.parse(serverData.predio.poligono) : serverData.predio?.poligono } catch { return undefined } })(),
+                        tipoUbicacion: (() => {
+                            const pol = serverData.predio?.poligono
+                            if (pol && (Array.isArray(pol) ? pol.length > 0 : pol !== '[]' && pol !== 'null')) return 'poligono' as const
+                            if (serverData.predio?.latitud != null && serverData.predio?.longitud != null) return 'punto' as const
+                            return undefined
+                        })(),
                         altitudMsnm: serverData.predio?.altitud_msnm ?? null,
                         viveEnPredio: serverData.predio?.vive_en_predio || "",
                         tieneVivienda: serverData.predio?.tiene_vivienda ?? false,

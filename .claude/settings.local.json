@@ -5,7 +5,17 @@
       "Bash(Select-String -NotMatch \"characterization-form\\\\.tsx|location-picker\\\\.tsx|map-viewer\\\\.tsx\")",
       "Bash(npx next build:*)",
       "Bash(findstr:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(xargs grep -l \"visitas.*estado\\\\|visita\\\\.estado\\\\|visita\\\\?\\\\.estado\")",
+      "Bash(grep -n \"recharts\\\\|Chart\\\\|BarChart\\\\|LineChart\\\\|PieChart\" /c/Users/jcorrea/Desktop/agro-360/components/*.tsx)",
+      "WebFetch(domain:supabase.com)",
+      "Bash(ls /c/Users/jcorrea/Desktop/agro-360/*.ts)",
+      "Bash(ls /c/Users/jcorrea/Desktop/agro-360/*.tsx)",
+      "Bash(grep -n \"activeSection === ''estadisticas'' && \\(\\(\\) => {\" C:/Users/jcorrea/Desktop/agro-360/components/admin-dashboard.tsx)",
+      "Bash(grep -n \"export\" C:/Users/jcorrea/Desktop/agro-360/app/dashboard/caracterizacion/[id]/page.tsx)",
+      "Bash(ls -la C:/Users/jcorrea/Desktop/agro-360/app/admin/*/page.tsx)",
+      "Bash(pnpm run build)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

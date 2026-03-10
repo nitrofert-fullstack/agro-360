@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { getCaracterizacionesConError, markAsError, type CaracterizacionLocal } from '@/lib/db/indexed-db'
+import { getCaracterizacionesConError, markAsError, deleteCaracterizacion, type CaracterizacionLocal } from '@/lib/db/indexed-db'
 import { AlertTriangle, RefreshCw, Trash2, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -38,9 +38,12 @@ export function SyncErrorDisplay() {
   }
 
   const handleDelete = async (caracterizacion: CaracterizacionLocal) => {
-    if (confirm('¿Estás seguro de que deseas eliminar este registro?')) {
-      // TODO: Implementar eliminación
-      toast.info('Funcionalidad en desarrollo')
+    if (caracterizacion.id === undefined) return
+    if (confirm('¿Estás seguro de que deseas eliminar este registro? Esta acción no se puede deshacer.')) {
+      await deleteCaracterizacion(caracterizacion.id)
+      toast.success('Registro eliminado de la cola local')
+      if (selectedError?.id === caracterizacion.id) setSelectedError(null)
+      loadErrors()
     }
   }
 
@@ -91,6 +94,14 @@ export function SyncErrorDisplay() {
                     <RefreshCw className="h-4 w-4" />
                     Reintentar
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => handleDelete(error)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             ))}
@@ -113,7 +124,7 @@ export function SyncErrorDisplay() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wider">Fecha</p>
-                  <p className="text-sm">{new Date(selectedError.fechaRegistro).toLocaleString()}</p>
+                  <p className="text-sm">{new Date(selectedError.fechaRegistro).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
                 <Button
                   onClick={() => handleRetry(selectedError)}

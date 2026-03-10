@@ -67,15 +67,20 @@ export async function GET(request: Request) {
     let searchPredioIds: string[] | null = null
 
     if (search) {
+      // Sanitizar para evitar inyección en PostgREST: solo letras, dígitos, espacios y guiones
+      const safeSearch = search.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9 \-]/g, '').trim()
+      if (!safeSearch) {
+        return NextResponse.json({ data: [], total: 0, page, limit })
+      }
       const [benefResult, predioResult] = await Promise.all([
         adminClient
           .from('beneficiarios')
           .select('id')
-          .or(`nombres.ilike.%${search}%,apellidos.ilike.%${search}%,numero_documento.ilike.%${search}%`),
+          .or(`nombres.ilike.%${safeSearch}%,apellidos.ilike.%${safeSearch}%,numero_documento.ilike.%${safeSearch}%`),
         adminClient
           .from('predios')
           .select('id')
-          .or(`nombre_predio.ilike.%${search}%,municipio.ilike.%${search}%,vereda.ilike.%${search}%`),
+          .or(`nombre_predio.ilike.%${safeSearch}%,municipio.ilike.%${safeSearch}%,vereda.ilike.%${safeSearch}%`),
       ])
       searchBenefIds = (benefResult.data || []).map((b: { id: string }) => b.id)
       searchPredioIds = (predioResult.data || []).map((p: { id: string }) => p.id)
@@ -86,18 +91,8 @@ export async function GET(request: Request) {
       }
     }
 
-    // --- Resolver IDs de visitas que coinciden con el filtro de estado ---
-    let estadoVisitaIds: string[] | null = null
-    if (estado && estado !== 'todos' && estado !== 'sin_asesor') {
-      const { data: visitasEstado } = await adminClient
-        .from('visitas')
-        .select('id')
-        .ilike('estado', estado)
-      estadoVisitaIds = (visitasEstado || []).map((v: { id: string }) => v.id)
-      if (estadoVisitaIds.length === 0) {
-        return NextResponse.json({ data: [], total: 0, page, limit })
-      }
-    }
+    // El estado ahora está en caracterizaciones directamente (no en visitas)
+    const filterEstado = (estado && estado !== 'todos' && estado !== 'sin_asesor') ? estado : null
 
     // --- Construir query principal ---
     let query = adminClient
@@ -122,9 +117,9 @@ export async function GET(request: Request) {
       }
     }
 
-    // Filtro por estado (vía visitas)
-    if (estadoVisitaIds !== null) {
-      query = query.in('id_visita', estadoVisitaIds) as typeof query
+    // Filtro por estado directo en caracterizaciones
+    if (filterEstado) {
+      query = query.ilike('estado', filterEstado) as typeof query
     }
 
     // Filtro "sin_asesor" — visitas con asesor_id null

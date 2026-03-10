@@ -11,6 +11,8 @@ export interface PDFCaracterizacion {
   tipoDocumento?: string
   numeroDocumento?: string
   edad?: number | null
+  genero?: string
+  personasACargo?: number | null
   telefono?: string
   correo?: string
   ocupacionPrincipal?: string
@@ -58,6 +60,7 @@ export interface PDFCaracterizacion {
   ingresosMensualesOtros?: number | null
   egresosMensuales?: number | null
   activosTotales?: number | null
+  activosAgropecuaria?: number | null
   pasivosTotales?: number | null
   // Autorizaciones
   autorizaTratamientoDatos?: boolean
@@ -67,11 +70,16 @@ export interface PDFCaracterizacion {
 }
 
 const estadoLabels: Record<string, string> = {
+  INICIADO: 'Iniciado',
+  REVISADO: 'En Revisión',
+  EN_ESTUDIO_CREDITO: 'En Estudio de Crédito',
+  APROBADO: 'Viable',
+  CANCELADO: 'No Viable',
+  // Legado
   PENDIENTE_SINCRONIZACION: 'Pendiente',
-  SINCRONIZADO: 'Sincronizado',
-  EN_REVISION: 'En Revision',
-  APROBADO: 'Aprobado',
-  RECHAZADO: 'Rechazado',
+  SINCRONIZADO: 'Registrado',
+  EN_REVISION: 'En Revisión',
+  RECHAZADO: 'No Viable',
 }
 
 export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
@@ -126,7 +134,7 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Caracterizacion — ${data.nombreCompleto}</title>
+  <title>Caracterización — ${data.nombreCompleto}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#111;background:#fff}
@@ -163,10 +171,10 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
   <div class="header">
     <div>
       <div class="logo">Agro360</div>
-      <div class="logo-sub">Sistema de Caracterizacion Agropecuaria — Santander, Colombia</div>
+      <div class="logo-sub">Sistema de Caracterización Agropecuaria — Santander, Colombia</div>
     </div>
     <div class="header-right">
-      <div class="doc-title">Ficha de Caracterizacion Predial</div>
+      <div class="doc-title">Ficha de Caracterización Predial</div>
       <div class="radicado">Radicado: ${data.radicado}</div>
       <div class="radicado">Generado: ${fechaGen}</div>
       <div class="estado-badge">${estadoLabel}</div>
@@ -180,9 +188,11 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
       ${field('Tipo documento', data.tipoDocumento)}
       ${field('Num. documento', data.numeroDocumento)}
       ${field('Edad', data.edad ? `${data.edad} años` : null)}
-      ${field('Telefono', data.telefono)}
+      ${field('Teléfono', data.telefono)}
       ${field('Correo', data.correo)}
-      ${field('Ocupacion', data.ocupacionPrincipal)}
+      ${field('Ocupación', data.ocupacionPrincipal)}
+      ${field('Género', data.genero)}
+      ${field('Personas a cargo', data.personasACargo != null ? String(data.personasACargo) : null)}
       ${field('Municipio', data.municipio)}
       ${field('Vereda', data.vereda)}
     </div>
@@ -207,14 +217,14 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
   </div>
 
   ${data.topografia || data.rutaAcceso || data.tiempoAcceso ? `
-  <h2>Caracterizacion del Predio</h2>
+  <h2>Caracterización del Predio</h2>
   <div class="section-box">
     <div class="grid3">
-      ${field('Topografia', data.topografia)}
-      ${field('Tipo suelo', data.tipoSuelo)}
-      ${field('Ruta acceso', data.rutaAcceso)}
+      ${field('Topografía', data.topografia)}
+      ${field('Tipo de suelo', data.tipoSuelo)}
+      ${field('Ruta de acceso', data.rutaAcceso)}
       ${field('Distancia', data.distanciaKm ? `${data.distanciaKm} km` : null)}
-      ${field('Tiempo acceso', data.tiempoAcceso)}
+      ${field('Tiempo de acceso', data.tiempoAcceso)}
       ${field('Temperatura', data.temperaturaCelsius ? `${data.temperaturaCelsius} °C` : null)}
       ${field('Meses lluvia', data.mesesLluvia)}
     </div>
@@ -230,26 +240,27 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
   <div class="section-box">${riesgosHtml}</div>` : ''}
 
   ${data.sistemaProductivo || data.estadoCultivo || data.cantidadProduccion ? `
-  <h2>Area Productiva</h2>
+  <h2>Área Productiva</h2>
   <div class="section-box">
     <div class="grid3">
       ${field('Sistema productivo', data.sistemaProductivo)}
-      ${field('Estado cultivo', data.estadoCultivo)}
-      ${field('Cantidad produccion', data.cantidadProduccion)}
-      ${field('Ingreso mensual', money(data.ingresoMensualVentas))}
-      ${field('Donde comercializa', data.dondeComercializa)}
-      ${field('Interesado en programa', data.interesadoPrograma ? 'Si' : null)}
+      ${field('Estado del cultivo', data.estadoCultivo)}
+      ${field('Cantidad de producción', data.cantidadProduccion)}
+      ${field('Ingreso mensual ventas', money(data.ingresoMensualVentas))}
+      ${field('Dónde comercializa', data.dondeComercializa)}
+      ${field('Requiere financiación', data.interesadoPrograma ? 'Sí' : null)}
     </div>
   </div>` : ''}
 
   ${data.ingresosMensualesAgropecuaria != null || data.ingresosMensualesOtros != null || data.activosTotales != null ? `
-  <h2>Informacion Financiera</h2>
+  <h2>Información Financiera</h2>
   <div class="section-box">
     <div class="grid3">
-      ${field('Ingresos agropecuarios', money(data.ingresosMensualesAgropecuaria))}
-      ${field('Otros ingresos', money(data.ingresosMensualesOtros))}
-      ${field('Egresos mensuales', money(data.egresosMensuales))}
+      ${field('Ingresos agropecuarios/mes', money(data.ingresosMensualesAgropecuaria))}
+      ${field('Otros ingresos/mes', money(data.ingresosMensualesOtros))}
+      ${field('Egresos/mes', money(data.egresosMensuales))}
       ${field('Activos totales', money(data.activosTotales))}
+      ${field('Activos agropecuarios', money(data.activosAgropecuaria))}
       ${field('Pasivos totales', money(data.pasivosTotales))}
     </div>
   </div>` : ''}
@@ -257,7 +268,7 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
   <h2>Datos del Registro</h2>
   <div class="section-box">
     <div class="grid3">
-      ${field('Tecnico / Asesor', data.nombreTecnico)}
+      ${field('Asesor', data.nombreTecnico)}
       ${field('Fecha visita', data.fechaVisita ? new Date(data.fechaVisita).toLocaleDateString('es-CO') : null)}
       ${field('Radicado', data.radicado)}
     </div>
@@ -278,7 +289,7 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
   </div>
 
   <div class="footer">
-    <span>Agro360 — Sistema de Caracterizacion Agropecuaria</span>
+    <span>Agro360 — Sistema de Caracterización Agropecuaria</span>
     <span>Documento generado el ${fechaGen}</span>
   </div>
 </div>
@@ -351,6 +362,8 @@ export function pdfFromFormData(
     tipoDocumento: b?.tipoDocumento,
     numeroDocumento: b?.numeroDocumento,
     edad: b?.edad,
+    genero: b?.genero,
+    personasACargo: b?.personasACargo,
     telefono: b?.telefono,
     correo: b?.correo,
     ocupacionPrincipal: b?.ocupacionPrincipal,
@@ -391,6 +404,7 @@ export function pdfFromFormData(
     ingresosMensualesOtros: fi?.ingresosMensualesOtros,
     egresosMensuales: fi?.egresosMensuales,
     activosTotales: fi?.activosTotales,
+    activosAgropecuaria: fi?.activosAgropecuaria,
     pasivosTotales: fi?.pasivosTotales,
     autorizaTratamientoDatos: fd.autorizaciones?.autorizacionDatosPersonales,
     autorizaConsultaCrediticia: fd.autorizaciones?.autorizacionConsultaCrediticia,
@@ -439,6 +453,8 @@ export function pdfFromLocalData(local: CaracterizacionLocal): PDFCaracterizacio
     tipoDocumento: b?.tipoDocumento,
     numeroDocumento: b?.numeroDocumento,
     edad: b?.edad,
+    genero: b?.genero,
+    personasACargo: b?.personasACargo,
     telefono: b?.telefono,
     correo: b?.email,
     ocupacionPrincipal: b?.ocupacionPrincipal,
@@ -480,6 +496,7 @@ export function pdfFromLocalData(local: CaracterizacionLocal): PDFCaracterizacio
     ingresosMensualesOtros: fi?.ingresosMensualesOtros,
     egresosMensuales: fi?.egresosMensuales,
     activosTotales: fi?.activosTotales,
+    activosAgropecuaria: fi?.activosAgropecuaria,
     pasivosTotales: fi?.pasivosTotales,
     autorizaTratamientoDatos: local.autorizacion?.autorizaTratamientoDatos,
     autorizaConsultaCrediticia: local.autorizacion?.autorizaConsultaCrediticia,
@@ -525,13 +542,15 @@ export function pdfFromServerData(server: {
 
   return {
     radicado: visita?.radicado_oficial ?? visita?.radicado_local ?? '',
-    estado: visita?.estado,
+    estado: server.caracterizacion?.estado,
     fechaVisita: visita?.fecha_visita,
     nombreTecnico: visita?.nombre_tecnico,
     nombreCompleto: nombre,
     tipoDocumento: beneficiario?.tipo_documento,
     numeroDocumento: beneficiario?.numero_documento,
     edad: beneficiario?.edad,
+    genero: beneficiario?.genero,
+    personasACargo: beneficiario?.personas_a_cargo,
     telefono: beneficiario?.telefono,
     correo: beneficiario?.correo,
     ocupacionPrincipal: beneficiario?.ocupacion_principal,
@@ -563,7 +582,7 @@ export function pdfFromServerData(server: {
     otraFuente: abastecimientoAgua?.otra_fuente,
     riesgos,
     otrosRiesgos: riesgosPredio?.otros_riesgos,
-    sistemaProductivo: areaProductiva?.sistema_produccion,
+    sistemaProductivo: areaProductiva?.sistema_productivo,
     estadoCultivo: areaProductiva?.estado_cultivo,
     cantidadProduccion: areaProductiva?.cantidad_produccion,
     ingresoMensualVentas: areaProductiva?.ingreso_mensual_ventas,
@@ -573,9 +592,10 @@ export function pdfFromServerData(server: {
     ingresosMensualesOtros: infoFinanciera?.ingresos_mensuales_otros,
     egresosMensuales: infoFinanciera?.egresos_mensuales,
     activosTotales: infoFinanciera?.activos_totales,
+    activosAgropecuaria: infoFinanciera?.activos_agropecuaria,
     pasivosTotales: infoFinanciera?.pasivos_totales,
-    autorizaTratamientoDatos: server.caracterizacion?.autoriza_tratamiento_datos,
-    autorizaConsultaCrediticia: server.caracterizacion?.autoriza_consulta_crediticia,
+    autorizaTratamientoDatos: server.caracterizacion?.autorizacion_datos_personales,
+    autorizaConsultaCrediticia: server.caracterizacion?.autorizacion_consulta_crediticia,
     observaciones: server.caracterizacion?.observaciones ?? visita?.observaciones,
   }
 }

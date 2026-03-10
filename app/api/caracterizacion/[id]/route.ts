@@ -15,17 +15,32 @@ export async function GET(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    // Obtener el rol del usuario para verificar acceso
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('rol, numero_documento')
+      .eq('id', user.id)
+      .single()
+
     // Determinar si buscar por visita ID o por radicado
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
     // 1. Obtener la visita
-    let visitaQuery = supabase.from('visitas').select('*')
+    let visita: any = null
+    let visitaErr: any = null
     if (isUUID) {
-      visitaQuery = visitaQuery.eq('id', id)
+      const res = await supabase.from('visitas').select('*').eq('id', id).single()
+      visita = res.data; visitaErr = res.error
     } else {
-      visitaQuery = visitaQuery.or(`radicado_local.eq.${id},radicado_oficial.eq.${id}`)
+      // Buscar primero por radicado_oficial, luego por radicado_local
+      const byOficial = await supabase.from('visitas').select('*').eq('radicado_oficial', id).maybeSingle()
+      if (byOficial.data) {
+        visita = byOficial.data; visitaErr = null
+      } else {
+        const byLocal = await supabase.from('visitas').select('*').eq('radicado_local', id).maybeSingle()
+        visita = byLocal.data; visitaErr = byLocal.data ? null : (byLocal.error ?? { message: 'No encontrado' })
+      }
     }
-    const { data: visita, error: visitaErr } = await visitaQuery.single()
 
     if (visitaErr || !visita) {
       return NextResponse.json({ error: 'Visita no encontrada' }, { status: 404 })
@@ -40,6 +55,31 @@ export async function GET(
 
     if (!carac) {
       return NextResponse.json({ error: 'Caracterización no encontrada' }, { status: 404 })
+    }
+
+    // Verificar acceso según rol: campesino solo puede ver su propia caracterización
+    if (userProfile?.rol === 'campesino') {
+      const numDoc = (userProfile as any).numero_documento
+      if (numDoc) {
+        const { data: ownBenef } = await supabase
+          .from('beneficiarios')
+          .select('id')
+          .eq('numero_documento', numDoc)
+          .maybeSingle()
+        if (!ownBenef || ownBenef.id !== carac.id_beneficiario) {
+          return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+        }
+      } else {
+        // Fallback: verificar por correo
+        const { data: ownBenef } = await supabase
+          .from('beneficiarios')
+          .select('id')
+          .eq('correo', user.email)
+          .maybeSingle()
+        if (!ownBenef || ownBenef.id !== carac.id_beneficiario) {
+          return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+        }
+      }
     }
 
     // 3. Obtener datos relacionados en paralelo

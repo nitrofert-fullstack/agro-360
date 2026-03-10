@@ -10,7 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Sprout, Mail, Lock, User, Phone, Loader2, Eye, EyeOff, ChevronLeft, CheckCircle, Info, CreditCard } from "lucide-react"
+import Image from "next/image"
+import { Mail, Lock, User, Phone, Loader2, Eye, EyeOff, ChevronLeft, CheckCircle, Info, CreditCard, Sprout } from "lucide-react"
 
 export default function RegistroPage() {
   const router = useRouter()
@@ -85,9 +86,7 @@ export default function RegistroPage() {
       <div className="flex min-h-screen flex-col bg-background">
         <header className="flex items-center justify-between border-b border-border px-4 py-3 md:px-6">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-              <Sprout className="h-5 w-5 text-primary" />
-            </div>
+            <Image src="/icons/icon-192x192.png" alt="Agro360" width={36} height={36} className="rounded-lg" />
             <span className="text-lg font-bold text-foreground">Agro360</span>
           </Link>
           <ThemeToggle />
@@ -145,9 +144,7 @@ export default function RegistroPage() {
               Volver a iniciar sesión
             </Link>
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-                <Sprout className="h-6 w-6 text-primary" />
-              </div>
+              <Image src="/icons/icon-192x192.png" alt="Agro360" width={48} height={48} className="rounded-2xl" />
               <div>
                 <CardTitle className="text-xl font-bold">Crear Cuenta de Agricultor</CardTitle>
                 <CardDescription>

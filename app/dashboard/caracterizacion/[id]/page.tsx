@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -16,7 +17,6 @@ import {
 } from "@/lib/db/indexed-db"
 import { createClient } from "@/lib/supabase/client"
 import {
-  Leaf,
   ArrowLeft,
   User,
   MapPin,
@@ -121,8 +121,8 @@ const estadoConfig: Record<string, { label: string; color: string; icon: typeof 
   INICIADO: { label: "Iniciado", color: "bg-slate-500/10 text-slate-600 border-slate-500/20", icon: Clock },
   REVISADO: { label: "En Revisión", color: "bg-blue-500/10 text-blue-600 border-blue-500/20", icon: Eye },
   EN_ESTUDIO_CREDITO: { label: "En Estudio Crédito", color: "bg-purple-500/10 text-purple-600 border-purple-500/20", icon: Eye },
-  APROBADO: { label: "Aprobado", color: "bg-green-500/10 text-green-600 border-green-500/20", icon: CheckCircle },
-  CANCELADO: { label: "Cancelado", color: "bg-red-500/10 text-red-600 border-red-500/20", icon: XCircle },
+  APROBADO: { label: "Viable", color: "bg-green-500/10 text-green-600 border-green-500/20", icon: CheckCircle },
+  CANCELADO: { label: "No Viable", color: "bg-red-500/10 text-red-600 border-red-500/20", icon: XCircle },
 }
 
 function getEstado(estado: string) {
@@ -167,7 +167,7 @@ export default function CaracterizacionDetailPage() {
       }
     } catch { /* ignore */ }
 
-    setError("No se encontro la caracterizacion")
+    setError("No se encontró la caracterización")
     setIsLoading(false)
   }, [id])
 
@@ -182,7 +182,7 @@ export default function CaracterizacionDetailPage() {
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Cargando caracterizacion...</p>
+          <p className="text-sm text-muted-foreground">Cargando caracterización...</p>
         </div>
       </div>
     )
@@ -324,14 +324,14 @@ function StatusChangePanel({
   const copyCredentials = () => {
     if (!credenciales) return
     navigator.clipboard.writeText(
-      `Correo: ${credenciales.email}\nContrasena: ${credenciales.password}`
+      `Correo: ${credenciales.email}\nContraseña: ${credenciales.password}`
     )
     toast.success("Credenciales copiadas al portapapeles")
   }
 
   let allowedStates: string[] = []
   if (userRol === "admin") {
-    allowedStates = ["INICIADO", "REVISADO", "EN_ESTUDIO_CREDITO", "APROBADO", "CANCELADO"]
+    allowedStates = ["REVISADO", "EN_ESTUDIO_CREDITO", "APROBADO", "CANCELADO"]
   } else if (userRol === "asesor") {
     allowedStates = ["REVISADO"]
   } else if (userRol === "analista") {
@@ -342,8 +342,8 @@ function StatusChangePanel({
     { key: "INICIADO", label: "Iniciado", icon: Clock, hoverClass: "hover:bg-slate-600 hover:text-white" },
     { key: "REVISADO", label: "En Revisión", icon: Eye, hoverClass: "hover:bg-blue-600 hover:text-white" },
     { key: "EN_ESTUDIO_CREDITO", label: "Estudio Crédito", icon: Eye, hoverClass: "hover:bg-purple-600 hover:text-white" },
-    { key: "APROBADO", label: "Aprobar", icon: CheckCircle, hoverClass: "hover:bg-green-600 hover:text-white" },
-    { key: "CANCELADO", label: "Cancelar", icon: XCircle, hoverClass: "hover:bg-red-600 hover:text-white" },
+    { key: "APROBADO", label: "Viable", icon: CheckCircle, hoverClass: "hover:bg-green-600 hover:text-white" },
+    { key: "CANCELADO", label: "No Viable", icon: XCircle, hoverClass: "hover:bg-red-600 hover:text-white" },
   ].filter(e => allowedStates.includes(e.key))
 
   return (
@@ -355,7 +355,7 @@ function StatusChangePanel({
             <Shield className="h-5 w-5 text-primary" />
             Gestionar Estado
           </CardTitle>
-          <CardDescription>Cambia el estado de esta caracterizacion</CardDescription>
+          <CardDescription>Cambia el estado de esta caracterización</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
@@ -430,7 +430,7 @@ function StatusChangePanel({
                   </p>
                   <div className="space-y-1 font-mono text-sm">
                     <p><span className="text-muted-foreground">Correo:</span> {credenciales.email}</p>
-                    <p><span className="text-muted-foreground">Contrasena:</span> {credenciales.password}</p>
+                    <p><span className="text-muted-foreground">Contraseña:</span> {credenciales.password}</p>
                   </div>
                 </div>
                 <Button variant="outline" size="sm" onClick={copyCredentials} className="gap-2">
@@ -449,21 +449,53 @@ function StatusChangePanel({
   )
 }
 
+// ==================== DOWNLOAD HELPER ====================
+async function downloadImage(url: string, filename: string) {
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(blobUrl)
+  } catch {
+    // Fallback: abrir en pestaña nueva
+    window.open(url, '_blank')
+  }
+}
+
+function slugify(label: string) {
+  return label.toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')
+}
+
 // ==================== PHOTO MODAL ====================
-function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
+function PhotoModal({ url, label, onClose }: { url: string; label?: string; onClose: () => void }) {
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
       onClick={onClose}
     >
-      <div className="relative max-h-[90vh] max-w-[90vw]">
+      <div className="relative max-h-[90vh] max-w-[90vw]" onClick={e => e.stopPropagation()}>
         <img src={url} alt="Vista ampliada" className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain" />
-        <button
-          onClick={onClose}
-          className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white text-black shadow-lg hover:bg-gray-200"
-        >
-          X
-        </button>
+        <div className="absolute -top-2 right-6 flex gap-2">
+          <button
+            onClick={() => downloadImage(url, `${slugify(label || 'imagen')}.jpg`)}
+            title="Descargar imagen"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary/80"
+          >
+            <Download className="h-4 w-4" />
+          </button>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black shadow-lg hover:bg-gray-200"
+          >
+            ✕
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -504,7 +536,7 @@ function ServerDetailView({
   ].filter((p) => p.url)
 
   const firma = caracterizacion?.firma_productor_url
-  const est = getEstado(visita?.estado || "INICIADO")
+  const est = getEstado(caracterizacion?.estado || "INICIADO")
   const EstIcon = est.icon
   const canManageStatus = profile?.rol === "admin" || profile?.rol === "asesor" || profile?.rol === "analista"
 
@@ -512,48 +544,33 @@ function ServerDetailView({
     <div className="min-h-screen bg-background pb-12">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-6">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")}>
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-2 md:px-6 md:py-3">
+          {/* Izquierda: volver + título */}
+          <div className="flex min-w-0 items-center gap-1.5">
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => router.push("/dashboard")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-                <Leaf className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-sm font-bold md:text-base">Detalle Caracterizacion</h1>
-                <p className="text-xs text-muted-foreground font-mono">
-                  {visita?.radicado_oficial || visita?.radicado_local}
-                </p>
-              </div>
+            <div className="min-w-0">
+              <h1 className="text-sm font-bold leading-tight">Detalle Caracterización</h1>
+              <p className="truncate text-xs font-mono text-muted-foreground">
+                {visita?.radicado_oficial || visita?.radicado_local}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {((profile?.rol === "campesino" && !["CANCELADO", "RECHAZADO"].includes(visita?.estado)) || ["admin", "asesor"].includes(profile?.rol)) && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => router.push(`/formulario/editar/${visita?.id}`)}
-              >
+          {/* Derecha: acciones */}
+          <div className="flex shrink-0 items-center gap-1">
+            <Badge variant="outline" className={`${est.color} gap-1`}>
+              <EstIcon className="h-3 w-3" />
+              <span className="hidden sm:inline">{est.label}</span>
+            </Badge>
+            {((profile?.rol === "campesino" && !["CANCELADO", "RECHAZADO"].includes(caracterizacion?.estado)) || ["admin", "asesor"].includes(profile?.rol)) && (
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => router.push(`/formulario/editar/${visita?.id}`)} title="Editar">
                 <PenTool className="h-4 w-4" />
-                <span className="hidden sm:inline">Editar</span>
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => generateCaracterizacionPDF(pdfFromServerData(data))}
-            >
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => generateCaracterizacionPDF(pdfFromServerData(data))} title="Descargar PDF">
               <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">PDF</span>
             </Button>
-            <Badge variant="outline" className={est.color}>
-              <EstIcon className="mr-1 h-3 w-3" />
-              {est.label}
-            </Badge>
             <ThemeToggle />
           </div>
         </div>
@@ -586,7 +603,7 @@ function ServerDetailView({
               <div>
                 <p className="text-xs text-muted-foreground">Fecha visita</p>
                 <p className="text-sm font-semibold">
-                  {visita?.fecha_visita ? new Date(visita.fecha_visita).toLocaleDateString("es-CO") : "N/A"}
+                  {visita?.fecha_visita ? new Date(visita.fecha_visita + "T12:00:00").toLocaleDateString("es-CO") : "N/A"}
                 </p>
               </div>
             </CardContent>
@@ -645,7 +662,7 @@ function ServerDetailView({
           <div className="mb-6">
             <StatusChangePanel
               visitaId={visita?.id}
-              currentEstado={visita?.estado || "INICIADO"}
+              currentEstado={caracterizacion?.estado || "INICIADO"}
               beneficiarioEmail={beneficiario?.correo || null}
               beneficiarioNombre={nombre}
               beneficiarioTelefono={beneficiario?.telefono || null}
@@ -663,6 +680,8 @@ function ServerDetailView({
               <InfoRow label="Tipo documento" value={beneficiario?.tipo_documento} />
               <InfoRow label="No. documento" value={beneficiario?.numero_documento} />
               <InfoRow label="Edad" value={beneficiario?.edad} />
+              <InfoRow label="Genero" value={beneficiario?.genero} />
+              <InfoRow label="Personas a cargo" value={beneficiario?.personas_a_cargo} />
               <InfoRow label="Telefono" value={beneficiario?.telefono} />
               <InfoRow label="Correo" value={beneficiario?.correo} />
               <InfoRow label="Ocupacion principal" value={beneficiario?.ocupacion_principal} />
@@ -702,12 +721,12 @@ function ServerDetailView({
           {caracterizacionPredio && (
             <SectionCard title="Caracterizacion del Predio" icon={Mountain}>
               <div className="grid gap-3 sm:grid-cols-2">
-                <InfoRow label="Topografia" value={caracterizacionPredio.topografia} />
-                <InfoRow label="Ruta acceso" value={caracterizacionPredio.ruta_acceso} />
+                <InfoRow label="Topografía" value={caracterizacionPredio.topografia} />
+                <InfoRow label="Ruta de acceso" value={caracterizacionPredio.ruta_acceso} />
                 <InfoRow label="Distancia (km)" value={caracterizacionPredio.distancia_km} />
-                <InfoRow label="Tiempo acceso" value={caracterizacionPredio.tiempo_acceso} />
-                <InfoRow label="Temperatura (C)" value={caracterizacionPredio.temperatura_celsius} />
-                <InfoRow label="Meses lluvia" value={caracterizacionPredio.meses_lluvia} />
+                <InfoRow label="Tiempo de acceso" value={caracterizacionPredio.tiempo_acceso} />
+                <InfoRow label="Temperatura (°C)" value={caracterizacionPredio.temperatura_celsius} />
+                <InfoRow label="Meses de lluvia" value={caracterizacionPredio.meses_lluvia} />
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <BooleanTag label="Bosque" active={caracterizacionPredio.cobertura_bosque} />
@@ -760,12 +779,11 @@ function ServerDetailView({
             <SectionCard title="Area Productiva" icon={Sprout}>
               <div className="grid gap-3 sm:grid-cols-2">
                 <InfoRow label="Sistema productivo" value={areaProductiva.sistema_productivo} />
-                <InfoRow label="Caracterizacion cultivo" value={areaProductiva.caracterizacion_cultivo} />
+                <InfoRow label="Caracterización del cultivo" value={areaProductiva.caracterizacion_cultivo} />
                 <InfoRow label="Cantidad produccion" value={areaProductiva.cantidad_produccion} />
                 <InfoRow label="Estado cultivo" value={areaProductiva.estado_cultivo} />
                 <InfoRow label="Infraestructura procesamiento" value={areaProductiva.tiene_infraestructura_procesamiento ? "Si" : "No"} />
                 <InfoRow label="Estructuras" value={areaProductiva.estructuras} />
-                <InfoRow label="Interesado en programa" value={areaProductiva.interesado_programa ? "Si" : "No"} />
                 <InfoRow label="Donde comercializa" value={areaProductiva.donde_comercializa} />
                 <InfoRow label="Ingreso mensual ventas" value={areaProductiva.ingreso_mensual_ventas ? `$${Number(areaProductiva.ingreso_mensual_ventas).toLocaleString("es-CO")}` : null} />
               </div>
@@ -794,7 +812,16 @@ function ServerDetailView({
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {photos.map((photo, idx) => (
                   <div key={idx} className="group relative">
-                    <p className="mb-2 text-xs font-medium text-muted-foreground">{photo.label}</p>
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-xs font-medium text-muted-foreground">{photo.label}</p>
+                      <button
+                        onClick={() => downloadImage(photo.url, `${slugify(photo.label)}.jpg`)}
+                        title="Descargar imagen"
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-muted hover:bg-primary hover:text-white transition-colors"
+                      >
+                        <Download className="h-3 w-3" />
+                      </button>
+                    </div>
                     <div
                       className="relative cursor-pointer overflow-hidden rounded-lg border border-border bg-muted"
                       onClick={() => setPhotoModal(photo.url)}
@@ -810,7 +837,16 @@ function ServerDetailView({
                 ))}
                 {firma && (
                   <div className="group relative">
-                    <p className="mb-2 text-xs font-medium text-muted-foreground">Firma del Productor</p>
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-xs font-medium text-muted-foreground">Firma del Productor</p>
+                      <button
+                        onClick={() => downloadImage(firma, 'firma-productor.png')}
+                        title="Descargar firma"
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-muted hover:bg-primary hover:text-white transition-colors"
+                      >
+                        <Download className="h-3 w-3" />
+                      </button>
+                    </div>
                     <div className="relative cursor-pointer overflow-hidden rounded-lg border border-border bg-white p-2" onClick={() => setPhotoModal(firma)}>
                       <img src={firma} alt="Firma" className="h-44 w-full object-contain" />
                     </div>
@@ -831,6 +867,9 @@ function ServerDetailView({
               <Badge variant="outline" className={caracterizacion?.autorizacion_consulta_crediticia ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
                 {caracterizacion?.autorizacion_consulta_crediticia ? "Autoriza" : "No autoriza"} consulta crediticia
               </Badge>
+              <Badge variant="outline" className={areaProductiva?.interesado_programa ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
+                {areaProductiva?.interesado_programa ? "Requiere financiación" : "No requiere financiación"}
+              </Badge>
             </div>
             {caracterizacion?.observaciones && (
               <div className="mt-3">
@@ -841,7 +880,7 @@ function ServerDetailView({
         </div>
       </main>
 
-      {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
+      {photoModal && <PhotoModal url={photoModal} label="imagen" onClose={() => setPhotoModal(null)} />}
     </div>
   )
 }
@@ -873,35 +912,24 @@ function LocalDetailView({
   return (
     <div className="min-h-screen bg-background pb-12">
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-6">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")}>
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-2 md:px-6 md:py-3">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => router.push("/dashboard")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-                <Leaf className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-sm font-bold md:text-base">Detalle Caracterizacion</h1>
-                <p className="text-xs text-muted-foreground font-mono">{data.radicadoLocal}</p>
-              </div>
+            <div className="min-w-0">
+              <h1 className="text-sm font-bold leading-tight">Detalle Caracterización</h1>
+              <p className="truncate text-xs font-mono text-muted-foreground">{data.radicadoLocal}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => generateCaracterizacionPDF(pdfFromLocalData(data))}
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">PDF</span>
-            </Button>
-            <Badge variant="outline" className={est.color}>
-              <EstIcon className="mr-1 h-3 w-3" />
-              {est.label}
+          <div className="flex shrink-0 items-center gap-1">
+            <Badge variant="outline" className={`${est.color} gap-1`}>
+              <EstIcon className="h-3 w-3" />
+              <span className="hidden sm:inline">{est.label}</span>
             </Badge>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => generateCaracterizacionPDF(pdfFromLocalData(data))} title="Descargar PDF">
+              <Download className="h-4 w-4" />
+            </Button>
             <ThemeToggle />
           </div>
         </div>
@@ -945,7 +973,7 @@ function LocalDetailView({
               <Calendar className="h-8 w-8 shrink-0 text-blue-600" />
               <div>
                 <p className="text-xs text-muted-foreground">Fecha visita</p>
-                <p className="text-sm font-semibold">{data.visita?.fechaVisita ? new Date(data.visita.fechaVisita).toLocaleDateString("es-CO") : "N/A"}</p>
+                <p className="text-sm font-semibold">{data.visita?.fechaVisita ? new Date(data.visita.fechaVisita + "T12:00:00").toLocaleDateString("es-CO") : "N/A"}</p>
               </div>
             </CardContent>
           </Card>
@@ -1031,12 +1059,12 @@ function LocalDetailView({
           {data.caracterizacion && (
             <SectionCard title="Caracterizacion del Predio" icon={Mountain}>
               <div className="grid gap-3 sm:grid-cols-2">
-                <InfoRow label="Topografia" value={data.caracterizacion.topografia} />
-                <InfoRow label="Ruta acceso" value={data.caracterizacion.rutaAcceso} />
+                <InfoRow label="Topografía" value={data.caracterizacion.topografia} />
+                <InfoRow label="Ruta de acceso" value={data.caracterizacion.rutaAcceso} />
                 <InfoRow label="Distancia (km)" value={data.caracterizacion.distanciaKm} />
-                <InfoRow label="Tiempo acceso" value={data.caracterizacion.tiempoAcceso} />
-                <InfoRow label="Temperatura (C)" value={data.caracterizacion.temperaturaCelsius} />
-                <InfoRow label="Meses lluvia" value={data.caracterizacion.mesesLluvia} />
+                <InfoRow label="Tiempo de acceso" value={data.caracterizacion.tiempoAcceso} />
+                <InfoRow label="Temperatura (°C)" value={data.caracterizacion.temperaturaCelsius} />
+                <InfoRow label="Meses de lluvia" value={data.caracterizacion.mesesLluvia} />
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <BooleanTag label="Bosque" active={data.caracterizacion.coberturaBosque} />
@@ -1076,7 +1104,7 @@ function LocalDetailView({
             <SectionCard title="Area Productiva" icon={Sprout}>
               <div className="grid gap-3 sm:grid-cols-2">
                 <InfoRow label="Sistema productivo" value={data.areaProductiva.sistemaProduccion} />
-                <InfoRow label="Caracterizacion cultivo" value={data.areaProductiva.caracterizacionCultivo} />
+                <InfoRow label="Caracterización del cultivo" value={data.areaProductiva.caracterizacionCultivo} />
                 <InfoRow label="Estado cultivo" value={data.areaProductiva.estadoCultivo} />
                 <InfoRow label="Donde comercializa" value={data.areaProductiva.dondeComercializa} />
               </div>
@@ -1100,7 +1128,16 @@ function LocalDetailView({
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {photos.map((photo, idx) => (
                   <div key={idx} className="group relative">
-                    <p className="mb-2 text-xs font-medium text-muted-foreground">{photo.label}</p>
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-xs font-medium text-muted-foreground">{photo.label}</p>
+                      <button
+                        onClick={() => downloadImage(photo.url!, `${slugify(photo.label)}.jpg`)}
+                        title="Descargar imagen"
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-muted hover:bg-primary hover:text-white transition-colors"
+                      >
+                        <Download className="h-3 w-3" />
+                      </button>
+                    </div>
                     <div className="relative cursor-pointer overflow-hidden rounded-lg border border-border bg-muted" onClick={() => setPhotoModal(photo.url!)}>
                       <img src={photo.url} alt={photo.label} className="h-48 w-full object-cover transition-transform group-hover:scale-105" />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
@@ -1111,7 +1148,16 @@ function LocalDetailView({
                 ))}
                 {firma && (
                   <div className="group relative">
-                    <p className="mb-2 text-xs font-medium text-muted-foreground">Firma del Productor</p>
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-xs font-medium text-muted-foreground">Firma del Productor</p>
+                      <button
+                        onClick={() => downloadImage(firma, 'firma-productor.png')}
+                        title="Descargar firma"
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-muted hover:bg-primary hover:text-white transition-colors"
+                      >
+                        <Download className="h-3 w-3" />
+                      </button>
+                    </div>
                     <div className="rounded-lg border border-border bg-white p-2 cursor-pointer" onClick={() => setPhotoModal(firma)}>
                       <img src={firma} alt="Firma" className="h-44 w-full object-contain" />
                     </div>
@@ -1132,12 +1178,15 @@ function LocalDetailView({
               <Badge variant="outline" className={data.autorizacion?.autorizaConsultaCrediticia ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
                 {data.autorizacion?.autorizaConsultaCrediticia ? "Autoriza" : "No autoriza"} consulta crediticia
               </Badge>
+              <Badge variant="outline" className={data.areaProductiva?.interesadoPrograma ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
+                {data.areaProductiva?.interesadoPrograma ? "Requiere financiación" : "No requiere financiación"}
+              </Badge>
             </div>
           </SectionCard>
         </div>
       </main>
 
-      {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
+      {photoModal && <PhotoModal url={photoModal} label="imagen" onClose={() => setPhotoModal(null)} />}
     </div>
   )
 }

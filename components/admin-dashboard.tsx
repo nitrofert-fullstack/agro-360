@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import dynamic from "next/dynamic"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -44,22 +45,32 @@ import {
   Mountain,
   Wallet,
   ChevronRight,
+  ChevronLeft,
   RefreshCw,
-  Home,
   LogOut,
   Loader2,
   UserX,
   UserCheck,
+  Trash2,
   Mail,
   Shield,
   Download,
   Printer,
   PenTool,
+  BarChart2,
+  TrendingUp,
+  Activity,
 } from "lucide-react"
 import { ThemeToggle } from "./theme-toggle"
 import Link from "next/link"
+import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import { useVirtualizer } from "@tanstack/react-virtual"
+import {
+  BarChart, Bar, PieChart, Pie, Cell,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer,
+} from "recharts"
 
 const MapViewer = dynamic(
   () => import("./map-viewer").then((mod) => mod.MapViewer),
@@ -85,12 +96,14 @@ interface CaracterizacionDB {
   observaciones: string | null
   created_at: string
   updated_at: string
-  fecha_sincronizacion: string | null
-  firma_beneficiario_url: string | null
+  firma_productor_url: string | null
   foto_beneficiario_url: string | null
-  foto_predio_1_url: string | null
-  foto_predio_2_url: string | null
-  autoriza_tratamiento_datos: boolean
+  foto_1_url: string | null
+  foto_2_url: string | null
+  foto_doc_frontal_url: string | null
+  foto_doc_trasera_url: string | null
+  autorizacion_datos_personales: boolean | null
+  autorizacion_consulta_crediticia: boolean | null
   // Joined relations
   beneficiario: {
     id: string
@@ -101,44 +114,44 @@ interface CaracterizacionDB {
     telefono: string | null
     correo: string | null
     edad: number | null
+    genero: string | null
+    personas_a_cargo: number | null
     ocupacion_principal: string | null
   } | null
   predio: {
     id: string
     nombre_predio: string
+    direccion: string | null
     tipo_tenencia: string | null
-    area_total: number | null
-    area_cultivada: number | null
+    area_total_hectareas: number | null
+    area_productiva_hectareas: number | null
     latitud: number | null
     longitud: number | null
-    altitud: number | null
+    altitud_msnm: number | null
     departamento: string | null
     municipio: string | null
     vereda: string | null
     codigo_catastral: string | null
-    fuente_agua: string | null
-    acceso_vial: string | null
-    distancia_cabecera: number | null
-    vive_en_predio: boolean | null
+    vive_en_predio: string | null
     tiene_vivienda: boolean | null
     cultivos_existentes: string | null
+    poligono: [number, number][] | null
   } | null
   visita: {
     id: string
     fecha_visita: string | null
     nombre_tecnico: string | null
-    objetivo: string | null
-    observaciones: string | null
     radicado_local: string | null
     radicado_oficial: string | null
-    estado: string | null
     asesor_id: string | null
   } | null
   caracterizacion_predio: {
     id: string
     topografia: string | null
-    tipo_suelo: string | null
-    cobertura_vegetal: string | null
+    cobertura_bosque: boolean | null
+    cobertura_cultivos: boolean | null
+    cobertura_pastos: boolean | null
+    cobertura_rastrojo: boolean | null
     ruta_acceso: string | null
     distancia_km: number | null
     tiempo_acceso: string | null
@@ -147,25 +160,24 @@ interface CaracterizacionDB {
   } | null
   area_productiva: {
     id: string
-    cultivo_principal: string | null
-    area_cultivo_principal: number | null
-    produccion_estimada: number | null
-    destino_produccion: string | null
-    sistema_produccion: string | null
+    sistema_productivo: string | null
     caracterizacion_cultivo: string | null
+    cantidad_produccion: string | null
     estado_cultivo: string | null
+    tiene_infraestructura_procesamiento: boolean | null
+    estructuras: string | null
+    interesado_programa: boolean | null
     donde_comercializa: string | null
     ingreso_mensual_ventas: number | null
   } | null
   informacion_financiera: {
     id: string
-    ingresos_mensuales: string | null
     ingresos_mensuales_agropecuaria: number | null
     ingresos_mensuales_otros: number | null
     egresos_mensuales: number | null
     activos_totales: number | null
+    activos_agropecuaria: number | null
     pasivos_totales: number | null
-    acceso_credito: boolean | null
   } | null
   asesor: {
     id: string
@@ -184,14 +196,14 @@ const estadoConfig: Record<EstadoKey, { label: string; color: string; icon: type
   iniciado: { label: "Iniciado", color: "bg-slate-500/10 text-slate-500 border-slate-500/20", icon: Clock },
   revisado: { label: "En Revisión", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Eye },
   en_estudio_credito: { label: "En Estudio", color: "bg-purple-500/10 text-purple-500 border-purple-500/20", icon: Eye },
-  aprobado: { label: "Aprobado", color: "bg-green-500/10 text-green-500 border-green-500/20", icon: CheckCircle },
-  cancelado: { label: "Cancelado", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: XCircle },
+  aprobado: { label: "Viable", color: "bg-green-500/10 text-green-500 border-green-500/20", icon: CheckCircle },
+  cancelado: { label: "No Viable", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: XCircle },
   // Legado
   pendiente: { label: "Pendiente", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", icon: Clock },
   pendiente_sincronizacion: { label: "Pend. Sync", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", icon: Clock },
   sincronizado: { label: "Sincronizado", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Eye },
   en_revision: { label: "En Revisión", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Eye },
-  rechazado: { label: "Rechazado", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: XCircle },
+  rechazado: { label: "No Viable", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: XCircle },
   error_sincronizacion: { label: "Error", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: XCircle },
 }
 
@@ -214,9 +226,34 @@ interface Invitation {
   created_at: string
 }
 
+async function downloadImage(url: string, filename: string) {
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(blobUrl)
+  } catch {
+    window.open(url, '_blank')
+  }
+}
+
 export function AdminDashboard() {
-  const { isAdmin, user: currentUser, profile: currentProfile } = useAuth()
+  const { isAdmin, isAuthenticated, loading: authLoading, user: currentUser, profile: currentProfile, signOut } = useAuth()
   const isAnalista = currentProfile?.rol === 'analista'
+  const router = useRouter()
+  const pathname = usePathname()
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const activeSection: 'caracterizaciones' | 'usuarios' | 'estadisticas' = pathname.includes('/usuarios')
+    ? 'usuarios'
+    : pathname.includes('/estadisticas')
+      ? 'estadisticas'
+      : 'caracterizaciones'
   const [caracterizaciones, setCaracterizaciones] = useState<CaracterizacionDB[]>([])
   const [estadisticas, setEstadisticas] = useState({ total: 0, pendientes: 0, sincronizados: 0, aprobados: 0, rechazados: 0 })
   const [selectedCaracterizacion, setSelectedCaracterizacion] = useState<CaracterizacionDB | null>(null)
@@ -233,7 +270,7 @@ export function AdminDashboard() {
   const [observaciones, setObservaciones] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
-  const [activeSection, setActiveSection] = useState<"caracterizaciones" | "usuarios">("caracterizaciones")
+  // activeSection derivado del pathname — ver arriba
   const [usuarios, setUsuarios] = useState<UserProfile[]>([])
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
@@ -249,10 +286,11 @@ export function AdminDashboard() {
   const [isAssigningAsesor, setIsAssigningAsesor] = useState(false)
   // Cambio de rol
   const [changingRoleUserId, setChangingRoleUserId] = useState<string | null>(null)
-  // Búsqueda y paginación de usuarios
+  // Búsqueda y paginación de usuarios (server-side)
   const [userSearch, setUserSearch] = useState("")
   const [userPage, setUserPage] = useState(1)
-  const USERS_PER_PAGE = 10
+  const [userTotalCount, setUserTotalCount] = useState(0)
+  const USERS_PER_PAGE = 20
 
   const supabase = createClient()
 
@@ -302,10 +340,10 @@ export function AdminDashboard() {
         setCaracterizaciones(items)
         setEstadisticas({
           total,
-          pendientes: items.filter(c => ['pendiente', 'pendiente_sincronizacion', 'iniciado'].includes((c.visita?.estado || c.estado || '').toLowerCase())).length,
-          sincronizados: items.filter(c => ['sincronizado', 'revisado'].includes((c.visita?.estado || c.estado || '').toLowerCase())).length,
-          aprobados: items.filter(c => (c.visita?.estado || c.estado || '').toLowerCase() === 'aprobado').length,
-          rechazados: items.filter(c => ['rechazado', 'cancelado'].includes((c.visita?.estado || c.estado || '').toLowerCase())).length,
+          pendientes: items.filter(c => ['pendiente', 'pendiente_sincronizacion', 'iniciado'].includes((c.estado || '').toLowerCase())).length,
+          sincronizados: items.filter(c => ['sincronizado', 'revisado'].includes((c.estado || '').toLowerCase())).length,
+          aprobados: items.filter(c => (c.estado || '').toLowerCase() === 'aprobado').length,
+          rechazados: items.filter(c => ['rechazado', 'cancelado'].includes((c.estado || '').toLowerCase())).length,
         })
       }
     } catch (err) {
@@ -317,27 +355,37 @@ export function AdminDashboard() {
     }
   }, [])
 
-  const loadUsers = useCallback(async () => {
+  const loadUsers = useCallback(async ({ page = 1, search = '' }: { page?: number; search?: string } = {}) => {
     setIsLoadingUsers(true)
     try {
-      // Cargar perfiles de usuarios
-      const { data: profiles, error: profilesErr } = await supabase
+      const offset = (page - 1) * USERS_PER_PAGE
+      let profilesQuery = supabase
         .from('profiles')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
+        .range(offset, offset + USERS_PER_PAGE - 1)
 
+      if (search.trim()) {
+        profilesQuery = profilesQuery.or(
+          `nombre_completo.ilike.%${search.trim()}%,email.ilike.%${search.trim()}%`
+        ) as typeof profilesQuery
+      }
+
+      const { data: profiles, error: profilesErr, count } = await profilesQuery
       if (profilesErr) throw profilesErr
-      setUsuarios((profiles || []) as UserProfile[])
 
-      // Cargar invitaciones
+      setUsuarios((profiles || []) as UserProfile[])
+      setUserTotalCount(count ?? 0)
+      setUserPage(page)
+
+      // Invitaciones — pocas filas, sin paginación
       const { data: invs, error: invsErr } = await supabase
         .from('invitations')
         .select('*')
         .order('created_at', { ascending: false })
+        .limit(200)
 
-      if (!invsErr) {
-        setInvitations((invs || []) as Invitation[])
-      }
+      if (!invsErr) setInvitations((invs || []) as Invitation[])
     } catch (err) {
       console.error('Error loading users:', err)
       toast.error('Error al cargar usuarios')
@@ -345,6 +393,43 @@ export function AdminDashboard() {
       setIsLoadingUsers(false)
     }
   }, [supabase])
+
+  const [userToDelete, setUserToDelete] = useState<{ id: string; nombre: string } | null>(null)
+  const [isDeletingUser, setIsDeletingUser] = useState(false)
+
+  interface DashboardStats {
+    porEstado: Record<string, number>
+    porMes: { mes: string; total: number }[]
+    porMunicipio: { municipio: string; total: number }[]
+    porDepartamento: { departamento: string; total: number }[]
+    porGenero: { genero: string; total: number }[]
+    totalRegistros: number
+    promedios: { edad: number | null; personasACargo: number | null; hectareas: number | null }
+    asignacion: { conAsesor: number; sinAsesor: number }
+  }
+  const [dashStats, setDashStats] = useState<DashboardStats | null>(null)
+  const [isLoadingStats, setIsLoadingStats] = useState(false)
+
+  const deleteUser = async () => {
+    if (!userToDelete) return
+    setIsDeletingUser(true)
+    try {
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userToDelete.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error desconocido')
+      toast.success(data.mensaje)
+      setUserToDelete(null)
+      await loadUsers({ page: 1, search: userSearch })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar la cuenta')
+    } finally {
+      setIsDeletingUser(false)
+    }
+  }
 
   const toggleUserActive = async (userId: string, currentActive: boolean) => {
     try {
@@ -358,7 +443,7 @@ export function AdminDashboard() {
       if (!res.ok) throw new Error(data.error || 'Error desconocido')
 
       toast.success(data.mensaje)
-      await loadUsers()
+      await loadUsers({ page: 1, search: userSearch })
     } catch (err) {
       console.error('Error toggling user:', err)
       toast.error(err instanceof Error ? err.message : 'Error al actualizar el estado de la cuenta')
@@ -425,7 +510,7 @@ export function AdminDashboard() {
       toast.success(data.emailEnviado ? 'Cuenta creada y credenciales enviadas por email' : 'Cuenta creada exitosamente')
       setInviteEmail('')
       setInviteNombre('')
-      await loadUsers()
+      await loadUsers({ page: 1, search: userSearch })
     } catch (err) {
       console.error('Error creating invitation:', err)
       toast.error('Error al crear el usuario')
@@ -433,6 +518,20 @@ export function AdminDashboard() {
       setIsCreatingInvite(false)
     }
   }
+
+  const loadStats = useCallback(async () => {
+    setIsLoadingStats(true)
+    try {
+      const res = await fetch('/api/admin/stats')
+      if (!res.ok) return
+      const data = await res.json()
+      setDashStats(data)
+    } catch {
+      // Non-critical
+    } finally {
+      setIsLoadingStats(false)
+    }
+  }, [])
 
   const loadAsesores = useCallback(async () => {
     try {
@@ -442,6 +541,7 @@ export function AdminDashboard() {
         .in('rol', ['asesor', 'admin'])
         .eq('activo', true)
         .order('nombre_completo')
+        .limit(200)
       setAsesoresDisponibles((data || []) as { id: string; nombre_completo: string }[])
     } catch {
       // No crítico
@@ -489,7 +589,7 @@ export function AdminDashboard() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error desconocido')
       toast.success(data.mensaje)
-      await loadUsers()
+      await loadUsers({ page: 1, search: userSearch })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al cambiar rol')
     } finally {
@@ -497,16 +597,35 @@ export function AdminDashboard() {
     }
   }
 
+  // Guard: redirigir si la sesión expiró o se restauró desde bfcache sin auth
   useEffect(() => {
-    loadData({ page: 1, search: '', estado: 'todos', append: false })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (authLoading) return
+    if (!isAuthenticated) {
+      router.replace('/auth/login')
+    }
+  }, [authLoading, isAuthenticated, router])
+
+  // Cuando el navegador restaura la página desde bfcache (botón Atrás),
+  // forzar recarga completa para que el middleware re-evalúe la sesión
+  useEffect(() => {
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        window.location.reload()
+      }
+    }
+    window.addEventListener('pageshow', handlePageShow)
+    return () => window.removeEventListener('pageshow', handlePageShow)
   }, [])
 
   useEffect(() => {
     if (activeSection === 'usuarios') {
-      loadUsers()
+      loadUsers({ page: 1, search: '' })
+    } else {
+      loadData({ page: 1, search: '', estado: 'todos', append: false })
     }
-  }, [activeSection, loadUsers])
+    loadStats()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Debounce: reload from server when search or estado filter changes
   useEffect(() => {
@@ -586,26 +705,23 @@ export function AdminDashboard() {
       'Radicado Oficial', 'Radicado Local', 'Estado', 'Fecha Registro', 'Fecha Visita',
       // Beneficiario
       'Nombres', 'Apellidos', 'Tipo Documento', 'Num. Documento',
-      'Edad', 'Telefono', 'Correo', 'Ocupacion Principal',
+      'Edad', 'Genero', 'Personas a Cargo', 'Telefono', 'Correo', 'Ocupacion Principal',
       // Predio
       'Nombre Predio', 'Departamento', 'Municipio', 'Vereda', 'Direccion',
-      'Tipo Tenencia', 'Codigo Catastral', 'Area Total (Ha)', 'Area Cultivada (Ha)',
+      'Tipo Tenencia', 'Codigo Catastral', 'Area Total (Ha)', 'Area Productiva (Ha)',
       'Latitud', 'Longitud', 'Altitud (msnm)',
       'Vive en Predio', 'Tiene Vivienda', 'Cultivos Existentes',
       // Caracterizacion predio
-      'Topografia', 'Tipo Suelo', 'Cobertura Vegetal', 'Ruta Acceso',
-      'Distancia Cabecera (km)', 'Tiempo Acceso', 'Temperatura (C)', 'Meses Lluvia',
-      // Agua
-      'Fuente Agua',
+      'Topografia', 'Cobertura Vegetal', 'Ruta Acceso',
+      'Distancia (km)', 'Tiempo Acceso', 'Temperatura (C)', 'Meses Lluvia',
       // Area productiva
-      'Cultivo Principal', 'Area Cultivo (Ha)', 'Produccion Estimada', 'Estado Cultivo',
-      'Destino Produccion', 'Sistema Productivo', 'Caracterizacion Cultivo',
-      'Donde Comercializa', 'Ingreso Mensual Ventas',
+      'Sistema Productivo', 'Caracterizacion Cultivo', 'Cantidad Produccion', 'Estado Cultivo',
+      'Donde Comercializa', 'Ingreso Mensual Ventas', 'Interesado Programa',
       // Financiero
-      'Ingresos Agropecuarios', 'Ingresos Otros', 'Egresos Mensuales',
-      'Activos Totales', 'Pasivos Totales', 'Acceso Credito',
+      'Ingresos Agropecuarios/mes', 'Otros Ingresos/mes', 'Egresos/mes',
+      'Activos Totales', 'Activos Agropecuarios', 'Pasivos Totales',
       // Autorizaciones
-      'Autoriza Datos Personales',
+      'Autoriza Datos Personales', 'Autoriza Consulta Crediticia',
       // Tecnico
       'Tecnico / Asesor', 'Asesor Email',
     ]
@@ -631,6 +747,8 @@ export function AdminDashboard() {
       c.beneficiario?.tipo_documento || '',
       c.beneficiario?.numero_documento || '',
       c.beneficiario?.edad ?? '',
+      c.beneficiario?.genero || '',
+      c.beneficiario?.personas_a_cargo ?? '',
       c.beneficiario?.telefono || '',
       c.beneficiario?.correo || '',
       c.beneficiario?.ocupacion_principal || '',
@@ -638,42 +756,39 @@ export function AdminDashboard() {
       c.predio?.departamento || '',
       c.predio?.municipio || '',
       c.predio?.vereda || '',
-      c.predio?.acceso_vial || '',
+      c.predio?.direccion || '',
       c.predio?.tipo_tenencia || '',
       c.predio?.codigo_catastral || '',
-      c.predio?.area_total ?? '',
-      c.predio?.area_cultivada ?? '',
+      c.predio?.area_total_hectareas ?? '',
+      c.predio?.area_productiva_hectareas ?? '',
       c.predio?.latitud ?? '',
       c.predio?.longitud ?? '',
-      c.predio?.altitud ?? '',
-      bool(c.predio?.vive_en_predio),
+      c.predio?.altitud_msnm ?? '',
+      c.predio?.vive_en_predio || '',
       bool(c.predio?.tiene_vivienda),
       c.predio?.cultivos_existentes || '',
       c.caracterizacion_predio?.topografia || '',
-      c.caracterizacion_predio?.tipo_suelo || '',
-      c.caracterizacion_predio?.cobertura_vegetal || '',
+      [c.caracterizacion_predio?.cobertura_bosque && 'Bosque', c.caracterizacion_predio?.cobertura_cultivos && 'Cultivos', c.caracterizacion_predio?.cobertura_pastos && 'Pastos', c.caracterizacion_predio?.cobertura_rastrojo && 'Rastrojo'].filter(Boolean).join(', '),
       c.caracterizacion_predio?.ruta_acceso || '',
       c.caracterizacion_predio?.distancia_km ?? '',
       c.caracterizacion_predio?.tiempo_acceso || '',
       c.caracterizacion_predio?.temperatura_celsius ?? '',
       c.caracterizacion_predio?.meses_lluvia || '',
-      c.predio?.fuente_agua || '',
-      c.area_productiva?.cultivo_principal || '',
-      c.area_productiva?.area_cultivo_principal ?? '',
-      c.area_productiva?.produccion_estimada ?? '',
-      c.area_productiva?.estado_cultivo || '',
-      c.area_productiva?.destino_produccion || '',
-      c.area_productiva?.sistema_produccion || '',
+      c.area_productiva?.sistema_productivo || '',
       c.area_productiva?.caracterizacion_cultivo || '',
+      c.area_productiva?.cantidad_produccion || '',
+      c.area_productiva?.estado_cultivo || '',
       c.area_productiva?.donde_comercializa || '',
       money(c.area_productiva?.ingreso_mensual_ventas),
+      bool(c.area_productiva?.interesado_programa),
       money(c.informacion_financiera?.ingresos_mensuales_agropecuaria),
       money(c.informacion_financiera?.ingresos_mensuales_otros),
       money(c.informacion_financiera?.egresos_mensuales),
       money(c.informacion_financiera?.activos_totales),
+      money(c.informacion_financiera?.activos_agropecuaria),
       money(c.informacion_financiera?.pasivos_totales),
-      bool(c.informacion_financiera?.acceso_credito),
-      bool(c.autoriza_tratamiento_datos),
+      bool(c.autorizacion_datos_personales),
+      bool(c.autorizacion_consulta_crediticia),
       c.visita?.nombre_tecnico || c.asesor?.nombre_completo || '',
       c.asesor?.email || '',
     ].map(escape))
@@ -785,9 +900,9 @@ export function AdminDashboard() {
       ${field('Vereda', c.predio?.vereda)}
       ${field('Tipo tenencia', c.predio?.tipo_tenencia)}
       ${field('Codigo catastral', c.predio?.codigo_catastral)}
-      ${field('Area total', c.predio?.area_total ? `${c.predio.area_total} ha` : null)}
-      ${field('Area cultivada', c.predio?.area_cultivada ? `${c.predio.area_cultivada} ha` : null)}
-      ${field('Altitud', c.predio?.altitud ? `${c.predio.altitud} msnm` : null)}
+      ${field('Area total', c.predio?.area_total_hectareas ? `${c.predio.area_total_hectareas} ha` : null)}
+      ${field('Area productiva', c.predio?.area_productiva_hectareas ? `${c.predio.area_productiva_hectareas} ha` : null)}
+      ${field('Altitud', c.predio?.altitud_msnm ? `${c.predio.altitud_msnm} msnm` : null)}
       ${field('Coordenadas', c.predio?.latitud && c.predio?.longitud ? `${c.predio.latitud.toFixed(5)}, ${c.predio.longitud.toFixed(5)}` : null)}
       ${field('Vive en predio', c.predio?.vive_en_predio ? 'Si' : (c.predio?.vive_en_predio === false ? 'No' : null))}
       ${field('Acceso vial', c.predio?.acceso_vial)}
@@ -802,7 +917,7 @@ export function AdminDashboard() {
     <div class="grid3">
       ${field('Topografia', c.caracterizacion_predio.topografia)}
       ${field('Tipo suelo', c.caracterizacion_predio.tipo_suelo)}
-      ${field('Cobertura vegetal', c.caracterizacion_predio.cobertura_vegetal)}
+      ${field('Cobertura vegetal', [c.caracterizacion_predio.cobertura_bosque && 'Bosque', c.caracterizacion_predio.cobertura_cultivos && 'Cultivos', c.caracterizacion_predio.cobertura_pastos && 'Pastos', c.caracterizacion_predio.cobertura_rastrojo && 'Rastrojo'].filter(Boolean).join(', ') || null)}
       ${field('Ruta acceso', c.caracterizacion_predio.ruta_acceso)}
       ${field('Distancia', c.caracterizacion_predio.distancia_km ? `${c.caracterizacion_predio.distancia_km} km` : null)}
       ${field('Tiempo acceso', c.caracterizacion_predio.tiempo_acceso)}
@@ -824,7 +939,7 @@ export function AdminDashboard() {
       ${field('Cultivo principal', c.area_productiva.cultivo_principal)}
       ${field('Area cultivo', c.area_productiva.area_cultivo_principal ? `${c.area_productiva.area_cultivo_principal} ha` : null)}
       ${field('Estado cultivo', c.area_productiva.estado_cultivo)}
-      ${field('Sistema productivo', c.area_productiva.sistema_produccion)}
+      ${field('Sistema productivo', c.area_productiva.sistema_productivo)}
       ${field('Prod. estimada', c.area_productiva.produccion_estimada ? `${c.area_productiva.produccion_estimada} ton` : null)}
       ${field('Destino produccion', c.area_productiva.destino_produccion)}
       ${field('Donde comercializa', c.area_productiva.donde_comercializa)}
@@ -843,7 +958,6 @@ export function AdminDashboard() {
       ${field('Egresos mensuales', money(c.informacion_financiera.egresos_mensuales))}
       ${field('Activos totales', money(c.informacion_financiera.activos_totales))}
       ${field('Pasivos totales', money(c.informacion_financiera.pasivos_totales))}
-      ${field('Acceso credito', c.informacion_financiera.acceso_credito ? 'Si' : (c.informacion_financiera.acceso_credito === false ? 'No' : null))}
     </div>
   </div>` : ''}
 
@@ -853,7 +967,7 @@ export function AdminDashboard() {
     <div class="grid3">
       ${field('Tecnico / Asesor', c.visita?.nombre_tecnico || c.asesor?.nombre_completo)}
       ${field('Correo asesor', c.asesor?.email)}
-      ${field('Fecha visita', c.visita?.fecha_visita ? new Date(c.visita.fecha_visita).toLocaleDateString('es-CO') : null)}
+      ${field('Fecha visita', c.visita?.fecha_visita ? new Date(c.visita.fecha_visita + 'T12:00:00').toLocaleDateString('es-CO') : null)}
       ${field('Fecha registro', c.created_at ? new Date(c.created_at).toLocaleDateString('es-CO') : null)}
       ${field('Radicado local', c.radicado_local)}
       ${field('Radicado oficial', c.radicado_oficial)}
@@ -864,8 +978,11 @@ export function AdminDashboard() {
   <h2>Autorizaciones</h2>
   <div class="section-box">
     <div class="auth-row">
-      <span class="auth-item ${c.autoriza_tratamiento_datos ? 'auth-ok' : 'auth-no'}">
-        ${c.autoriza_tratamiento_datos ? '✓' : '✗'} Tratamiento de datos personales
+      <span class="auth-item ${c.autorizacion_datos_personales ? 'auth-ok' : 'auth-no'}">
+        ${c.autorizacion_datos_personales ? '✓' : '✗'} Tratamiento de datos personales
+      </span>
+      <span class="auth-item ${c.autorizacion_consulta_crediticia ? 'auth-ok' : 'auth-no'}">
+        ${c.autorizacion_consulta_crediticia ? '✓' : '✗'} Consulta crediticia
       </span>
     </div>
     ${c.observaciones ? `<div style="margin-top:8px">${field('Observaciones', c.observaciones)}</div>` : ''}
@@ -892,19 +1009,9 @@ export function AdminDashboard() {
     }, 500)
   }
 
-  const filteredUsuarios = usuarios.filter(u => {
-    if (!userSearch.trim()) return true
-    const q = userSearch.toLowerCase()
-    return (
-      (u.nombre_completo || '').toLowerCase().includes(q) ||
-      (u.email || '').toLowerCase().includes(q)
-    )
-  })
-  const userTotalPages = Math.max(1, Math.ceil(filteredUsuarios.length / USERS_PER_PAGE))
-  const paginatedUsuarios = filteredUsuarios.slice(
-    (userPage - 1) * USERS_PER_PAGE,
-    userPage * USERS_PER_PAGE
-  )
+  // Paginación server-side: `usuarios` ya contiene solo la página actual
+  const userTotalPages = Math.max(1, Math.ceil(userTotalCount / USERS_PER_PAGE))
+  const paginatedUsuarios = usuarios
 
   return (
     <div className="min-h-screen bg-background">
@@ -912,31 +1019,34 @@ export function AdminDashboard() {
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
         <div className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Sprout className="h-5 w-5 text-primary" />
-            </div>
+            <Image src="/icons/icon-192x192.png" alt="Agro360" width={40} height={40} className="rounded-lg" />
             <div>
               <h1 className="text-lg font-bold text-foreground md:text-xl">Agro360</h1>
-              <p className="hidden text-sm text-muted-foreground sm:block">Panel de Administracion</p>
+              <p className="hidden text-sm text-muted-foreground sm:block">
+                {isAnalista ? 'Panel del Analista' : 'Panel de Administración'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 md:gap-2">
-            <Button variant="outline" size="sm" asChild className="h-9 gap-2 bg-transparent px-2 md:px-3">
-              <Link href="/dashboard">
-                <Home className="h-4 w-4" />
-                <span className="hidden sm:inline">Dashboard</span>
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => { loadData({ page: 1, search: searchQuery, estado: filterEstado }); if (activeSection === 'usuarios') loadUsers(); toast.info('Actualizando datos...') }} className="h-9 gap-2 bg-transparent px-2 md:px-3">
+            <Button variant="outline" size="sm" onClick={() => { if (activeSection === 'usuarios') loadUsers({ page: userPage, search: userSearch }); else loadData({ page: 1, search: searchQuery, estado: filterEstado }); loadStats(); toast.info('Actualizando datos...') }} className="h-9 gap-2 bg-transparent px-2 md:px-3">
               <RefreshCw className="h-4 w-4" />
               <span className="hidden md:inline">Actualizar</span>
             </Button>
             <div className="hidden h-6 w-px bg-border md:block" />
-            <Button variant="ghost" size="sm" asChild className="h-9 gap-2 text-muted-foreground hover:text-destructive">
-              <Link href="/auth/login">
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Salir</span>
-              </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={isSigningOut}
+              onClick={async () => {
+                if (isSigningOut) return
+                setIsSigningOut(true)
+                await fetch('/auth/signout', { method: 'POST' })
+                window.location.href = '/auth/login'
+              }}
+              className="h-9 gap-2 text-muted-foreground hover:text-destructive"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">{isSigningOut ? 'Saliendo...' : 'Salir'}</span>
             </Button>
             <ThemeToggle />
           </div>
@@ -1034,7 +1144,7 @@ export function AdminDashboard() {
                 variant={activeSection === 'caracterizaciones' ? 'default' : 'ghost'}
                 size="sm"
                 className="w-full justify-start gap-2"
-                onClick={() => setActiveSection('caracterizaciones')}
+                onClick={() => router.push('/admin/caracterizaciones')}
               >
                 <FileText className="h-4 w-4" />
                 Caracterizaciones
@@ -1044,12 +1154,21 @@ export function AdminDashboard() {
                   variant={activeSection === 'usuarios' ? 'default' : 'ghost'}
                   size="sm"
                   className="w-full justify-start gap-2"
-                  onClick={() => setActiveSection('usuarios')}
+                  onClick={() => router.push('/admin/usuarios')}
                 >
                   <Users className="h-4 w-4" />
                   Usuarios
                 </Button>
               )}
+              <Button
+                variant={activeSection === 'estadisticas' ? 'default' : 'ghost'}
+                size="sm"
+                className="w-full justify-start gap-2"
+                onClick={() => router.push('/admin/estadisticas')}
+              >
+                <BarChart2 className="h-4 w-4" />
+                Estadísticas
+              </Button>
             </div>
           </div>
         </aside>
@@ -1057,12 +1176,12 @@ export function AdminDashboard() {
         {/* Main Content */}
         <main className="flex-1 p-3 md:p-6">
           {/* Mobile section tabs */}
-          <div className="mb-4 flex gap-2 lg:hidden">
+          <div className="mb-4 flex flex-wrap gap-2 lg:hidden">
             <Button
               variant={activeSection === 'caracterizaciones' ? 'default' : 'outline'}
               size="sm"
               className="gap-2"
-              onClick={() => setActiveSection('caracterizaciones')}
+              onClick={() => router.push('/admin/caracterizaciones')}
             >
               <FileText className="h-4 w-4" />
               Caracterizaciones
@@ -1072,192 +1191,214 @@ export function AdminDashboard() {
                 variant={activeSection === 'usuarios' ? 'default' : 'outline'}
                 size="sm"
                 className="gap-2"
-                onClick={() => setActiveSection('usuarios')}
+                onClick={() => router.push('/admin/usuarios')}
               >
                 <Users className="h-4 w-4" />
                 Usuarios
               </Button>
             )}
+            <Button
+              variant={activeSection === 'estadisticas' ? 'default' : 'outline'}
+              size="sm"
+              className="gap-2"
+              onClick={() => router.push('/admin/estadisticas')}
+            >
+              <BarChart2 className="h-4 w-4" />
+              Estadísticas
+            </Button>
           </div>
 
           {activeSection === 'caracterizaciones' && (
-          <>
-          {/* Filters */}
-          <div className="mb-6 flex flex-col gap-3">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar nombre, predio, municipio..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 w-full"
-                />
-              </div>
-              <Select value={filterEstado} onValueChange={setFilterEstado}>
-                <SelectTrigger className="w-28 shrink-0 sm:w-36">
-                  <Filter className="mr-1.5 h-3.5 w-3.5 shrink-0" />
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="INICIADO">Iniciado</SelectItem>
-                  <SelectItem value="REVISADO">En Revisión</SelectItem>
-                  <SelectItem value="EN_ESTUDIO_CREDITO">En Estudio Crédito</SelectItem>
-                  <SelectItem value="APROBADO">Aprobado</SelectItem>
-                  <SelectItem value="CANCELADO">Cancelado</SelectItem>
-                  {isAdmin && <SelectItem value="sin_asesor">Sin Asesor</SelectItem>}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {caracterizaciones.length} cargados de {totalCount} total(es)
-              </p>
-              {caracterizaciones.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => {
-                    const fecha = new Date().toISOString().split('T')[0]
-                    downloadCSV(caracterizaciones, `encuestas-${fecha}.csv`)
-                  }}
-                >
-                  <Download className="h-4 w-4" />
-                  <span className="hidden xs:inline">Descargar</span> CSV
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Loading */}
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <span className="text-sm text-muted-foreground">Cargando caracterizaciones...</span>
-              </div>
-            </div>
-          ) : caracterizaciones.length === 0 ? (
-            <Card className="py-12 text-center">
-              <CardContent>
-                <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
-                <h3 className="mb-2 text-lg font-medium">No hay caracterizaciones</h3>
-                <p className="text-sm text-muted-foreground">
-                  {totalCount === 0
-                    ? "Aun no se han sincronizado caracterizaciones al servidor"
-                    : "No se encontraron resultados con los filtros aplicados"}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
             <>
-            {/* Virtual scroll container */}
-            <div
-              ref={parentRef}
-              style={{ height: 'calc(100vh - 310px)', overflowY: 'auto' }}
-              className="rounded-md"
-            >
-              <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
-                {virtualizer.getVirtualItems().map((virtualRow) => {
-                  const c = caracterizaciones[virtualRow.index]
-                  if (!c) return null
-                  const config = getEstadoConfig(c.visita?.estado || c.estado)
-                  const Icon = config.icon
-                  return (
-                    <div
-                      key={virtualRow.key}
-                      data-index={virtualRow.index}
-                      ref={virtualizer.measureElement}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        transform: `translateY(${virtualRow.start}px)`,
-                        paddingBottom: '12px',
+              {/* Filters */}
+              <div className="mb-6 flex flex-col gap-3">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar nombre, predio, municipio..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 w-full"
+                    />
+                  </div>
+                  <Select value={filterEstado} onValueChange={setFilterEstado}>
+                    <SelectTrigger className="w-28 shrink-0 sm:w-36">
+                      <Filter className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                      <SelectValue placeholder="Estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="INICIADO">Iniciado</SelectItem>
+                      <SelectItem value="REVISADO">En Revisión</SelectItem>
+                      <SelectItem value="EN_ESTUDIO_CREDITO">En Estudio Crédito</SelectItem>
+                      <SelectItem value="APROBADO">Viable</SelectItem>
+                      <SelectItem value="CANCELADO">No Viable</SelectItem>
+                      {isAdmin && <SelectItem value="sin_asesor">Sin Asesor</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {caracterizaciones.length} cargados de {totalCount} total(es)
+                  </p>
+                  {caracterizaciones.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => {
+                        const fecha = new Date().toISOString().split('T')[0]
+                        downloadCSV(caracterizaciones, `encuestas-${fecha}.csv`)
                       }}
                     >
-                      <Card className="transition-colors hover:bg-muted/30">
-                        <CardContent className="p-3 sm:p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                              <Users className="h-5 w-5 text-primary" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <h3 className="font-medium leading-tight">{getNombreCompleto(c)}</h3>
-                                <Badge variant="outline" className={`${config.color} shrink-0 text-[10px] px-1.5 py-0`}>
-                                  <Icon className="mr-1 h-2.5 w-2.5" />
-                                  {config.label}
-                                </Badge>
-                              </div>
-                              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                {c.beneficiario?.numero_documento && (
-                                  <span className="flex items-center gap-1 font-mono">
-                                    <User className="h-3 w-3 shrink-0" />
-                                    {c.beneficiario.numero_documento}
-                                  </span>
-                                )}
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3 shrink-0" />
-                                  <span className="max-w-[110px] truncate sm:max-w-none">{c.predio?.nombre_predio || 'Sin predio'}</span>
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <Map className="h-3 w-3 shrink-0" />
-                                  {c.predio?.municipio || 'Sin municipio'}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3 shrink-0" />
-                                  {new Date(c.created_at).toLocaleDateString()}
-                                </span>
-                                {!c.visita?.asesor_id && (
-                                  <span className="flex items-center gap-1 text-blue-500">
-                                    <User className="h-3 w-3 shrink-0" />
-                                    Sin asesor
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                              {c.predio?.latitud && c.predio?.longitud && (
-                                <Button variant="outline" size="sm" onClick={() => openMapView(c)} className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:gap-1 sm:px-3">
-                                  <Map className="h-3.5 w-3.5" />
-                                  <span className="hidden sm:inline text-xs">Mapa</span>
-                                </Button>
-                              )}
-                              <Button variant="default" size="sm" onClick={() => openDetail(c)} className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:gap-1 sm:px-3">
-                                <Eye className="h-3.5 w-3.5" />
-                                <span className="hidden sm:inline text-xs">Ver</span>
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )
-                })}
+                      <Download className="h-4 w-4" />
+                      <span className="hidden xs:inline">Descargar</span> CSV
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Load more */}
-            {hasMore && (
-              <div className="mt-3 flex justify-center">
-                <Button variant="outline" onClick={loadMore} disabled={isLoadingMore} className="gap-2">
-                  {isLoadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {isLoadingMore ? 'Cargando...' : `Cargar más (${totalCount - caracterizaciones.length} restantes)`}
-                </Button>
-              </div>
-            )}
-            {isLoadingMore && !hasMore && (
-              <div className="mt-3 flex justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
-            )}
+              {/* Loading */}
+              {isLoading ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <span className="text-sm text-muted-foreground">Cargando caracterizaciones...</span>
+                  </div>
+                </div>
+              ) : caracterizaciones.length === 0 ? (
+                <Card className="py-12 text-center">
+                  <CardContent>
+                    <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
+                    <h3 className="mb-2 text-lg font-medium">No hay caracterizaciones</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {totalCount === 0
+                        ? "Aun no se han sincronizado caracterizaciones al servidor"
+                        : "No se encontraron resultados con los filtros aplicados"}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  {/* Virtual scroll container */}
+                  <div
+                    ref={parentRef}
+                    style={{ height: 'calc(100vh - 310px)', overflowY: 'auto' }}
+                    className="rounded-md"
+                  >
+                    <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
+                      {virtualizer.getVirtualItems().map((virtualRow) => {
+                        const c = caracterizaciones[virtualRow.index]
+                        if (!c) return null
+                        const config = getEstadoConfig(c.estado)
+                        const Icon = config.icon
+                        return (
+                          <div
+                            key={virtualRow.key}
+                            data-index={virtualRow.index}
+                            ref={virtualizer.measureElement}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              transform: `translateY(${virtualRow.start}px)`,
+                              paddingBottom: '12px',
+                            }}
+                          >
+                            <Card className="transition-colors hover:bg-muted/30">
+                              <CardContent className="p-3 sm:p-4">
+                                <div className="flex items-start gap-3">
+                                  <div className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                    <Users className="h-5 w-5 text-primary" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                      <h3 className="font-medium leading-tight">{getNombreCompleto(c)}</h3>
+                                      <Badge variant="outline" className={`${config.color} shrink-0 text-[10px] px-1.5 py-0`}>
+                                        <Icon className="mr-1 h-2.5 w-2.5" />
+                                        {config.label}
+                                      </Badge>
+                                    </div>
+                                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                      {c.beneficiario?.numero_documento && (
+                                        <span className="flex items-center gap-1 font-mono">
+                                          <User className="h-3 w-3 shrink-0" />
+                                          {c.beneficiario.numero_documento}
+                                        </span>
+                                      )}
+                                      <span className="flex items-center gap-1">
+                                        <MapPin className="h-3 w-3 shrink-0" />
+                                        <span className="max-w-[110px] truncate sm:max-w-none">{c.predio?.nombre_predio || 'Sin predio'}</span>
+                                      </span>
+                                      <span className="flex items-center gap-1">
+                                        <Map className="h-3 w-3 shrink-0" />
+                                        {c.predio?.municipio || 'Sin municipio'}
+                                      </span>
+                                      <span className="flex items-center gap-1">
+                                        <Calendar className="h-3 w-3 shrink-0" />
+                                        {new Date(c.created_at).toLocaleDateString('es-CO')}
+                                      </span>
+                                      {!c.visita?.asesor_id && (
+                                        <span className="flex items-center gap-1 text-blue-500">
+                                          <User className="h-3 w-3 shrink-0" />
+                                          Sin asesor
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                                    {c.predio?.latitud && c.predio?.longitud && (
+                                      <Button variant="outline" size="sm" onClick={() => openMapView(c)} className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:gap-1 sm:px-3">
+                                        <Map className="h-3.5 w-3.5" />
+                                        <span className="hidden sm:inline text-xs">Mapa</span>
+                                      </Button>
+                                    )}
+                                    <Button variant="default" size="sm" onClick={() => openDetail(c)} className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:gap-1 sm:px-3">
+                                      <Eye className="h-3.5 w-3.5" />
+                                      <span className="hidden sm:inline text-xs">Ver</span>
+                                    </Button>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Paginador */}
+                  {totalCount > 0 && (() => {
+                    const totalPages = Math.max(1, Math.ceil(totalCount / 50))
+                    return (
+                      <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+                        <p className="text-sm text-muted-foreground">
+                          {totalCount} registro{totalCount !== 1 ? 's' : ''} · Pág. {page} de {totalPages}
+                        </p>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="outline" size="sm"
+                            disabled={page === 1 || isLoading}
+                            onClick={() => loadData({ page: page - 1, search: searchQuery, estado: filterEstado })}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline" size="sm"
+                            disabled={page >= totalPages || isLoading}
+                            onClick={() => loadData({ page: page + 1, search: searchQuery, estado: filterEstado })}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </>
+              )}
             </>
-          )}
-          </>
           )}
 
           {/* Seccion Usuarios */}
@@ -1269,7 +1410,7 @@ export function AdminDashboard() {
                   <p className="text-sm text-muted-foreground">Administra las cuentas de asesores y sus permisos de acceso</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={loadUsers} className="gap-2">
+                  <Button variant="outline" size="sm" onClick={() => loadUsers({ page: userPage, search: userSearch })} className="gap-2">
                     <RefreshCw className="h-4 w-4" />
                     <span className="hidden sm:inline">Actualizar</span>
                   </Button>
@@ -1369,17 +1510,22 @@ export function AdminDashboard() {
               )}
 
               {/* Buscador de usuarios */}
-              {!isLoadingUsers && usuarios.length > 0 && (
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por nombre o email..."
-                    value={userSearch}
-                    onChange={e => { setUserSearch(e.target.value); setUserPage(1) }}
-                    className="pl-9"
-                  />
-                </div>
-              )}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nombre o email..."
+                  value={userSearch}
+                  onChange={e => {
+                    const val = e.target.value
+                    setUserSearch(val)
+                    clearTimeout((window as any)._userSearchTimer)
+                      ; (window as any)._userSearchTimer = setTimeout(() => {
+                        loadUsers({ page: 1, search: val })
+                      }, 350)
+                  }}
+                  className="pl-9"
+                />
+              </div>
 
               {isLoadingUsers ? (
                 <div className="flex items-center justify-center py-20">
@@ -1398,7 +1544,7 @@ export function AdminDashboard() {
                     </p>
                   </CardContent>
                 </Card>
-              ) : filteredUsuarios.length === 0 ? (
+              ) : paginatedUsuarios.length === 0 ? (
                 <Card className="py-8 text-center">
                   <CardContent>
                     <p className="text-sm text-muted-foreground">No se encontraron usuarios con "{userSearch}"</p>
@@ -1410,63 +1556,66 @@ export function AdminDashboard() {
                     const invitation = getInvitationForEmail(u.email)
                     return (
                       <Card key={u.id} className={`transition-colors ${!u.activo ? 'opacity-60 border-red-500/20' : ''}`}>
-                        <CardContent className="flex items-center gap-4 p-4">
-                          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${u.activo ? 'bg-primary/10' : 'bg-red-500/10'}`}>
-                            {u.activo ? (
-                              <User className="h-6 w-6 text-primary" />
-                            ) : (
-                              <UserX className="h-6 w-6 text-red-500" />
-                            )}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="truncate font-medium">{u.nombre_completo || 'Sin nombre'}</h3>
-                              <Badge variant="outline" className={
-                                u.rol === 'admin'    ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
-                                u.rol === 'analista' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
-                                u.rol === 'campesino'? 'bg-green-500/10 text-green-600 border-green-500/20' :
-                                                       'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                              }>
-                                {u.rol === 'admin'     ? <><Shield className="mr-1 h-3 w-3" />Admin</> :
-                                 u.rol === 'analista'  ? <><Eye className="mr-1 h-3 w-3" />Analista</> :
-                                 u.rol === 'campesino' ? <><Sprout className="mr-1 h-3 w-3" />Agricultor</> :
-                                                         <><User className="mr-1 h-3 w-3" />Asesor</>}
-                              </Badge>
-                              {invitation && (
-                                <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-600 border-green-500/20">
-                                  <CheckCircle className="h-3 w-3" />
-                                  {invitation.usado ? 'Accedió' : 'Cred. enviadas'}
-                                </Badge>
-                              )}
-                              {!u.activo && (
-                                <Badge variant="destructive" className="gap-1">
-                                  <XCircle className="h-3 w-3" />
-                                  Inhabilitado
-                                </Badge>
+                        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-4">
+                          {/* Avatar + info */}
+                          <div className="flex min-w-0 flex-1 items-start gap-3">
+                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${u.activo ? 'bg-primary/10' : 'bg-red-500/10'}`}>
+                              {u.activo ? (
+                                <User className="h-5 w-5 text-primary" />
+                              ) : (
+                                <UserX className="h-5 w-5 text-red-500" />
                               )}
                             </div>
-                            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Mail className="h-3 w-3" />
-                                {u.email}
-                              </span>
-                              {u.telefono && (
-                                <span className="flex items-center gap-1">
-                                  <Phone className="h-3 w-3" />
-                                  {u.telefono}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="truncate font-medium">{u.nombre_completo || 'Sin nombre'}</h3>
+                                <Badge variant="outline" className={
+                                  u.rol === 'admin' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
+                                    u.rol === 'analista' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
+                                      u.rol === 'campesino' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+                                        'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                                }>
+                                  {u.rol === 'admin' ? <><Shield className="mr-1 h-3 w-3" />Admin</> :
+                                    u.rol === 'analista' ? <><Eye className="mr-1 h-3 w-3" />Analista</> :
+                                      u.rol === 'campesino' ? <><Sprout className="mr-1 h-3 w-3" />Agricultor</> :
+                                        <><User className="mr-1 h-3 w-3" />Asesor</>}
+                                </Badge>
+                                {invitation && (
+                                  <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-600 border-green-500/20">
+                                    <CheckCircle className="h-3 w-3" />
+                                    {invitation.usado ? 'Accedió' : 'Cred. enviadas'}
+                                  </Badge>
+                                )}
+                                {!u.activo && (
+                                  <Badge variant="destructive" className="gap-1">
+                                    <XCircle className="h-3 w-3" />
+                                    Inhabilitado
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1 truncate">
+                                  <Mail className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{u.email}</span>
                                 </span>
-                              )}
-                              {u.created_at && (
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />
-                                  Registrado: {new Date(u.created_at).toLocaleDateString()}
-                                </span>
-                              )}
+                                {u.telefono && (
+                                  <span className="flex items-center gap-1">
+                                    <Phone className="h-3 w-3" />
+                                    {u.telefono}
+                                  </span>
+                                )}
+                                {u.created_at && (
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    {new Date(u.created_at).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
 
-                          <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+                          {/* Acciones */}
+                          <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                             {/* Selector de rol — solo admin, no sobre sí mismo */}
                             {isAdmin && u.id !== currentUser?.id && (
                               <div className="flex items-center gap-1">
@@ -1478,7 +1627,7 @@ export function AdminDashboard() {
                                   onValueChange={(newRol) => changeUserRole(u.id, newRol)}
                                   disabled={changingRoleUserId === u.id}
                                 >
-                                  <SelectTrigger className="h-8 w-32 text-xs">
+                                  <SelectTrigger className="h-8 w-36 text-xs">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1491,24 +1640,35 @@ export function AdminDashboard() {
                               </div>
                             )}
                             {u.rol !== 'admin' && (
-                              <Button
-                                variant={u.activo ? "outline" : "default"}
-                                size="sm"
-                                onClick={() => toggleUserActive(u.id, u.activo)}
-                                className={`gap-1.5 ${u.activo ? 'hover:bg-red-50 hover:text-red-600 hover:border-red-300 dark:hover:bg-red-950' : 'bg-green-600 hover:bg-green-700'}`}
-                              >
-                                {u.activo ? (
-                                  <>
-                                    <UserX className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Inhabilitar</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <UserCheck className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Habilitar</span>
-                                  </>
-                                )}
-                              </Button>
+                              <>
+                                <Button
+                                  variant={u.activo ? "outline" : "default"}
+                                  size="sm"
+                                  onClick={() => toggleUserActive(u.id, u.activo)}
+                                  className={`gap-1.5 ${u.activo ? 'hover:bg-red-50 hover:text-red-600 hover:border-red-300 dark:hover:bg-red-950' : 'bg-green-600 hover:bg-green-700'}`}
+                                >
+                                  {u.activo ? (
+                                    <>
+                                      <UserX className="h-4 w-4" />
+                                      Inhabilitar
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserCheck className="h-4 w-4" />
+                                      Habilitar
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setUserToDelete({ id: u.id, nombre: u.nombre_completo || u.email })}
+                                  className="gap-1.5 hover:bg-red-50 hover:text-red-600 hover:border-red-300 dark:hover:bg-red-950"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Eliminar
+                                </Button>
+                              </>
                             )}
                           </div>
                         </CardContent>
@@ -1517,31 +1677,29 @@ export function AdminDashboard() {
                   })}
 
                   {/* Paginación usuarios */}
-                  {userTotalPages > 1 && (
-                    <div className="flex items-center justify-between border-t border-border pt-4">
-                      <p className="text-sm text-muted-foreground">
-                        {filteredUsuarios.length} usuario{filteredUsuarios.length !== 1 ? 's' : ''} · Pág. {userPage} de {userTotalPages}
-                      </p>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={userPage === 1}
-                          onClick={() => setUserPage(p => p - 1)}
-                        >
-                          Anterior
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={userPage === userTotalPages}
-                          onClick={() => setUserPage(p => p + 1)}
-                        >
-                          Siguiente
-                        </Button>
-                      </div>
+                  <div className="flex items-center justify-between border-t border-border pt-4">
+                    <p className="text-sm text-muted-foreground">
+                      {userTotalCount} usuario{userTotalCount !== 1 ? 's' : ''} · Pág. {userPage} de {userTotalPages}
+                    </p>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={userPage === 1 || isLoadingUsers}
+                        onClick={() => loadUsers({ page: userPage - 1, search: userSearch })}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={userPage >= userTotalPages || isLoadingUsers}
+                        onClick={() => loadUsers({ page: userPage + 1, search: userSearch })}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
 
@@ -1579,485 +1737,802 @@ export function AdminDashboard() {
               )}
             </div>
           )}
+
+          {/* Sección Estadísticas */}
+          {activeSection === 'estadisticas' && (() => {
+            const estadoColors: Record<string, string> = {
+              INICIADO: '#94a3b8',
+              REVISADO: '#3b82f6',
+              EN_ESTUDIO_CREDITO: '#a855f7',
+              APROBADO: '#22c55e',
+              CANCELADO: '#ef4444',
+              RECHAZADO: '#ef4444',
+              SINCRONIZADO: '#3b82f6',
+            }
+            const estadoLabels: Record<string, string> = {
+              INICIADO: 'Iniciado',
+              REVISADO: 'En Revisión',
+              EN_ESTUDIO_CREDITO: 'En Estudio',
+              APROBADO: 'Viable',
+              CANCELADO: 'No Viable',
+              RECHAZADO: 'No Viable',
+              SINCRONIZADO: 'Sincronizado',
+            }
+            const estadosChartData = dashStats
+              ? Object.entries(dashStats.porEstado)
+                  .filter(([, v]) => v > 0)
+                  .map(([key, value]) => ({
+                    name: estadoLabels[key] || key,
+                    value,
+                    fill: estadoColors[key] || '#94a3b8',
+                  }))
+              : []
+
+            const genderLabels: Record<string, string> = {
+              M: 'Masculino', F: 'Femenino', Masculino: 'Masculino', Femenino: 'Femenino',
+            }
+            const genderColors = ['#3b82f6', '#ec4899', '#f59e0b', '#94a3b8']
+            const genderData = (dashStats?.porGenero || []).map((g, i) => ({
+              name: genderLabels[g.genero] || g.genero,
+              value: g.total,
+              fill: genderColors[i % genderColors.length],
+            }))
+
+            const mesFormatter = (mes: string) => {
+              const [y, m] = mes.split('-')
+              const d = new Date(parseInt(y), parseInt(m) - 1, 1)
+              return d.toLocaleDateString('es-CO', { month: 'short', year: '2-digit' })
+            }
+
+            const viables = dashStats?.porEstado['APROBADO'] || 0
+            const total = dashStats?.totalRegistros || 0
+            const viablePct = total > 0 ? Math.round((viables / total) * 100) : 0
+
+            return (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-primary" />
+                    Estadísticas del Sistema
+                  </h2>
+                  <p className="text-sm text-muted-foreground">Análisis de caracterizaciones y productores registrados</p>
+                </div>
+
+                {isLoadingStats ? (
+                  <div className="flex items-center justify-center py-20">
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                      <span className="text-sm text-muted-foreground">Cargando estadísticas...</span>
+                    </div>
+                  </div>
+                ) : !dashStats ? (
+                  <Card className="py-12 text-center">
+                    <CardContent>
+                      <BarChart2 className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
+                      <p className="text-muted-foreground">No hay datos disponibles</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <FileText className="h-4 w-4 text-primary" />
+                            <span className="text-xs text-muted-foreground">Total Registros</span>
+                          </div>
+                          <p className="text-3xl font-bold">{dashStats.totalRegistros}</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-green-500/20 bg-green-500/5">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span className="text-xs text-muted-foreground">Viables</span>
+                          </div>
+                          <p className="text-3xl font-bold text-green-500">{viables}</p>
+                          <p className="text-xs text-green-500/70 mt-0.5">{viablePct}% del total</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-purple-500/20 bg-purple-500/5">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Eye className="h-4 w-4 text-purple-500" />
+                            <span className="text-xs text-muted-foreground">En Estudio</span>
+                          </div>
+                          <p className="text-3xl font-bold text-purple-500">
+                            {dashStats.porEstado['EN_ESTUDIO_CREDITO'] || 0}
+                          </p>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-red-500/20 bg-red-500/5">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <XCircle className="h-4 w-4 text-red-500" />
+                            <span className="text-xs text-muted-foreground">No Viables</span>
+                          </div>
+                          <p className="text-3xl font-bold text-red-500">
+                            {(dashStats.porEstado['CANCELADO'] || 0) + (dashStats.porEstado['RECHAZADO'] || 0)}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Promedios */}
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {dashStats.promedios.edad != null && (
+                        <Card className="border-border bg-muted/20">
+                          <CardContent className="p-4">
+                            <p className="text-xs text-muted-foreground mb-1">Edad Promedio</p>
+                            <p className="text-2xl font-bold">{dashStats.promedios.edad} <span className="text-sm font-normal text-muted-foreground">años</span></p>
+                          </CardContent>
+                        </Card>
+                      )}
+                      {dashStats.promedios.personasACargo != null && (
+                        <Card className="border-border bg-muted/20">
+                          <CardContent className="p-4">
+                            <p className="text-xs text-muted-foreground mb-1">Personas a Cargo</p>
+                            <p className="text-2xl font-bold">{dashStats.promedios.personasACargo} <span className="text-sm font-normal text-muted-foreground">prom.</span></p>
+                          </CardContent>
+                        </Card>
+                      )}
+                      {dashStats.promedios.hectareas != null && (
+                        <Card className="border-border bg-muted/20">
+                          <CardContent className="p-4">
+                            <p className="text-xs text-muted-foreground mb-1">Hectáreas Prom.</p>
+                            <p className="text-2xl font-bold">{dashStats.promedios.hectareas} <span className="text-sm font-normal text-muted-foreground">ha</span></p>
+                          </CardContent>
+                        </Card>
+                      )}
+                      <Card className="border-border bg-muted/20">
+                        <CardContent className="p-4">
+                          <p className="text-xs text-muted-foreground mb-1">Con Asesor</p>
+                          <p className="text-2xl font-bold">{dashStats.asignacion.conAsesor} <span className="text-sm font-normal text-muted-foreground">/ {dashStats.asignacion.conAsesor + dashStats.asignacion.sinAsesor}</span></p>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Charts Row 1: Estado + Municipios */}
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-primary" />
+                            Distribución por Estado
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {estadosChartData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={230}>
+                              <PieChart>
+                                <Pie
+                                  data={estadosChartData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={55}
+                                  outerRadius={85}
+                                  paddingAngle={2}
+                                  dataKey="value"
+                                >
+                                  {estadosChartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                                  ))}
+                                </Pie>
+                                <Tooltip formatter={(value) => [`${value} registros`, '']} />
+                                <Legend iconType="circle" iconSize={10} />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          ) : (
+                            <div className="flex h-[230px] items-center justify-center text-sm text-muted-foreground">Sin datos</div>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-primary" />
+                            Top Municipios
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {dashStats.porMunicipio.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={230}>
+                              <BarChart data={dashStats.porMunicipio} layout="vertical" margin={{ left: 4, right: 16, top: 4, bottom: 4 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />
+                                <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                                <YAxis type="category" dataKey="municipio" tick={{ fontSize: 10 }} width={88} />
+                                <Tooltip formatter={(value) => [`${value} registros`, 'Total']} />
+                                <Bar dataKey="total" fill="#16a34a" radius={[0, 4, 4, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          ) : (
+                            <div className="flex h-[230px] items-center justify-center text-sm text-muted-foreground">Sin datos</div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Tendencia mensual */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-primary" />
+                          Tendencia de Nuevos Registros
+                        </CardTitle>
+                        <CardDescription>Últimos 12 meses</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <AreaChart data={dashStats.porMes} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#16a34a" stopOpacity={0.3} />
+                                <stop offset="95%" stopColor="#16a34a" stopOpacity={0.02} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                            <XAxis dataKey="mes" tick={{ fontSize: 11 }} tickFormatter={mesFormatter} />
+                            <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                            <Tooltip labelFormatter={(v) => `Mes: ${mesFormatter(String(v))}`} formatter={(value) => [`${value}`, 'Nuevos registros']} />
+                            <Area type="monotone" dataKey="total" stroke="#16a34a" fill="url(#areaGrad)" strokeWidth={2} dot={{ r: 3 }} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+
+                    {/* Género + Departamentos */}
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      {genderData.length > 0 && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <Users className="h-4 w-4 text-primary" />
+                              Distribución por Género
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <ResponsiveContainer width="100%" height={200}>
+                              <PieChart>
+                                <Pie
+                                  data={genderData}
+                                  cx="50%"
+                                  cy="50%"
+                                  outerRadius={75}
+                                  dataKey="value"
+                                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                  labelLine={false}
+                                >
+                                  {genderData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                                </Pie>
+                                <Tooltip formatter={(value) => [`${value}`, 'Productores']} />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {dashStats.porDepartamento.length > 1 && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <Map className="h-4 w-4 text-primary" />
+                              Por Departamento
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <ResponsiveContainer width="100%" height={200}>
+                              <BarChart data={dashStats.porDepartamento} margin={{ top: 4, right: 4, left: -10, bottom: 4 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                                <XAxis dataKey="departamento" tick={{ fontSize: 10 }} />
+                                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                                <Tooltip formatter={(value) => [`${value}`, 'Registros']} />
+                                <Bar dataKey="total" fill="#a855f7" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )
+          })()}
         </main>
       </div>
 
       {/* Detail Dialog */}
       <Dialog open={showDetail} onOpenChange={setShowDetail}>
-        <DialogContent className="max-h-[95dvh] w-[calc(100vw-16px)] max-w-5xl overflow-hidden p-0 sm:w-full sm:max-h-[90vh]">
-          <DialogHeader className="border-b border-border px-6 py-4">
+        <DialogContent className="flex flex-col h-[100dvh] max-h-[100dvh] w-screen max-w-none gap-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none md:h-[90vh] md:max-h-[90vh] md:w-[95vw] md:max-w-[1400px] md:rounded-lg md:border">
+          <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
-              Detalle de Caracterizacion
+              Detalle de Caracterización
             </DialogTitle>
-            <DialogDescription>
-              Radicado: {selectedCaracterizacion?.radicado_oficial || selectedCaracterizacion?.radicado_local}
-            </DialogDescription>
+            {(selectedCaracterizacion?.radicado_oficial || selectedCaracterizacion?.radicado_local) && (
+              <DialogDescription className="font-mono text-xs">
+                {selectedCaracterizacion.radicado_oficial || selectedCaracterizacion.radicado_local}
+              </DialogDescription>
+            )}
           </DialogHeader>
 
           {selectedCaracterizacion && (
-            <Tabs defaultValue="general" className="flex-1">
-              <div className="overflow-x-auto border-b border-border">
-                <TabsList className="inline-flex w-auto min-w-full justify-start rounded-none bg-transparent px-3 sm:px-6">
-                  <TabsTrigger value="general" className="gap-1.5 text-xs sm:gap-2 sm:text-sm">
-                    <User className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    General
-                  </TabsTrigger>
-                  <TabsTrigger value="predio" className="gap-1.5 text-xs sm:gap-2 sm:text-sm">
-                    <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    Predio
-                  </TabsTrigger>
-                  <TabsTrigger value="produccion" className="gap-1.5 text-xs sm:gap-2 sm:text-sm">
-                    <Sprout className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    Produccion
-                  </TabsTrigger>
-                  <TabsTrigger value="acciones" className="gap-1.5 text-xs sm:gap-2 sm:text-sm">
-                    <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    Acciones
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <div className="space-y-4 p-4 md:p-6">
 
-              <ScrollArea className="h-[60vh]">
-                <TabsContent value="general" className="m-0 p-6">
-                  <div className="grid gap-6 md:grid-cols-2">
+                {/* Fila 1: Beneficiario · Contacto · Registro */}
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <User className="h-4 w-4 text-primary" />
+                        Información del Beneficiario
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Nombre:</span>
+                        <span className="font-medium text-right">{getNombreCompleto(selectedCaracterizacion)}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Documento:</span>
+                        <span className="font-medium">{selectedCaracterizacion.beneficiario?.tipo_documento} {selectedCaracterizacion.beneficiario?.numero_documento}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Edad:</span>
+                        <span>{selectedCaracterizacion.beneficiario?.edad ?? 'No especificada'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Ocupación:</span>
+                        <span className="text-right">{selectedCaracterizacion.beneficiario?.ocupacion_principal || 'No especificada'}</span>
+                      </div>
+                      {selectedCaracterizacion.beneficiario?.genero && (
+                        <div className="flex justify-between gap-x-3">
+                          <span className="text-muted-foreground shrink-0">Género:</span>
+                          <span>{selectedCaracterizacion.beneficiario.genero}</span>
+                        </div>
+                      )}
+                      {selectedCaracterizacion.beneficiario?.personas_a_cargo != null && (
+                        <div className="flex justify-between gap-x-3">
+                          <span className="text-muted-foreground shrink-0">Personas a cargo:</span>
+                          <span>{selectedCaracterizacion.beneficiario.personas_a_cargo}</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Phone className="h-4 w-4 text-primary" />
+                        Contacto
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Teléfono:</span>
+                        <span className="font-medium">{selectedCaracterizacion.beneficiario?.telefono || 'No registrado'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Correo:</span>
+                        <span className="text-right break-all">{selectedCaracterizacion.beneficiario?.correo || 'No registrado'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Municipio:</span>
+                        <span>{selectedCaracterizacion.predio?.municipio || 'No especificado'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Vereda:</span>
+                        <span>{selectedCaracterizacion.predio?.vereda || 'No especificada'}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Calendar className="h-4 w-4 text-primary" />
+                        Registro
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Asesor:</span>
+                        <span className="font-medium text-right">{selectedCaracterizacion.visita?.nombre_tecnico || selectedCaracterizacion.asesor?.nombre_completo || 'No registrado'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Fecha visita:</span>
+                        <span>{selectedCaracterizacion.visita?.fecha_visita ? new Date(selectedCaracterizacion.visita.fecha_visita + 'T12:00:00').toLocaleDateString('es-CO') : 'No registrada'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Registrado:</span>
+                        <span>{selectedCaracterizacion.fecha_sincronizacion ? new Date(selectedCaracterizacion.fecha_sincronizacion).toLocaleDateString('es-CO') : 'Pendiente'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground shrink-0">Estado:</span>
+                        <Badge variant="outline" className={getEstadoConfig(selectedCaracterizacion.estado).color}>
+                          {getEstadoConfig(selectedCaracterizacion.estado).label}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Evidencia fotográfica */}
+                {(selectedCaracterizacion.foto_beneficiario_url ||
+                  selectedCaracterizacion.foto_1_url ||
+                  selectedCaracterizacion.foto_2_url ||
+                  selectedCaracterizacion.foto_doc_frontal_url ||
+                  selectedCaracterizacion.foto_doc_trasera_url ||
+                  selectedCaracterizacion.firma_productor_url) && (
                     <Card>
                       <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-base">
-                          <User className="h-4 w-4 text-primary" />
-                          Informacion del Productor
-                        </CardTitle>
+                        <CardTitle className="text-base">Evidencia Fotográfica</CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-2 text-sm [&>div>span:last-child]:min-w-0 [&>div>span:last-child]:break-words [&>div>span:last-child]:text-right">
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Nombre:</span>
-                          <span className="font-medium">{getNombreCompleto(selectedCaracterizacion)}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Documento:</span>
-                          <span className="font-medium">{selectedCaracterizacion.beneficiario?.tipo_documento} {selectedCaracterizacion.beneficiario?.numero_documento}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Edad:</span>
-                          <span>{selectedCaracterizacion.beneficiario?.edad || 'No especificada'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Ocupacion:</span>
-                          <span>{selectedCaracterizacion.beneficiario?.ocupacion_principal || 'No especificada'}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-base">
-                          <Phone className="h-4 w-4 text-primary" />
-                          Contacto
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2 text-sm [&>div>span:last-child]:min-w-0 [&>div>span:last-child]:break-words [&>div>span:last-child]:text-right">
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Telefono:</span>
-                          <span className="font-medium">{selectedCaracterizacion.beneficiario?.telefono || 'No registrado'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Correo:</span>
-                          <span>{selectedCaracterizacion.beneficiario?.correo || 'No registrado'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Municipio:</span>
-                          <span>{selectedCaracterizacion.predio?.municipio || 'No especificado'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Vereda:</span>
-                          <span>{selectedCaracterizacion.predio?.vereda || 'No especificada'}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-base">
-                          <Calendar className="h-4 w-4 text-primary" />
-                          Registro
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2 text-sm [&>div>span:last-child]:min-w-0 [&>div>span:last-child]:break-words [&>div>span:last-child]:text-right">
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Tecnico:</span>
-                          <span className="font-medium">{selectedCaracterizacion.visita?.nombre_tecnico || selectedCaracterizacion.asesor?.nombre_completo || 'No registrado'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Fecha visita:</span>
-                          <span>{selectedCaracterizacion.visita?.fecha_visita ? new Date(selectedCaracterizacion.visita.fecha_visita).toLocaleDateString() : 'No registrada'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Sincronizado:</span>
-                          <span>{selectedCaracterizacion.fecha_sincronizacion ? new Date(selectedCaracterizacion.fecha_sincronizacion).toLocaleDateString() : 'Pendiente'}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Estado:</span>
-                          <Badge variant="outline" className={getEstadoConfig(selectedCaracterizacion.estado).color}>
-                            {getEstadoConfig(selectedCaracterizacion.estado).label}
-                          </Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Fotos */}
-                    {(selectedCaracterizacion.foto_beneficiario_url || selectedCaracterizacion.foto_predio_1_url) && (
-                      <Card>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-base">Evidencia Fotografica</CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex flex-wrap gap-2">
-                          {selectedCaracterizacion.foto_beneficiario_url && (
-                            <img src={selectedCaracterizacion.foto_beneficiario_url} alt="Beneficiario" className="h-24 w-24 rounded-md object-cover" />
-                          )}
-                          {selectedCaracterizacion.foto_predio_1_url && (
-                            <img src={selectedCaracterizacion.foto_predio_1_url} alt="Predio 1" className="h-24 w-24 rounded-md object-cover" />
-                          )}
-                          {selectedCaracterizacion.foto_predio_2_url && (
-                            <img src={selectedCaracterizacion.foto_predio_2_url} alt="Predio 2" className="h-24 w-24 rounded-md object-cover" />
-                          )}
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="predio" className="m-0 p-6">
-                  <div className="grid gap-6 md:grid-cols-2">
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-base">
-                          <MapPin className="h-4 w-4 text-primary" />
-                          Datos del Predio
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2 text-sm [&>div>span:last-child]:min-w-0 [&>div>span:last-child]:break-words [&>div>span:last-child]:text-right">
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Nombre:</span>
-                          <span className="font-medium">{selectedCaracterizacion.predio?.nombre_predio || 'Sin nombre'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Area Total:</span>
-                          <span>{selectedCaracterizacion.predio?.area_total ? `${selectedCaracterizacion.predio.area_total} ha` : 'No registrada'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Area Cultivada:</span>
-                          <span>{selectedCaracterizacion.predio?.area_cultivada ? `${selectedCaracterizacion.predio.area_cultivada} ha` : 'No registrada'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Tenencia:</span>
-                          <span>{selectedCaracterizacion.predio?.tipo_tenencia || 'No especificada'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Altitud:</span>
-                          <span>{selectedCaracterizacion.predio?.altitud ? `${selectedCaracterizacion.predio.altitud} msnm` : 'No registrada'}</span>
-                        </div>
-                        {selectedCaracterizacion.predio?.latitud && selectedCaracterizacion.predio?.longitud && (
-                          <div className="flex justify-between gap-x-3 min-w-0">
-                            <span className="text-muted-foreground">Coordenadas:</span>
-                            <span className="font-mono text-xs">
-                              {selectedCaracterizacion.predio.latitud.toFixed(5)}, {selectedCaracterizacion.predio.longitud.toFixed(5)}
-                            </span>
+                      <CardContent className="flex flex-wrap gap-3">
+                        {[
+                          { url: selectedCaracterizacion.foto_beneficiario_url, label: 'Beneficiario', file: 'foto-beneficiario.jpg' },
+                          { url: selectedCaracterizacion.foto_1_url, label: 'Predio 1', file: 'foto-predio-1.jpg' },
+                          { url: selectedCaracterizacion.foto_2_url, label: 'Predio 2', file: 'foto-predio-2.jpg' },
+                          { url: selectedCaracterizacion.foto_doc_frontal_url, label: 'Doc. Frontal', file: 'documento-frontal.jpg' },
+                          { url: selectedCaracterizacion.foto_doc_trasera_url, label: 'Doc. Trasero', file: 'documento-trasero.jpg' },
+                        ].filter(p => p.url).map(({ url, label, file }) => (
+                          <div key={file} className="flex flex-col items-center gap-1">
+                            <div className="relative group">
+                              <img src={url!} alt={label} className="h-28 w-28 rounded-md object-cover border" />
+                              <button
+                                onClick={() => downloadImage(url!, file)}
+                                title={`Descargar ${label}`}
+                                className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <span className="text-xs text-muted-foreground">{label}</span>
+                          </div>
+                        ))}
+                        {selectedCaracterizacion.firma_productor_url && (
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="relative group">
+                              <img src={selectedCaracterizacion.firma_productor_url} alt="Firma" className="h-28 w-auto max-w-[200px] rounded-md border bg-white object-contain p-1" />
+                              <button
+                                onClick={() => downloadImage(selectedCaracterizacion.firma_productor_url!, 'firma-productor.png')}
+                                title="Descargar Firma"
+                                className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <span className="text-xs text-muted-foreground">Firma</span>
                           </div>
                         )}
                       </CardContent>
                     </Card>
+                  )}
 
-                    <Card>
+                {/* Fila 2: Predio + Características */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <MapPin className="h-4 w-4 text-primary" />
+                        Datos del Predio
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Nombre:</span>
+                        <span className="font-medium">{selectedCaracterizacion.predio?.nombre_predio || 'Sin nombre'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Área total:</span>
+                        <span>{selectedCaracterizacion.predio?.area_total_hectareas ? `${selectedCaracterizacion.predio.area_total_hectareas} ha` : 'No registrada'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Área productiva:</span>
+                        <span>{selectedCaracterizacion.predio?.area_productiva_hectareas ? `${selectedCaracterizacion.predio.area_productiva_hectareas} ha` : 'No registrada'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Tenencia:</span>
+                        <span>{selectedCaracterizacion.predio?.tipo_tenencia || 'No especificada'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Altitud:</span>
+                        <span>{selectedCaracterizacion.predio?.altitud_msnm ? `${selectedCaracterizacion.predio.altitud_msnm} msnm` : 'No registrada'}</span>
+                      </div>
+                      {selectedCaracterizacion.predio?.latitud && selectedCaracterizacion.predio?.longitud && (
+                        <div className="flex justify-between gap-x-3">
+                          <span className="text-muted-foreground shrink-0">Coordenadas:</span>
+                          <span className="font-mono text-xs">
+                            {Number(selectedCaracterizacion.predio.latitud).toFixed(5)}, {Number(selectedCaracterizacion.predio.longitud).toFixed(5)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Cultivos:</span>
+                        <span className="text-right">{selectedCaracterizacion.predio?.cultivos_existentes || 'No especificados'}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Mountain className="h-4 w-4 text-primary" />
+                        Características del Predio
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Topografía:</span>
+                        <span>{selectedCaracterizacion.caracterizacion_predio?.topografia || 'No especificada'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Ruta de acceso:</span>
+                        <span className="text-right">{selectedCaracterizacion.predio?.acceso_vial || selectedCaracterizacion.caracterizacion_predio?.ruta_acceso || 'No especificada'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Distancia:</span>
+                        <span>{selectedCaracterizacion.predio?.distancia_cabecera ? `${selectedCaracterizacion.predio.distancia_cabecera} km` : selectedCaracterizacion.caracterizacion_predio?.distancia_km ? `${selectedCaracterizacion.caracterizacion_predio.distancia_km} km` : 'No registrada'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Temperatura:</span>
+                        <span>{selectedCaracterizacion.caracterizacion_predio?.temperatura_celsius ? `${selectedCaracterizacion.caracterizacion_predio.temperatura_celsius} °C` : 'No registrada'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Vive en predio:</span>
+                        <span>{selectedCaracterizacion.predio?.vive_en_predio || 'No especificado'}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Fila 3: Producción + Financiero */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Sprout className="h-4 w-4 text-primary" />
+                        Área Productiva
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Sistema productivo:</span>
+                        <span className="font-medium text-right">{selectedCaracterizacion.area_productiva?.sistema_productivo || 'No registrado'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Estado del cultivo:</span>
+                        <span>{selectedCaracterizacion.area_productiva?.estado_cultivo || 'No especificado'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Producción estimada:</span>
+                        <span>{selectedCaracterizacion.area_productiva?.produccion_estimada ? `${selectedCaracterizacion.area_productiva.produccion_estimada} kg` : 'No especificada'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Dónde comercializa:</span>
+                        <span className="text-right">{selectedCaracterizacion.area_productiva?.donde_comercializa || 'No especificado'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Ingreso mensual:</span>
+                        <span>{selectedCaracterizacion.area_productiva?.ingreso_mensual_ventas ? `$${Number(selectedCaracterizacion.area_productiva.ingreso_mensual_ventas).toLocaleString('es-CO')}` : 'No registrado'}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Wallet className="h-4 w-4 text-primary" />
+                        Información Financiera
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Ingresos agropecuarios/mes:</span>
+                        <span>{selectedCaracterizacion.informacion_financiera?.ingresos_mensuales_agropecuaria ? `$${Number(selectedCaracterizacion.informacion_financiera.ingresos_mensuales_agropecuaria).toLocaleString('es-CO')}` : 'No registrado'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Otros ingresos/mes:</span>
+                        <span>{selectedCaracterizacion.informacion_financiera?.ingresos_mensuales_otros ? `$${Number(selectedCaracterizacion.informacion_financiera.ingresos_mensuales_otros).toLocaleString('es-CO')}` : 'No registrado'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Egresos/mes:</span>
+                        <span>{selectedCaracterizacion.informacion_financiera?.egresos_mensuales ? `$${Number(selectedCaracterizacion.informacion_financiera.egresos_mensuales).toLocaleString('es-CO')}` : 'No registrado'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Activos totales:</span>
+                        <span>{selectedCaracterizacion.informacion_financiera?.activos_totales ? `$${Number(selectedCaracterizacion.informacion_financiera.activos_totales).toLocaleString('es-CO')}` : 'No registrado'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Pasivos totales:</span>
+                        <span>{selectedCaracterizacion.informacion_financiera?.pasivos_totales ? `$${Number(selectedCaracterizacion.informacion_financiera.pasivos_totales).toLocaleString('es-CO')}` : 'No registrado'}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Acciones */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* Editar formulario */}
+                  {(isAdmin || (currentProfile?.rol === 'asesor' && (!selectedCaracterizacion.visita?.asesor_id || selectedCaracterizacion.visita?.asesor_id === currentUser?.id))) && selectedCaracterizacion.visita?.id && (
+                    <Card className="border-primary/20 bg-primary/5">
                       <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-base">
-                          <Mountain className="h-4 w-4 text-primary" />
-                          Caracteristicas del Predio
+                          <PenTool className="h-4 w-4 text-primary" />
+                          Editar Formulario
                         </CardTitle>
+                        <CardDescription>Modifica los datos del registro directamente en el formulario</CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-2 text-sm [&>div>span:last-child]:min-w-0 [&>div>span:last-child]:break-words [&>div>span:last-child]:text-right">
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Topografia:</span>
-                          <span>{selectedCaracterizacion.caracterizacion_predio?.topografia || 'No especificada'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Cobertura vegetal:</span>
-                          <span>{selectedCaracterizacion.caracterizacion_predio?.cobertura_vegetal || 'No especificada'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Acceso vial:</span>
-                          <span>{selectedCaracterizacion.predio?.acceso_vial || selectedCaracterizacion.caracterizacion_predio?.ruta_acceso || 'No especificado'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Distancia cabecera:</span>
-                          <span>{selectedCaracterizacion.predio?.distancia_cabecera ? `${selectedCaracterizacion.predio.distancia_cabecera} km` : 'No registrada'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Vive en predio:</span>
-                          <span>{selectedCaracterizacion.predio?.vive_en_predio ? 'Si' : 'No'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Cultivos existentes:</span>
-                          <span>{selectedCaracterizacion.predio?.cultivos_existentes || 'No especificados'}</span>
-                        </div>
+                      <CardContent>
+                        <Button asChild className="gap-2">
+                          <Link href={`/formulario/editar/${selectedCaracterizacion.visita.id}`}>
+                            <PenTool className="h-4 w-4" />
+                            Abrir Editor
+                          </Link>
+                        </Button>
                       </CardContent>
                     </Card>
-                  </div>
-                </TabsContent>
+                  )}
 
-                <TabsContent value="produccion" className="m-0 p-6">
-                  <div className="grid gap-6 md:grid-cols-2">
-                    <Card>
+                  {/* Exportar PDF */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Exportar Ficha</CardTitle>
+                      <CardDescription>Genera una ficha PDF con todos los datos del registro</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Button variant="outline" className="gap-2" onClick={() => generatePDF(selectedCaracterizacion)}>
+                        <Printer className="h-4 w-4" />
+                        Generar PDF / Imprimir
+                      </Button>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Se abrirá una ventana con la ficha completa lista para imprimir o guardar como PDF.
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  {/* Asignar Asesor */}
+                  {isAdmin && !selectedCaracterizacion.visita?.asesor_id && (
+                    <Card className="border-blue-500/20 bg-blue-500/5">
                       <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-base">
-                          <Sprout className="h-4 w-4 text-primary" />
-                          Area Productiva
+                          <UserCheck className="h-4 w-4 text-blue-500" />
+                          Asignar Asesor
                         </CardTitle>
+                        <CardDescription>
+                          Este registro fue enviado sin asesor asignado. Asígnalo a un asesor o admin.
+                        </CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-2 text-sm [&>div>span:last-child]:min-w-0 [&>div>span:last-child]:break-words [&>div>span:last-child]:text-right">
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Cultivo principal:</span>
-                          <span className="font-medium">{selectedCaracterizacion.area_productiva?.cultivo_principal || 'No registrado'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Area:</span>
-                          <span>{selectedCaracterizacion.area_productiva?.area_cultivo_principal ? `${selectedCaracterizacion.area_productiva.area_cultivo_principal} ha` : 'No registrada'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Estado del cultivo:</span>
-                          <span>{selectedCaracterizacion.area_productiva?.estado_cultivo || 'No especificado'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Destino produccion:</span>
-                          <span>{selectedCaracterizacion.area_productiva?.destino_produccion || 'No especificado'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Donde comercializa:</span>
-                          <span>{selectedCaracterizacion.area_productiva?.donde_comercializa || 'No especificado'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Ingreso mensual:</span>
-                          <span>{selectedCaracterizacion.area_productiva?.ingreso_mensual_ventas ? `$${Number(selectedCaracterizacion.area_productiva.ingreso_mensual_ventas).toLocaleString()}` : 'No registrado'}</span>
-                        </div>
+                      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <Select value={selectedNewAsesorId} onValueChange={setSelectedNewAsesorId}>
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Seleccionar asesor..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {asesoresDisponibles.map(a => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.nombre_completo || a.id}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          disabled={!selectedNewAsesorId || isAssigningAsesor}
+                          onClick={() => assignAsesor(selectedCaracterizacion.visita!.id, selectedNewAsesorId)}
+                          className="gap-2 shrink-0"
+                        >
+                          {isAssigningAsesor ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
+                          Asignar
+                        </Button>
                       </CardContent>
                     </Card>
+                  )}
 
+                  {/* Ver en Mapa */}
+                  {selectedCaracterizacion.predio?.latitud && selectedCaracterizacion.predio?.longitud && (
                     <Card>
                       <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-base">
-                          <Wallet className="h-4 w-4 text-primary" />
-                          Informacion Financiera
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2 text-sm [&>div>span:last-child]:min-w-0 [&>div>span:last-child]:break-words [&>div>span:last-child]:text-right">
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Ingresos agropecuaria:</span>
-                          <span>{selectedCaracterizacion.informacion_financiera?.ingresos_mensuales_agropecuaria ? `$${Number(selectedCaracterizacion.informacion_financiera.ingresos_mensuales_agropecuaria).toLocaleString()}` : 'No registrado'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Otros ingresos:</span>
-                          <span>{selectedCaracterizacion.informacion_financiera?.ingresos_mensuales_otros ? `$${Number(selectedCaracterizacion.informacion_financiera.ingresos_mensuales_otros).toLocaleString()}` : 'No registrado'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Egresos:</span>
-                          <span>{selectedCaracterizacion.informacion_financiera?.egresos_mensuales ? `$${Number(selectedCaracterizacion.informacion_financiera.egresos_mensuales).toLocaleString()}` : 'No registrado'}</span>
-                        </div>
-                        <div className="flex justify-between gap-x-3 min-w-0">
-                          <span className="text-muted-foreground">Acceso credito:</span>
-                          <span>{selectedCaracterizacion.informacion_financiera?.acceso_credito ? 'Si' : 'No'}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="acciones" className="m-0 p-6">
-                  <div className="space-y-6">
-
-                    {/* Editar formulario — solo asesor (propio) y admin */}
-                    {(isAdmin || (currentProfile?.rol === 'asesor' && (!selectedCaracterizacion.visita?.asesor_id || selectedCaracterizacion.visita?.asesor_id === currentUser?.id))) && selectedCaracterizacion.visita?.id && (
-                      <Card className="border-primary/20 bg-primary/5">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="flex items-center gap-2 text-base">
-                            <PenTool className="h-4 w-4 text-primary" />
-                            Editar Formulario
-                          </CardTitle>
-                          <CardDescription>Modifica los datos del registro directamente en el formulario</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <Button asChild className="gap-2">
-                            <Link href={`/formulario/editar/${selectedCaracterizacion.visita.id}`}>
-                              <PenTool className="h-4 w-4" />
-                              Abrir Editor
-                            </Link>
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Exportar PDF */}
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base">Exportar Ficha</CardTitle>
-                        <CardDescription>Genera una ficha PDF con todos los datos del registro</CardDescription>
+                        <CardTitle className="text-base">Ver en Mapa</CardTitle>
+                        <CardDescription>Analice la ubicación con capas NDVI, satelital y clima</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <Button
-                          variant="outline"
+                          onClick={() => { setShowDetail(false); setTimeout(() => openMapView(selectedCaracterizacion), 100) }}
                           className="gap-2"
-                          onClick={() => generatePDF(selectedCaracterizacion)}
                         >
-                          <Printer className="h-4 w-4" />
-                          Generar PDF / Imprimir
+                          <Map className="h-4 w-4" />
+                          Abrir Vista de Mapa
+                          <ChevronRight className="h-4 w-4" />
                         </Button>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          Se abrira una ventana con la ficha completa lista para imprimir o guardar como PDF.
-                        </p>
                       </CardContent>
                     </Card>
+                  )}
+                </div>
 
-                    {/* Asignar Asesor — solo admin, solo cuando el registro no tiene asesor */}
-                    {isAdmin && !selectedCaracterizacion.visita?.asesor_id && (
-                      <Card className="border-blue-500/20 bg-blue-500/5">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="flex items-center gap-2 text-base">
-                            <UserCheck className="h-4 w-4 text-blue-500" />
-                            Asignar Asesor
-                          </CardTitle>
-                          <CardDescription>
-                            Este registro fue enviado sin asesor asignado. Asígnalo a un asesor o admin.
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                          <Select value={selectedNewAsesorId} onValueChange={setSelectedNewAsesorId}>
-                            <SelectTrigger className="flex-1">
-                              <SelectValue placeholder="Seleccionar asesor..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {asesoresDisponibles.map(a => (
-                                <SelectItem key={a.id} value={a.id}>
-                                  {a.nombre_completo || a.id}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            disabled={!selectedNewAsesorId || isAssigningAsesor}
-                            onClick={() => assignAsesor(selectedCaracterizacion.visita!.id, selectedNewAsesorId)}
-                            className="gap-2 shrink-0"
-                          >
-                            {isAssigningAsesor ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <UserCheck className="h-4 w-4" />
-                            )}
-                            Asignar
-                          </Button>
-                        </CardContent>
-                      </Card>
+                {/* Cambiar Estado */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Cambiar Estado</CardTitle>
+                    <CardDescription>Actualice el estado de la caracterización</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      {(["REVISADO", "EN_ESTUDIO_CREDITO", "APROBADO", "CANCELADO"] as const)
+                        .filter(est => {
+                          const rol = currentProfile?.rol
+                          if (rol === 'admin') return true
+                          if (rol === 'asesor') return ['REVISADO'].includes(est)
+                          if (rol === 'analista') return ['EN_ESTUDIO_CREDITO', 'APROBADO', 'CANCELADO'].includes(est)
+                          return false
+                        })
+                        .map((est) => {
+                          const cfg = estadoConfig[est.toLowerCase() as EstadoKey] || estadoConfig.pendiente
+                          const EstIcon = cfg.icon
+                          const currentEstado = (selectedCaracterizacion.estado || '').toUpperCase()
+                          const isCurrent = currentEstado === est
+                          return (
+                            <Button
+                              key={est}
+                              variant={isCurrent ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleUpdateEstado(selectedCaracterizacion.id, est)}
+                              disabled={isUpdating || isCurrent}
+                              className={`gap-2 ${est === 'APROBADO' && !isCurrent ? 'hover:bg-green-600 hover:text-white' : ''} ${est === 'CANCELADO' && !isCurrent ? 'hover:bg-red-600 hover:text-white' : ''}`}
+                            >
+                              <EstIcon className="h-4 w-4" />
+                              {cfg.label}
+                            </Button>
+                          )
+                        })}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Observaciones */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Observaciones</CardTitle>
+                    <CardDescription>Agregue notas o comentarios sobre la caracterización</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Textarea
+                      placeholder="Escriba sus observaciones aquí..."
+                      value={observaciones}
+                      onChange={(e) => setObservaciones(e.target.value)}
+                      rows={4}
+                    />
+                    <Button
+                      onClick={async () => {
+                        try {
+                          await supabase
+                            .from('caracterizaciones')
+                            .update({ observaciones, updated_at: new Date().toISOString() })
+                            .eq('id', selectedCaracterizacion.id)
+                          toast.success('Observaciones guardadas')
+                          await loadData({ page: 1, search: searchQuery, estado: filterEstado })
+                        } catch {
+                          toast.error('Error al guardar observaciones')
+                        }
+                      }}
+                      className="gap-2"
+                      disabled={isUpdating}
+                    >
+                      Guardar Observaciones
+                    </Button>
+                    {selectedCaracterizacion.observaciones && (
+                      <div className="rounded-lg bg-muted p-3">
+                        <p className="text-sm font-medium">Observaciones guardadas:</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{selectedCaracterizacion.observaciones}</p>
+                      </div>
                     )}
+                  </CardContent>
+                </Card>
 
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Cambiar Estado</CardTitle>
-                        <CardDescription>Actualice el estado de la caracterizacion</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex flex-wrap gap-2">
-                          {(["INICIADO", "REVISADO", "EN_ESTUDIO_CREDITO", "APROBADO", "CANCELADO"] as const)
-                            .filter(est => {
-                              const rol = currentProfile?.rol
-                              if (rol === 'admin') return true
-                              if (rol === 'asesor') return ['REVISADO'].includes(est)
-                              if (rol === 'analista') return ['EN_ESTUDIO_CREDITO', 'APROBADO', 'CANCELADO'].includes(est)
-                              return false
-                            })
-                            .map((est) => {
-                            const cfg = estadoConfig[est.toLowerCase() as EstadoKey] || estadoConfig.pendiente
-                            const EstIcon = cfg.icon
-                            const currentEstado = (selectedCaracterizacion.visita?.estado || selectedCaracterizacion.estado || '').toUpperCase()
-                            const isCurrent = currentEstado === est
-                            return (
-                              <Button
-                                key={est}
-                                variant={isCurrent ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => handleUpdateEstado(selectedCaracterizacion.id, est)}
-                                disabled={isUpdating || isCurrent}
-                                className={`gap-2 ${est === 'APROBADO' && !isCurrent ? 'hover:bg-green-600 hover:text-white' : ''} ${est === 'CANCELADO' && !isCurrent ? 'hover:bg-red-600 hover:text-white' : ''}`}
-                              >
-                                <EstIcon className="h-4 w-4" />
-                                {cfg.label}
-                              </Button>
-                            )
-                          })}
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Observaciones</CardTitle>
-                        <CardDescription>Agregue notas o comentarios sobre la caracterizacion</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <Textarea
-                          placeholder="Escriba sus observaciones aqui..."
-                          value={observaciones}
-                          onChange={(e) => setObservaciones(e.target.value)}
-                          rows={4}
-                        />
-                        <Button
-                          onClick={async () => {
-                            try {
-                              await supabase
-                                .from('caracterizaciones')
-                                .update({ observaciones, updated_at: new Date().toISOString() })
-                                .eq('id', selectedCaracterizacion.id)
-                              toast.success('Observaciones guardadas')
-                              await loadData({ page: 1, search: searchQuery, estado: filterEstado })
-                            } catch {
-                              toast.error('Error al guardar observaciones')
-                            }
-                          }}
-                          className="gap-2"
-                          disabled={isUpdating}
-                        >
-                          Guardar Observaciones
-                        </Button>
-                        {selectedCaracterizacion.observaciones && (
-                          <div className="rounded-lg bg-muted p-3">
-                            <p className="text-sm font-medium">Observaciones guardadas:</p>
-                            <p className="mt-1 text-sm text-muted-foreground">{selectedCaracterizacion.observaciones}</p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    {selectedCaracterizacion.predio?.latitud && selectedCaracterizacion.predio?.longitud && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-base">Ver en Mapa</CardTitle>
-                          <CardDescription>Analice la ubicacion con capas NDVI, satelital y clima</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <Button
-                            onClick={() => {
-                              setShowDetail(false)
-                              setTimeout(() => openMapView(selectedCaracterizacion), 100)
-                            }}
-                            className="gap-2"
-                          >
-                            <Map className="h-4 w-4" />
-                            Abrir Vista de Mapa
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                </TabsContent>
-              </ScrollArea>
-            </Tabs>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
@@ -2123,8 +2598,40 @@ export function AdminDashboard() {
                 initialCenter={[selectedCaracterizacion.predio.latitud, selectedCaracterizacion.predio.longitud]}
                 initialZoom={14}
                 markerPosition={[selectedCaracterizacion.predio.latitud, selectedCaracterizacion.predio.longitud]}
+                polygonCoords={selectedCaracterizacion.predio.poligono ?? undefined}
               />
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog confirmar eliminación de usuario */}
+      <Dialog open={!!userToDelete} onOpenChange={(open) => { if (!open) setUserToDelete(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Eliminar cuenta
+            </DialogTitle>
+            <DialogDescription>
+              Esta acción es irreversible. Se eliminará completamente la cuenta de{' '}
+              <strong>{userToDelete?.nombre}</strong>, incluyendo su acceso al sistema.
+              Sus caracterizaciones asociadas se conservarán.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setUserToDelete(null)} disabled={isDeletingUser}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={deleteUser}
+              disabled={isDeletingUser}
+              className="gap-2"
+            >
+              {isDeletingUser ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Eliminar definitivamente
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

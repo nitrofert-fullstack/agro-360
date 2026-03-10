@@ -98,7 +98,8 @@ export async function POST(request: Request) {
                 .eq('id', visitaId)
                 .single()
 
-            if (visita && visita.asesor_id && visita.asesor_id !== user.id) {
+            // Si la visita no existe, o tiene asesor asignado y no es este asesor → denegar
+            if (!visita || (visita.asesor_id && visita.asesor_id !== user.id)) {
                 return NextResponse.json({ error: 'No autorizado para editar este formulario' }, { status: 403 })
             }
         }
@@ -106,20 +107,29 @@ export async function POST(request: Request) {
 
         // 1. Visita — solo columnas que existen en el schema
         // (departamento, municipio, vereda, observaciones NO existen en visitas; están en predios/caracterizaciones)
+        // NOTA: visitas.estado fue eliminado — el estado vive en caracterizaciones.estado
         await supabaseAdmin.from('visitas').update({
-            estado: 'INICIADO',
             fecha_visita: datos.visita.fechaVisita,
             updated_at: new Date().toISOString(),
         }).eq('id', visitaId)
 
         // 2. Beneficiario
+        // El formulario envía primerNombre/segundoNombre/primerApellido/segundoApellido
+        const nombres = [datos.beneficiario.primerNombre, datos.beneficiario.segundoNombre].filter(Boolean).join(' ')
+            || datos.beneficiario.nombres || ''
+        const apellidos = [datos.beneficiario.primerApellido, datos.beneficiario.segundoApellido].filter(Boolean).join(' ')
+            || datos.beneficiario.apellidos || ''
         await supabaseAdmin.from('beneficiarios').update({
             tipo_documento: datos.beneficiario.tipoDocumento,
-            nombres: datos.beneficiario.nombres || '',
-            apellidos: datos.beneficiario.apellidos || '',
+            nombres,
+            apellidos,
+            correo: datos.beneficiario.email || datos.beneficiario.correo || null,
+            fecha_nacimiento: datos.beneficiario.fechaNacimiento || null,
             edad: datos.beneficiario.edad ?? null,
             telefono: datos.beneficiario.telefono || null,
             ocupacion_principal: datos.beneficiario.ocupacionPrincipal || null,
+            genero: datos.beneficiario.genero || null,
+            personas_a_cargo: datos.beneficiario.personasACargo ?? null,
             nombre_contacto_secundario: datos.beneficiario.nombreContactoSecundario || null,
             telefono_secundario: datos.beneficiario.telefonoSecundario || null,
             parentesco_contacto_secundario: datos.beneficiario.parentescoContactoSecundario || null,
@@ -139,6 +149,8 @@ export async function POST(request: Request) {
             area_productiva_hectareas: datos.predio.areaProductivaHectareas ?? null,
             latitud: datos.predio.latitud,
             longitud: datos.predio.longitud,
+            coordenada_x: datos.predio.coordenadaX || null,
+            coordenada_y: datos.predio.coordenadaY || null,
             poligono: datos.predio.poligono,
             altitud_msnm: datos.predio.altitudMsnm ?? null,
             direccion: datos.predio.direccion,
@@ -148,8 +160,18 @@ export async function POST(request: Request) {
             cultivos_existentes: datos.predio.cultivosExistentes,
         }).eq('id', predioId)
 
-        // 4. Caracterizacion predio — buscar por id_predio (no hay id_caracterizacion en caracterizaciones)
-        await supabaseAdmin.from('caracterizacion_predio').update({
+        // Helper: update si existe, insert si no (evita fallo silencioso de update en fila inexistente)
+        const upsertByPredio = async (table: string, data: Record<string, unknown>) => {
+            const { data: existing } = await supabaseAdmin.from(table).select('id').eq('id_predio', predioId).maybeSingle()
+            if (existing) {
+                await supabaseAdmin.from(table).update(data).eq('id_predio', predioId)
+            } else {
+                await supabaseAdmin.from(table).insert({ id_predio: predioId, ...data })
+            }
+        }
+
+        // 4. Caracterizacion predio
+        await upsertByPredio('caracterizacion_predio', {
             ruta_acceso: datos.caracterizacion.rutaAcceso,
             distancia_km: datos.caracterizacion.distanciaKm ?? null,
             tiempo_acceso: datos.caracterizacion.tiempoAcceso,
@@ -160,11 +182,10 @@ export async function POST(request: Request) {
             cobertura_cultivos: datos.caracterizacion.coberturaCultivos,
             cobertura_pastos: datos.caracterizacion.coberturaPastos,
             cobertura_rastrojo: datos.caracterizacion.coberturaRastrojo,
-        }).eq('id_predio', predioId)
+        })
 
-        // 5. Abastecimiento agua — buscar por id_predio
-        // (tipo_fuente_agua no existe en el schema real)
-        await supabaseAdmin.from('abastecimiento_agua').update({
+        // 5. Abastecimiento agua
+        await upsertByPredio('abastecimiento_agua', {
             nacimiento_manantial: datos.aguaRiesgos.nacimientoManantial,
             rio_quebrada: datos.aguaRiesgos.rioQuebrada,
             pozo: datos.aguaRiesgos.pozo,
@@ -173,19 +194,19 @@ export async function POST(request: Request) {
             jaguey_reservorio: datos.aguaRiesgos.jagueyReservorio,
             agua_lluvia: datos.aguaRiesgos.aguaLluvia,
             otra_fuente: datos.aguaRiesgos.otraFuente || null,
-        }).eq('id_predio', predioId)
+        })
 
-        // 6. Riesgos predio — buscar por id_predio
-        await supabaseAdmin.from('riesgos_predio').update({
+        // 6. Riesgos predio
+        await upsertByPredio('riesgos_predio', {
             inundacion: datos.aguaRiesgos.inundacion,
             sequia: datos.aguaRiesgos.sequia,
             viento: datos.aguaRiesgos.viento,
             helada: datos.aguaRiesgos.helada,
             otros_riesgos: datos.aguaRiesgos.otrosRiesgos || null,
-        }).eq('id_predio', predioId)
+        })
 
-        // 7. Área productiva — buscar por id_predio
-        await supabaseAdmin.from('area_productiva').update({
+        // 7. Área productiva
+        await upsertByPredio('area_productiva', {
             sistema_productivo: datos.areaProductiva.sistemaProductivo,
             caracterizacion_cultivo: datos.areaProductiva.caracterizacionCultivo,
             cantidad_produccion: datos.areaProductiva.cantidadProduccion,
@@ -195,7 +216,7 @@ export async function POST(request: Request) {
             interesado_programa: datos.areaProductiva.interesadoPrograma,
             donde_comercializa: datos.areaProductiva.dondeComercializa,
             ingreso_mensual_ventas: datos.areaProductiva.ingresoMensualVentas ?? null,
-        }).eq('id_predio', predioId)
+        })
 
         // 8. Información financiera — upsert por id_beneficiario
         // NOTA: la tabla informacion_financiera no tiene columna "ingresos_mensuales"

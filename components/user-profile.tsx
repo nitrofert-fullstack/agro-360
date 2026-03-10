@@ -53,8 +53,8 @@ export function UserProfile() {
   const handleLogout = async () => {
     if (isLoggingOut) return
     setIsLoggingOut(true)
-    await signOut()
-    router.push("/auth/login")
+    await fetch('/auth/signout', { method: 'POST' })
+    window.location.href = '/auth/login'
   }
 
   return (

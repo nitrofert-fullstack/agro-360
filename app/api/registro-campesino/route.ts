@@ -2,7 +2,29 @@ import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
+// Rate limiter en memoria: 5 registros por IP por hora
+const rl = new Map<string, { count: number; resetAt: number }>()
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const entry = rl.get(ip)
+  if (!entry || entry.resetAt < now) {
+    rl.set(ip, { count: 1, resetAt: now + 3_600_000 })
+    return true
+  }
+  if (entry.count >= 5) return false
+  entry.count++
+  return true
+}
+
 export async function POST(request: Request) {
+  const ip = (request.headers.get('x-forwarded-for') ?? '127.0.0.1').split(',')[0].trim()
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json(
+      { error: 'Demasiados intentos. Intenta de nuevo en una hora.' },
+      { status: 429 }
+    )
+  }
+
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 
@@ -48,7 +70,7 @@ export async function POST(request: Request) {
 
     if (existingProfile) {
       return NextResponse.json(
-        { error: 'Ya existe una cuenta con este correo electrónico' },
+        { error: 'No fue posible crear la cuenta. Verifica los datos o intenta iniciar sesión.' },
         { status: 409 }
       )
     }
@@ -69,7 +91,7 @@ export async function POST(request: Request) {
     if (createErr) {
       if (createErr.message.includes('already registered')) {
         return NextResponse.json(
-          { error: 'Ya existe una cuenta con este correo electrónico' },
+          { error: 'No fue posible crear la cuenta. Verifica los datos o intenta iniciar sesión.' },
           { status: 409 }
         )
       }

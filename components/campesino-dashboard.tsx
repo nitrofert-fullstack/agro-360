@@ -8,10 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  Leaf,
   MapPin,
   Sprout,
-  Droplets,
   Loader2,
   Eye,
   Calendar,
@@ -65,12 +63,12 @@ const estadoConfig: Record<string, { label: string; color: string }> = {
   INICIADO: { label: "Iniciado", color: "bg-slate-500/10 text-slate-600 border-slate-500/20" },
   REVISADO: { label: "En Revisión", color: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
   EN_ESTUDIO_CREDITO: { label: "En Estudio Crédito", color: "bg-purple-500/10 text-purple-600 border-purple-500/20" },
-  APROBADO: { label: "Aprobado", color: "bg-green-500/10 text-green-600 border-green-500/20" },
-  CANCELADO: { label: "Cancelado", color: "bg-red-500/10 text-red-600 border-red-500/20" },
+  APROBADO: { label: "Viable", color: "bg-green-500/10 text-green-600 border-green-500/20" },
+  CANCELADO: { label: "No Viable", color: "bg-red-500/10 text-red-600 border-red-500/20" },
   // legado (compatibilidad con registros anteriores)
   SINCRONIZADO: { label: "Registrado", color: "bg-slate-500/10 text-slate-600 border-slate-500/20" },
   EN_REVISION: { label: "En Revisión", color: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
-  RECHAZADO: { label: "Cancelado", color: "bg-red-500/10 text-red-600 border-red-500/20" },
+  RECHAZADO: { label: "No Viable", color: "bg-red-500/10 text-red-600 border-red-500/20" },
 }
 
 export function CampesinoDashboard({ userEmail, userName, userNumDoc }: { userEmail: string; userName: string; userNumDoc?: string | null }) {
@@ -103,7 +101,7 @@ export function CampesinoDashboard({ userEmail, userName, userNumDoc }: { userEm
 
       const beneficiarioIds = beneficiarios.map((b: any) => b.id)
 
-      // Buscar caracterizaciones con esos beneficiarios
+      // Buscar caracterizaciones con esos beneficiarios (max 50 más recientes)
       const { data: caracterizaciones } = await supabase
         .from("caracterizaciones")
         .select(`
@@ -111,29 +109,41 @@ export function CampesinoDashboard({ userEmail, userName, userNumDoc }: { userEm
           id_visita,
           id_predio,
           id_beneficiario,
+          estado,
           foto_1_url,
-          foto_2_url
+          foto_2_url,
+          foto_beneficiario_url,
+          foto_doc_frontal_url,
+          foto_doc_trasera_url
         `)
         .in("id_beneficiario", beneficiarioIds)
+        .order("created_at", { ascending: false })
+        .limit(50)
 
       if (!caracterizaciones || caracterizaciones.length === 0) {
         setIsLoading(false)
         return
       }
 
-      // Obtener predios y visitas
+      // Obtener predios y visitas (visitas: solo para fecha, técnico y radicado)
       const predioIds = [...new Set(caracterizaciones.map((c: any) => c.id_predio))]
       const visitaIds = [...new Set(caracterizaciones.map((c: any) => c.id_visita))]
 
-      const [{ data: prediosData }, { data: visitasData }] = await Promise.all([
+      const [prediosResult, visitasResult] = await Promise.allSettled([
         supabase.from("predios").select("*").in("id", predioIds),
-        supabase.from("visitas").select("*").in("id", visitaIds),
+        supabase.from("visitas").select("id, radicado_oficial, radicado_local, fecha_visita, nombre_tecnico").in("id", visitaIds),
       ])
+      const prediosData = prediosResult.status === 'fulfilled' ? prediosResult.value.data : []
+      const visitasData = visitasResult.status === 'fulfilled' ? visitasResult.value.data : []
 
-      const result: PredioCompleto[] = caracterizaciones.map((c: any) => ({
-        predio: prediosData?.find((p: any) => p.id === c.id_predio),
-        visita: visitasData?.find((v: any) => v.id === c.id_visita),
-      })).filter((r: PredioCompleto) => r.predio && r.visita)
+      const result: PredioCompleto[] = caracterizaciones.map((c: any) => {
+        const visita = visitasData?.find((v: any) => v.id === c.id_visita)
+        return {
+          predio: prediosData?.find((p: any) => p.id === c.id_predio),
+          // Combinar visita con el estado de la caracterización (fuente de verdad)
+          visita: visita ? { ...visita, estado: c.estado || 'INICIADO' } : null,
+        }
+      }).filter((r: PredioCompleto) => r.predio && r.visita)
 
       setPredios(result)
     } catch (err) {
@@ -172,7 +182,7 @@ export function CampesinoDashboard({ userEmail, userName, userNumDoc }: { userEm
         <div>
           <h2 className="text-xl font-bold md:text-2xl">Bienvenido, {userName}</h2>
           <p className="text-sm text-muted-foreground">
-            Aqui puede ver la informacion de sus terrenos registrados
+            Aquí puede ver la información de sus terrenos registrados
           </p>
         </div>
         {/* Mostrar botón solo si todos los formularios están cancelados o no hay ninguno */}
@@ -273,7 +283,7 @@ export function CampesinoDashboard({ userEmail, userName, userNumDoc }: { userEm
             <Card className="py-12 text-center">
               <CardContent className="flex flex-col items-center gap-4">
                 <Sprout className="h-12 w-12 text-muted-foreground/30" />
-                <p className="text-muted-foreground">No tiene terrenos registrados aun</p>
+                <p className="text-muted-foreground">No tiene terrenos registrados aún</p>
                 <Button asChild>
                   <Link href="/formulario" className="gap-2">
                     <Plus className="h-4 w-4" />
@@ -285,7 +295,6 @@ export function CampesinoDashboard({ userEmail, userName, userNumDoc }: { userEm
           ) : (
             predios.map((item, idx) => {
               const est = estadoConfig[item.visita.estado] || estadoConfig.INICIADO
-              const hasCoords = item.predio.latitud && item.predio.longitud
 
               return (
                 <Card

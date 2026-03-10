@@ -32,11 +32,9 @@ export function SyncButton({ variant = "default", className, onSyncComplete }: S
       setPendingCount(stats.pendientes)
     }
     loadStats()
-    
-    // Refresh every 5 seconds
     const interval = setInterval(loadStats, 5000)
     return () => clearInterval(interval)
-  }, [lastSyncResult])
+  }, []) // Sin lastSyncResult — el interval ya refresca cada 5s
 
   const handleSync = async () => {
     toast.info("Sincronizando...", { duration: 2000 })
@@ -57,7 +55,7 @@ export function SyncButton({ variant = "default", className, onSyncComplete }: S
 
   const getTooltipContent = () => {
     if (!isAuthenticated) {
-      return "Inicia sesion para sincronizar"
+      return "Inicia sesión para sincronizar"
     }
     if (!canSync) {
       return "Sin conexion a internet"
@@ -120,7 +118,7 @@ export function SyncButton({ variant = "default", className, onSyncComplete }: S
       )}
       <span>
         {!isAuthenticated 
-          ? "Iniciar sesion" 
+          ? "Iniciar sesión"
           : isSyncing 
             ? "Sincronizando..." 
             : pendingCount > 0 
