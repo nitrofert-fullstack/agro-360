@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -9,90 +10,60 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Parámetro documento requerido' }, { status: 400 })
   }
 
-  // Solo usuarios autenticados
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
-  // Verificar rol: campesinos solo pueden consultar su propio documento
-  const { data: userProfile } = await supabase
-    .from('profiles')
-    .select('rol, numero_documento')
-    .eq('id', user.id)
-    .single()
+  const userProfile = await prisma.profiles.findUnique({
+    where: { id: user.id },
+    select: { rol: true, numero_documento: true },
+  })
 
-  if (userProfile?.rol === 'campesino') {
-    const ownDoc = (userProfile as any).numero_documento
-    if (!ownDoc || ownDoc !== documento) {
+  if (userProfile?.rol === 'agricultor') {
+    if (!userProfile.numero_documento || userProfile.numero_documento !== documento) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
   }
 
-  // 1. Buscar el beneficiario por número de documento
-  const { data: beneficiario, error } = await supabase
-    .from('beneficiarios')
-    .select(`
-      id,
-      tipo_documento,
-      nombres,
-      apellidos,
-      fecha_nacimiento,
-      edad,
-      genero,
-      personas_a_cargo,
-      telefono,
-      correo,
-      ocupacion_principal,
-      nombre_contacto_secundario,
-      telefono_secundario,
-      parentesco_contacto_secundario
-    `)
-    .eq('numero_documento', documento)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
+  const beneficiario = await prisma.beneficiarios.findFirst({
+    where:   { numero_documento: documento },
+    orderBy: { created_at: 'desc' },
+  })
 
   if (!beneficiario) {
     return NextResponse.json({ encontrado: false })
   }
 
-  // 2. Obtener el último predio del beneficiario (predios.id_beneficiario → beneficiarios.id)
-  const { data: ultimoPredio } = await supabase
-    .from('predios')
-    .select('municipio, departamento, vereda')
-    .eq('id_beneficiario', beneficiario.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const ultimoPredio = await prisma.predios.findFirst({
+    where:   { id_beneficiario: beneficiario.id },
+    orderBy: { created_at: 'desc' },
+    select:  { municipio: true, departamento: true, vereda: true },
+  })
 
   return NextResponse.json({
     encontrado: true,
     beneficiario: {
-      tipoDocumento: beneficiario.tipo_documento || 'CC',
-      nombres: beneficiario.nombres || '',
-      apellidos: beneficiario.apellidos || '',
-      fechaNacimiento: (beneficiario as any).fecha_nacimiento || '',
-      edad: beneficiario.edad ?? null,
-      genero: (beneficiario as any).genero || '',
-      personasACargo: (beneficiario as any).personas_a_cargo ?? null,
-      telefono: beneficiario.telefono || '',
-      correo: beneficiario.correo || '',
+      tipoDocumento:    beneficiario.tipo_documento || 'CC',
+      nombres:          beneficiario.nombres || '',
+      apellidos:        beneficiario.apellidos || '',
+      fechaNacimiento:  beneficiario.fecha_nacimiento?.toISOString().split('T')[0] || '',
+      edad:             beneficiario.edad ?? null,
+      genero:           beneficiario.genero || '',
+      personasACargo:   beneficiario.personas_a_cargo ?? null,
+      telefono:         beneficiario.telefono || '',
+      correo:           beneficiario.correo || '',
       ocupacionPrincipal: beneficiario.ocupacion_principal || '',
       contactoSecundario: {
-        nombre: beneficiario.nombre_contacto_secundario || '',
-        telefono: beneficiario.telefono_secundario || '',
+        nombre:    beneficiario.nombre_contacto_secundario || '',
+        telefono:  beneficiario.telefono_secundario || '',
         parentesco: beneficiario.parentesco_contacto_secundario || '',
       },
       ultimoPredio: ultimoPredio ? {
-        municipio: ultimoPredio.municipio || '',
+        municipio:    ultimoPredio.municipio || '',
         departamento: ultimoPredio.departamento || '',
-        vereda: ultimoPredio.vereda || '',
+        vereda:       ultimoPredio.vereda || '',
       } : null,
     },
   })

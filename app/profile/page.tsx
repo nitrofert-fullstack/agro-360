@@ -88,7 +88,7 @@ export default function ProfilePage() {
                 <div>
                   <p className="text-lg font-semibold">{profile?.nombre_completo}</p>
                   <p className="text-sm text-muted-foreground">
-                    {({ admin: 'Administrador', analista: 'Analista', asesor: 'Asesor', campesino: 'Agricultor' } as Record<string, string>)[profile?.rol ?? ''] ?? 'Usuario'}
+                    {({ admin: 'Administrador', analista: 'Analista', asesor: 'Asesor', agricultor: 'Agricultor' } as Record<string, string>)[profile?.rol ?? ''] ?? 'Usuario'}
                   </p>
                 </div>
               </div>
@@ -118,7 +118,7 @@ export default function ProfilePage() {
                   <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2">
                     <Shield className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">
-                      {({ admin: 'Administrador', analista: 'Analista', asesor: 'Asesor', campesino: 'Agricultor' } as Record<string, string>)[profile?.rol ?? ''] ?? 'Usuario'}
+                      {({ admin: 'Administrador', analista: 'Analista', asesor: 'Asesor', agricultor: 'Agricultor' } as Record<string, string>)[profile?.rol ?? ''] ?? 'Usuario'}
                     </span>
                   </div>
                 </div>

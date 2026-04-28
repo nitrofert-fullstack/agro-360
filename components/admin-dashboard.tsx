@@ -104,6 +104,8 @@ interface CaracterizacionDB {
   foto_doc_trasera_url: string | null
   autorizacion_datos_personales: boolean | null
   autorizacion_consulta_crediticia: boolean | null
+  autorizacion_aviso_privacidad: boolean | null
+  autorizacion_uso_imagen: boolean | null
   // Joined relations
   beneficiario: {
     id: string
@@ -358,41 +360,27 @@ export function AdminDashboard() {
   const loadUsers = useCallback(async ({ page = 1, search = '' }: { page?: number; search?: string } = {}) => {
     setIsLoadingUsers(true)
     try {
-      const offset = (page - 1) * USERS_PER_PAGE
-      let profilesQuery = supabase
-        .from('profiles')
-        .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range(offset, offset + USERS_PER_PAGE - 1)
+      const params = new URLSearchParams({ page: String(page), limit: String(USERS_PER_PAGE) })
+      if (search.trim()) params.set('search', search.trim())
 
-      if (search.trim()) {
-        profilesQuery = profilesQuery.or(
-          `nombre_completo.ilike.%${search.trim()}%,email.ilike.%${search.trim()}%`
-        ) as typeof profilesQuery
+      const res = await fetch(`/api/admin/users?${params}`)
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error || 'Error al cargar usuarios')
       }
+      const json = await res.json()
 
-      const { data: profiles, error: profilesErr, count } = await profilesQuery
-      if (profilesErr) throw profilesErr
-
-      setUsuarios((profiles || []) as UserProfile[])
-      setUserTotalCount(count ?? 0)
+      setUsuarios((json.users || []) as UserProfile[])
+      setUserTotalCount(json.total ?? 0)
       setUserPage(page)
-
-      // Invitaciones — pocas filas, sin paginación
-      const { data: invs, error: invsErr } = await supabase
-        .from('invitations')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(200)
-
-      if (!invsErr) setInvitations((invs || []) as Invitation[])
+      setInvitations((json.invitations || []) as Invitation[])
     } catch (err) {
       console.error('Error loading users:', err)
       toast.error('Error al cargar usuarios')
     } finally {
       setIsLoadingUsers(false)
     }
-  }, [supabase])
+  }, [])
 
   const [userToDelete, setUserToDelete] = useState<{ id: string; nombre: string } | null>(null)
   const [isDeletingUser, setIsDeletingUser] = useState(false)
@@ -535,18 +523,14 @@ export function AdminDashboard() {
 
   const loadAsesores = useCallback(async () => {
     try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, nombre_completo')
-        .in('rol', ['asesor', 'admin'])
-        .eq('activo', true)
-        .order('nombre_completo')
-        .limit(200)
-      setAsesoresDisponibles((data || []) as { id: string; nombre_completo: string }[])
+      const res = await fetch('/api/admin/users?asesores_only=true')
+      if (!res.ok) return
+      const json = await res.json()
+      setAsesoresDisponibles((json.asesores || []) as { id: string; nombre_completo: string }[])
     } catch {
       // No crítico
     }
-  }, [supabase])
+  }, [])
 
   const assignAsesor = async (visitaId: string, asesorId: string) => {
     if (!visitaId || !asesorId) return
@@ -721,7 +705,7 @@ export function AdminDashboard() {
       'Ingresos Agropecuarios/mes', 'Otros Ingresos/mes', 'Egresos/mes',
       'Activos Totales', 'Activos Agropecuarios', 'Pasivos Totales',
       // Autorizaciones
-      'Autoriza Datos Personales', 'Autoriza Consulta Crediticia',
+      'Autoriza Datos Personales', 'Autoriza Aviso Privacidad', 'Autoriza Consulta Crediticia', 'Autoriza Uso Imagen',
       // Tecnico
       'Tecnico / Asesor', 'Asesor Email',
     ]
@@ -788,7 +772,9 @@ export function AdminDashboard() {
       money(c.informacion_financiera?.activos_agropecuaria),
       money(c.informacion_financiera?.pasivos_totales),
       bool(c.autorizacion_datos_personales),
+      bool(c.autorizacion_aviso_privacidad),
       bool(c.autorizacion_consulta_crediticia),
+      bool(c.autorizacion_uso_imagen),
       c.visita?.nombre_tecnico || c.asesor?.nombre_completo || '',
       c.asesor?.email || '',
     ].map(escape))
@@ -804,8 +790,9 @@ export function AdminDashboard() {
     toast.success(`Archivo descargado: ${filename}`)
   }
 
-  const generatePDF = (c: CaracterizacionDB) => {
-    const nombre = getNombreCompleto(c)
+  const generatePDF = (cTyped: CaracterizacionDB) => {
+    const c: any = cTyped
+    const nombre = getNombreCompleto(cTyped)
     const fechaGen = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })
     const estadoLabel = getEstadoConfig(c.estado).label
 
@@ -981,8 +968,14 @@ export function AdminDashboard() {
       <span class="auth-item ${c.autorizacion_datos_personales ? 'auth-ok' : 'auth-no'}">
         ${c.autorizacion_datos_personales ? '✓' : '✗'} Tratamiento de datos personales
       </span>
+      <span class="auth-item ${c.autorizacion_aviso_privacidad ? 'auth-ok' : 'auth-no'}">
+        ${c.autorizacion_aviso_privacidad ? '✓' : '✗'} Aviso de privacidad
+      </span>
       <span class="auth-item ${c.autorizacion_consulta_crediticia ? 'auth-ok' : 'auth-no'}">
         ${c.autorizacion_consulta_crediticia ? '✓' : '✗'} Consulta crediticia
+      </span>
+      <span class="auth-item ${c.autorizacion_uso_imagen ? 'auth-ok' : 'auth-no'}">
+        ${c.autorizacion_uso_imagen ? '✓' : '✗'} Uso de imagen
       </span>
     </div>
     ${c.observaciones ? `<div style="margin-top:8px">${field('Observaciones', c.observaciones)}</div>` : ''}
@@ -1457,7 +1450,7 @@ export function AdminDashboard() {
                         <SelectContent>
                           <SelectItem value="asesor">Asesor</SelectItem>
                           <SelectItem value="analista">Analista</SelectItem>
-                          <SelectItem value="campesino">Beneficiario / Campesino</SelectItem>
+                          <SelectItem value="agricultor">Agricultor</SelectItem>
                           <SelectItem value="admin">Administrador</SelectItem>
                         </SelectContent>
                       </Select>
@@ -1572,12 +1565,12 @@ export function AdminDashboard() {
                                 <Badge variant="outline" className={
                                   u.rol === 'admin' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
                                     u.rol === 'analista' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
-                                      u.rol === 'campesino' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+                                      u.rol === 'agricultor' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
                                         'bg-blue-500/10 text-blue-500 border-blue-500/20'
                                 }>
                                   {u.rol === 'admin' ? <><Shield className="mr-1 h-3 w-3" />Admin</> :
                                     u.rol === 'analista' ? <><Eye className="mr-1 h-3 w-3" />Analista</> :
-                                      u.rol === 'campesino' ? <><Sprout className="mr-1 h-3 w-3" />Agricultor</> :
+                                      u.rol === 'agricultor' ? <><Sprout className="mr-1 h-3 w-3" />Agricultor</> :
                                         <><User className="mr-1 h-3 w-3" />Asesor</>}
                                 </Badge>
                                 {invitation && (
@@ -1634,7 +1627,7 @@ export function AdminDashboard() {
                                     <SelectItem value="admin">Administrador</SelectItem>
                                     <SelectItem value="asesor">Asesor</SelectItem>
                                     <SelectItem value="analista">Analista</SelectItem>
-                                    <SelectItem value="campesino">Agricultor</SelectItem>
+                                    <SelectItem value="agricultor">Agricultor</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -2148,7 +2141,7 @@ export function AdminDashboard() {
                       </div>
                       <div className="flex justify-between gap-x-3">
                         <span className="text-muted-foreground shrink-0">Registrado:</span>
-                        <span>{selectedCaracterizacion.fecha_sincronizacion ? new Date(selectedCaracterizacion.fecha_sincronizacion).toLocaleDateString('es-CO') : 'Pendiente'}</span>
+                        <span>{(selectedCaracterizacion.visita as any)?.created_at ? new Date((selectedCaracterizacion.visita as any).created_at).toLocaleDateString('es-CO') : 'No registrada'}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground shrink-0">Estado:</span>
@@ -2271,11 +2264,11 @@ export function AdminDashboard() {
                       </div>
                       <div className="flex justify-between gap-x-3">
                         <span className="text-muted-foreground shrink-0">Ruta de acceso:</span>
-                        <span className="text-right">{selectedCaracterizacion.predio?.acceso_vial || selectedCaracterizacion.caracterizacion_predio?.ruta_acceso || 'No especificada'}</span>
+                        <span className="text-right">{(selectedCaracterizacion.predio as any)?.acceso_vial || selectedCaracterizacion.caracterizacion_predio?.ruta_acceso || 'No especificada'}</span>
                       </div>
                       <div className="flex justify-between gap-x-3">
                         <span className="text-muted-foreground shrink-0">Distancia:</span>
-                        <span>{selectedCaracterizacion.predio?.distancia_cabecera ? `${selectedCaracterizacion.predio.distancia_cabecera} km` : selectedCaracterizacion.caracterizacion_predio?.distancia_km ? `${selectedCaracterizacion.caracterizacion_predio.distancia_km} km` : 'No registrada'}</span>
+                        <span>{(selectedCaracterizacion.predio as any)?.distancia_cabecera ? `${(selectedCaracterizacion.predio as any).distancia_cabecera} km` : selectedCaracterizacion.caracterizacion_predio?.distancia_km ? `${selectedCaracterizacion.caracterizacion_predio.distancia_km} km` : 'No registrada'}</span>
                       </div>
                       <div className="flex justify-between gap-x-3">
                         <span className="text-muted-foreground shrink-0">Temperatura:</span>
@@ -2309,7 +2302,7 @@ export function AdminDashboard() {
                       </div>
                       <div className="flex justify-between gap-x-3">
                         <span className="text-muted-foreground shrink-0">Producción estimada:</span>
-                        <span>{selectedCaracterizacion.area_productiva?.produccion_estimada ? `${selectedCaracterizacion.area_productiva.produccion_estimada} kg` : 'No especificada'}</span>
+                        <span>{(selectedCaracterizacion.area_productiva as any)?.produccion_estimada ? `${(selectedCaracterizacion.area_productiva as any).produccion_estimada} kg` : 'No especificada'}</span>
                       </div>
                       <div className="flex justify-between gap-x-3">
                         <span className="text-muted-foreground shrink-0">Dónde comercializa:</span>

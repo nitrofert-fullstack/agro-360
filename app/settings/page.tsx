@@ -71,36 +71,23 @@ export default function SettingsPage() {
 
       <div className="mx-auto max-w-2xl px-4 py-6 md:px-6">
         <div className="space-y-6">
-          {/* Configuración offline */}
+          {/* Configuración de sesión */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Smartphone className="h-5 w-5" />
-                Modo Offline
+                Conexión
               </CardTitle>
               <CardDescription>
-                Configura cómo funciona la aplicación sin conexión
+                La aplicación requiere conexión a internet para funcionar
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-base font-medium">Sincronización automática</Label>
+                  <Label className="text-base font-medium">Almacenamiento de sesión</Label>
                   <p className="text-sm text-muted-foreground">
-                    Sincronizar formularios automáticamente al recuperar conexión
-                  </p>
-                </div>
-                <Switch 
-                  checked={settings.syncAutomatico}
-                  onCheckedChange={() => handleToggle('syncAutomatico')}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-base font-medium">Almacenamiento local</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Los datos se guardan en IndexedDB para acceso offline
+                    La sesión se guarda en localStorage para mantener el acceso
                   </p>
                 </div>
                 <div className="h-9 px-3 rounded-lg border border-border bg-muted flex items-center">
@@ -123,26 +110,13 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label className="text-sm">Datos almacenados localmente</Label>
+                <Label className="text-sm">Sesión activa</Label>
                 <div className="rounded-lg border border-border bg-muted/50 p-3 text-sm">
                   <p className="text-muted-foreground">
-                    Se almacenan en IndexedDB para acceso offline y se sincroniza automáticamente al conectarse
+                    Los datos se almacenan en Supabase. Para cerrar sesión en todos los dispositivos, cierre sesión desde el menú principal.
                   </p>
                 </div>
               </div>
-
-              <Button 
-                variant="destructive" 
-                size="sm"
-                onClick={() => {
-                  if (confirm("¿Estás seguro? Se eliminarán todos los datos locales.")) {
-                    // Implementar limpieza
-                    console.log("Limpiando datos locales")
-                  }
-                }}
-              >
-                Limpiar datos locales
-              </Button>
             </CardContent>
           </Card>
 
@@ -180,9 +154,8 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
               <p>Versión: 1.0.0</p>
-              <p>PWA: Instalable</p>
-              <p>Almacenamiento: IndexedDB + LocalStorage</p>
-              <p>Sincronización: Basada en JWT</p>
+              <p>Almacenamiento: Supabase (nube) + LocalStorage (sesión)</p>
+              <p>Autenticación: Supabase Auth (JWT)</p>
             </CardContent>
           </Card>
         </div>

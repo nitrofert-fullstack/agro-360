@@ -1,176 +1,159 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
-
-const SELECT_QUERY = `
-  *,
-  beneficiario:beneficiarios(*, informacion_financiera(*)),
-  predio:predios(*, caracterizacion_predio(*), area_productiva(*)),
-  visita:visitas(*)
-`
+import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
 
-    // Verificar autenticación
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Obtener rol del usuario
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('rol')
-      .eq('id', user.id)
-      .single()
+    const profile = await prisma.profiles.findUnique({
+      where: { id: user.id },
+      select: { rol: true },
+    })
 
     const rol = profile?.rol
-    if (!['admin', 'asesor', 'analista'].includes(rol)) {
+    if (!['admin', 'asesor', 'analista'].includes(rol ?? '')) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-
-    if (!serviceRoleKey || !supabaseUrl) {
-      return NextResponse.json({ error: 'Configuración del servidor incompleta' }, { status: 500 })
-    }
-
-    // Params de paginación y filtros
     const { searchParams } = new URL(request.url)
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const page  = Math.max(1, parseInt(searchParams.get('page')  || '1'))
     const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '50')), 100)
     const search = (searchParams.get('search') || '').trim()
     const estado = (searchParams.get('estado') || '').trim()
-    const offset = (page - 1) * limit
+    const skip   = (page - 1) * limit
 
-    const adminClient = createAdminClient(supabaseUrl, serviceRoleKey)
-
-    // Construir conjunto de ids de visitas permitidas para el asesor
-    let allowedVisitaIds: string[] | null = null
+    // ── Filtro por asesor ───────────────────────────────────────────────────
+    let allowedVisitaIds: string[] | undefined
     if (rol === 'asesor') {
-      const { data: visitas } = await adminClient
-        .from('visitas')
-        .select('id')
-        .or(`asesor_id.eq.${user.id},asesor_id.is.null`)
-
-      allowedVisitaIds = (visitas || []).map((v: { id: string }) => v.id)
+      const visitas = await prisma.visitas.findMany({
+        where: { OR: [{ asesor_id: user.id }, { asesor_id: null }] },
+        select: { id: true },
+      })
+      allowedVisitaIds = visitas.map(v => v.id)
       if (allowedVisitaIds.length === 0) {
         return NextResponse.json({ data: [], total: 0, page, limit })
       }
     }
 
-    // --- Resolver IDs de beneficiarios/predios que coinciden con la búsqueda ---
-    let searchBenefIds: string[] | null = null
-    let searchPredioIds: string[] | null = null
+    // ── Búsqueda por texto ──────────────────────────────────────────────────
+    let searchBenefIds: string[] | undefined
+    let searchPredioIds: string[] | undefined
 
     if (search) {
-      // Sanitizar para evitar inyección en PostgREST: solo letras, dígitos, espacios y guiones
-      const safeSearch = search.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9 \-]/g, '').trim()
-      if (!safeSearch) {
-        return NextResponse.json({ data: [], total: 0, page, limit })
-      }
-      const [benefResult, predioResult] = await Promise.all([
-        adminClient
-          .from('beneficiarios')
-          .select('id')
-          .or(`nombres.ilike.%${safeSearch}%,apellidos.ilike.%${safeSearch}%,numero_documento.ilike.%${safeSearch}%`),
-        adminClient
-          .from('predios')
-          .select('id')
-          .or(`nombre_predio.ilike.%${safeSearch}%,municipio.ilike.%${safeSearch}%,vereda.ilike.%${safeSearch}%`),
-      ])
-      searchBenefIds = (benefResult.data || []).map((b: { id: string }) => b.id)
-      searchPredioIds = (predioResult.data || []).map((p: { id: string }) => p.id)
+      const safe = search.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9 \-]/g, '').trim()
+      if (!safe) return NextResponse.json({ data: [], total: 0, page, limit })
 
-      // Si no hay resultados en ninguna tabla, devolver vacío
+      const [benefs, predios] = await Promise.all([
+        prisma.beneficiarios.findMany({
+          where: {
+            OR: [
+              { nombres:          { contains: safe, mode: 'insensitive' } },
+              { apellidos:        { contains: safe, mode: 'insensitive' } },
+              { numero_documento: { contains: safe, mode: 'insensitive' } },
+            ],
+          },
+          select: { id: true },
+        }),
+        prisma.predios.findMany({
+          where: {
+            OR: [
+              { nombre_predio: { contains: safe, mode: 'insensitive' } },
+              { municipio:     { contains: safe, mode: 'insensitive' } },
+              { vereda:        { contains: safe, mode: 'insensitive' } },
+            ],
+          },
+          select: { id: true },
+        }),
+      ])
+
+      searchBenefIds  = benefs.map(b => b.id)
+      searchPredioIds = predios.map(p => p.id)
+
       if (searchBenefIds.length === 0 && searchPredioIds.length === 0) {
         return NextResponse.json({ data: [], total: 0, page, limit })
       }
     }
 
-    // El estado ahora está en caracterizaciones directamente (no en visitas)
-    const filterEstado = (estado && estado !== 'todos' && estado !== 'sin_asesor') ? estado : null
-
-    // --- Construir query principal ---
-    let query = adminClient
-      .from('caracterizaciones')
-      .select(SELECT_QUERY, { count: 'exact' })
-      .order('created_at', { ascending: false })
-
-    // Filtro por asesor (solo sus registros)
-    if (allowedVisitaIds !== null) {
-      query = query.in('id_visita', allowedVisitaIds) as typeof query
-    }
-
-    // Filtro por búsqueda (beneficiario OR predio)
-    if (searchBenefIds !== null && searchPredioIds !== null) {
-      const allMatchIds = [...new Set([...searchBenefIds, ...searchPredioIds])]
-      if (searchBenefIds.length > 0 && searchPredioIds.length > 0) {
-        query = query.or(`id_beneficiario.in.(${searchBenefIds.join(',')}),id_predio.in.(${searchPredioIds.join(',')})`) as typeof query
-      } else if (searchBenefIds.length > 0) {
-        query = query.in('id_beneficiario', searchBenefIds) as typeof query
-      } else {
-        query = query.in('id_predio', searchPredioIds) as typeof query
-      }
-    }
-
-    // Filtro por estado directo en caracterizaciones
-    if (filterEstado) {
-      query = query.ilike('estado', filterEstado) as typeof query
-    }
-
-    // Filtro "sin_asesor" — visitas con asesor_id null
+    // ── Filtro sin_asesor ───────────────────────────────────────────────────
+    let sinAsesorIds: string[] | undefined
     if (estado === 'sin_asesor') {
-      const { data: sinAsesorVisitas } = await adminClient
-        .from('visitas')
-        .select('id')
-        .is('asesor_id', null)
-      const sinAsesorIds = (sinAsesorVisitas || []).map((v: { id: string }) => v.id)
+      const v = await prisma.visitas.findMany({
+        where: { asesor_id: null },
+        select: { id: true },
+      })
+      sinAsesorIds = v.map(x => x.id)
       if (sinAsesorIds.length === 0) {
         return NextResponse.json({ data: [], total: 0, page, limit })
       }
-      query = query.in('id_visita', sinAsesorIds) as typeof query
     }
 
-    // Paginación
-    query = query.range(offset, offset + limit - 1) as typeof query
+    const filterEstado = estado && estado !== 'todos' && estado !== 'sin_asesor' ? estado : undefined
 
-    const { data, error, count } = await query
+    // ── WHERE principal ─────────────────────────────────────────────────────
+    const where: Prisma.caracterizacionesWhereInput = {}
 
-    if (error) throw error
+    if (allowedVisitaIds) where.id_visita = { in: allowedVisitaIds }
+    if (sinAsesorIds)     where.id_visita = { in: sinAsesorIds }
+    if (filterEstado)     where.estado    = { equals: filterEstado, mode: 'insensitive' }
 
-    // Obtener profiles de los asesores referenciados en visitas
-    const asesorIds = [...new Set(
-      (data || []).map((c: any) => c.visita?.asesor_id).filter(Boolean)
-    )]
+    if (searchBenefIds !== undefined && searchPredioIds !== undefined) {
+      const orClauses: Prisma.caracterizacionesWhereInput[] = []
+      if (searchBenefIds.length  > 0) orClauses.push({ id_beneficiario: { in: searchBenefIds  } })
+      if (searchPredioIds.length > 0) orClauses.push({ id_predio:       { in: searchPredioIds } })
+      if (orClauses.length > 0) where.OR = orClauses
+    }
 
-    let profilesMap: Record<string, { id: string; nombre_completo: string; email: string }> = {}
+    const include = {
+      beneficiarios: { include: { informacion_financiera: true } },
+      predios: {
+        include: {
+          caracterizacion_predio: true,
+          area_productiva:        true,
+        },
+      },
+      visitas: true,
+    } satisfies Prisma.caracterizacionesInclude
+
+    const [data, total] = await Promise.all([
+      prisma.caracterizaciones.findMany({ where, include, orderBy: { created_at: 'desc' }, skip, take: limit }),
+      prisma.caracterizaciones.count({ where }),
+    ])
+
+    // ── Enriquecer con perfil del asesor ────────────────────────────────────
+    const asesorIds = [...new Set(data.map(c => c.visitas?.asesor_id).filter((x): x is string => !!x))]
+    let profilesMap: Record<string, { id: string; nombre_completo: string | null; email: string | null }> = {}
     if (asesorIds.length > 0) {
-      const { data: profiles } = await adminClient
-        .from('profiles')
-        .select('id, nombre_completo, email')
-        .in('id', asesorIds)
-      for (const p of profiles || []) {
-        profilesMap[p.id] = p
-      }
+      const profiles = await prisma.profiles.findMany({
+        where: { id: { in: asesorIds } },
+        select: { id: true, nombre_completo: true, email: true },
+      })
+      for (const p of profiles) profilesMap[p.id] = p
     }
 
-    const items = (data || []).map((c: any) => {
-      const asesorProfile = c.visita?.asesor_id ? (profilesMap[c.visita.asesor_id] ?? null) : null
+    const items = data.map(c => {
+      const asesorProfile = c.visitas?.asesor_id ? (profilesMap[c.visitas.asesor_id] ?? null) : null
+      // Renombrar relaciones Prisma (plural) a los nombres que usa el componente (singular)
+      const { beneficiarios, predios, visitas, ...rest } = c
       return {
-        ...c,
-        caracterizacion_predio: c.predio?.caracterizacion_predio?.[0] ?? null,
-        area_productiva: c.predio?.area_productiva?.[0] ?? null,
-        informacion_financiera: c.beneficiario?.informacion_financiera?.[0] ?? null,
-        asesor: asesorProfile,
-        visita: c.visita ?? null,
+        ...rest,
+        beneficiario:           beneficiarios ?? null,
+        predio:                 predios ?? null,
+        visita:                 visitas ?? null,
+        caracterizacion_predio: predios?.caracterizacion_predio ?? null,
+        area_productiva:        (predios?.area_productiva ?? [])[0] ?? null,
+        informacion_financiera: (beneficiarios?.informacion_financiera ?? [])[0] ?? null,
+        asesor:                 asesorProfile,
       }
     })
 
-    return NextResponse.json({ data: items, total: count ?? 0, page, limit })
+    return NextResponse.json({ data: items, total, page, limit })
   } catch (err) {
     console.error('[AdminCaracterizaciones] Error:', err)
     return NextResponse.json(

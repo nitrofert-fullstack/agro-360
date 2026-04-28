@@ -1,5 +1,3 @@
-import type { CaracterizacionLocal } from '@/lib/db/indexed-db'
-
 export interface PDFCaracterizacion {
   radicado: string
   estado?: string
@@ -65,6 +63,8 @@ export interface PDFCaracterizacion {
   // Autorizaciones
   autorizaTratamientoDatos?: boolean
   autorizaConsultaCrediticia?: boolean
+  autorizaAvisoPrivacidad?: boolean
+  autorizaUsoImagen?: boolean
   // Observaciones
   observaciones?: string
 }
@@ -280,9 +280,17 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
       <span class="auth-item ${data.autorizaTratamientoDatos ? 'auth-ok' : 'auth-no'}">
         ${data.autorizaTratamientoDatos ? '&#10003;' : '&#10007;'} Tratamiento de datos personales
       </span>
+      ${data.autorizaAvisoPrivacidad != null ? `
+      <span class="auth-item ${data.autorizaAvisoPrivacidad ? 'auth-ok' : 'auth-no'}">
+        ${data.autorizaAvisoPrivacidad ? '&#10003;' : '&#10007;'} Aviso de privacidad
+      </span>` : ''}
       ${data.autorizaConsultaCrediticia != null ? `
       <span class="auth-item ${data.autorizaConsultaCrediticia ? 'auth-ok' : 'auth-no'}">
         ${data.autorizaConsultaCrediticia ? '&#10003;' : '&#10007;'} Consulta crediticia
+      </span>` : ''}
+      ${data.autorizaUsoImagen != null ? `
+      <span class="auth-item ${data.autorizaUsoImagen ? 'auth-ok' : 'auth-no'}">
+        ${data.autorizaUsoImagen ? '&#10003;' : '&#10007;'} Uso de imagen
       </span>` : ''}
     </div>
     ${data.observaciones ? `<div style="margin-top:8px">${field('Observaciones', data.observaciones)}</div>` : ''}
@@ -408,99 +416,9 @@ export function pdfFromFormData(
     pasivosTotales: fi?.pasivosTotales,
     autorizaTratamientoDatos: fd.autorizaciones?.autorizacionDatosPersonales,
     autorizaConsultaCrediticia: fd.autorizaciones?.autorizacionConsultaCrediticia,
+    autorizaAvisoPrivacidad: fd.autorizaciones?.autorizacionAvisoPrivacidad,
+    autorizaUsoImagen: fd.autorizaciones?.autorizacionUsoImagen,
     observaciones: fd.observaciones,
-  }
-}
-
-// ==================== ADAPTER: CaracterizacionLocal → PDFCaracterizacion ====================
-export function pdfFromLocalData(local: CaracterizacionLocal): PDFCaracterizacion {
-  const b = local.beneficiario
-  const p = local.predio
-  const c = local.caracterizacion
-  const ar = local.aguaRiesgos
-  const ap = local.areaProductiva
-  const fi = local.infoFinanciera
-  const v = local.visita
-
-  const fuentesAgua: string[] = [
-    ar?.nacimientoManantial && 'Nacimiento/Manantial',
-    ar?.rioQuebrada && 'Rio/Quebrada',
-    ar?.pozo && 'Pozo',
-    ar?.acueductoRural && 'Acueducto Rural',
-    ar?.canalDistritoRiego && 'Canal Distrito Riego',
-    ar?.jagueyReservorio && 'Jagüey/Reservorio',
-    ar?.aguaLluvia && 'Agua Lluvia',
-  ].filter(Boolean) as string[]
-
-  const riesgos: string[] = [
-    ar?.inundacion && 'Inundacion',
-    ar?.sequia && 'Sequia',
-    ar?.viento && 'Viento',
-    ar?.helada && 'Helada',
-  ].filter(Boolean) as string[]
-
-  const nombreCompleto =
-    [b?.primerNombre, b?.segundoNombre, b?.primerApellido, b?.segundoApellido]
-      .filter(Boolean)
-      .join(' ') || 'Sin nombre'
-
-  return {
-    radicado: local.radicadoOficial ?? local.radicadoLocal,
-    estado: local.estado,
-    fechaVisita: v?.fechaVisita,
-    nombreTecnico: v?.nombreTecnico,
-    nombreCompleto,
-    tipoDocumento: b?.tipoDocumento,
-    numeroDocumento: b?.numeroDocumento,
-    edad: b?.edad,
-    genero: b?.genero,
-    personasACargo: b?.personasACargo,
-    telefono: b?.telefono,
-    correo: b?.email,
-    ocupacionPrincipal: b?.ocupacionPrincipal,
-    nombrePredio: p?.nombrePredio,
-    departamento: p?.departamento,
-    municipio: p?.municipio,
-    vereda: p?.vereda,
-    tipoTenencia: p?.tipoTenencia,
-    codigoCatastral: p?.codigoCatastral,
-    areaTotalHectareas: p?.areaTotalHectareas,
-    areaProductivaHectareas: p?.areaProductivaHectareas,
-    altitudMsnm: p?.altitudMsnm,
-    latitud: p?.latitud,
-    longitud: p?.longitud,
-    cultivosExistentes: p?.cultivosExistentes,
-    viveEnPredio: p?.viveEnPredio,
-    topografia: c?.topografia,
-    tipoSuelo: c?.tipoSuelo,
-    rutaAcceso: c?.rutaAcceso,
-    distanciaKm: c?.distanciaKm,
-    tiempoAcceso: c?.tiempoAcceso,
-    temperaturaCelsius: c?.temperaturaCelsius,
-    mesesLluvia: c?.mesesLluvia,
-    coberturaBosque: c?.coberturaBosque,
-    coberturaCultivos: c?.coberturaCultivos,
-    coberturaPastos: c?.coberturaPastos,
-    coberturaRastrojo: c?.coberturaRastrojo,
-    fuentesAgua,
-    otraFuente: ar?.otraFuente,
-    riesgos,
-    otrosRiesgos: ar?.otrosRiesgos,
-    sistemaProductivo: ap?.sistemaProduccion,
-    estadoCultivo: ap?.estadoCultivo,
-    cantidadProduccion: ap?.cantidadProduccion,
-    ingresoMensualVentas: ap?.ingresoMensualVentas,
-    dondeComercializa: ap?.dondeComercializa,
-    interesadoPrograma: ap?.interesadoPrograma,
-    ingresosMensualesAgropecuaria: fi?.ingresosMensualesAgropecuaria,
-    ingresosMensualesOtros: fi?.ingresosMensualesOtros,
-    egresosMensuales: fi?.egresosMensuales,
-    activosTotales: fi?.activosTotales,
-    activosAgropecuaria: fi?.activosAgropecuaria,
-    pasivosTotales: fi?.pasivosTotales,
-    autorizaTratamientoDatos: local.autorizacion?.autorizaTratamientoDatos,
-    autorizaConsultaCrediticia: local.autorizacion?.autorizaConsultaCrediticia,
-    observaciones: local.observaciones,
   }
 }
 
@@ -596,6 +514,8 @@ export function pdfFromServerData(server: {
     pasivosTotales: infoFinanciera?.pasivos_totales,
     autorizaTratamientoDatos: server.caracterizacion?.autorizacion_datos_personales,
     autorizaConsultaCrediticia: server.caracterizacion?.autorizacion_consulta_crediticia,
+    autorizaAvisoPrivacidad: server.caracterizacion?.autorizacion_aviso_privacidad,
+    autorizaUsoImagen: server.caracterizacion?.autorizacion_uso_imagen,
     observaciones: server.caracterizacion?.observaciones ?? visita?.observaciones,
   }
 }

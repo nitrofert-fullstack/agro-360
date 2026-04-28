@@ -54,7 +54,7 @@ export default function RegistroPage() {
     setIsLoading(true)
 
     try {
-      const res = await fetch('/api/registro-campesino', {
+      const res = await fetch('/api/registro-agricultor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

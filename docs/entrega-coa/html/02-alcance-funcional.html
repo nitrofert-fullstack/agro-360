@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>02-alcance-funcional</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">02-alcance-funcional</h1>
+</header>
+<h1 id="alcance-funcional-final-agro360">Alcance Funcional Final —
+Agro360</h1>
+<p><strong>Sistema de Caracterización Predial Agropecuaria</strong>
+<strong>Versión:</strong> 1.0 — Entrega formal COA
+<strong>Fecha:</strong> Abril 2026</p>
+<hr />
+<h2 id="objeto">1. Objeto</h2>
+<p>Sistema web para la recolección, almacenamiento, análisis y gestión
+de caracterizaciones prediales agropecuarias de pequeños y medianos
+productores, orientado a la toma de decisiones en programas de apoyo
+rural en el departamento de Santander (Colombia).</p>
+<h2 id="alcance-general">2. Alcance general</h2>
+<p>El sistema cubre el <strong>ciclo completo</strong> de una
+caracterización:</p>
+<ol type="1">
+<li><strong>Captura en campo</strong> por asesor técnico.</li>
+<li><strong>Almacenamiento centralizado</strong> en la nube (PostgreSQL
++ Storage).</li>
+<li><strong>Revisión y análisis</strong> por analistas crediticios.</li>
+<li><strong>Consulta por el beneficiario</strong> del estado de su
+caracterización.</li>
+<li><strong>Administración</strong> de usuarios, estados y
+reportes.</li>
+</ol>
+<hr />
+<h2 id="módulos-funcionales">3. Módulos funcionales</h2>
+<h3 id="módulo-de-autenticación-y-usuarios">3.1 Módulo de Autenticación
+y Usuarios</h3>
+<ul>
+<li>Registro de usuarios con correo y contraseña.</li>
+<li>Inicio de sesión y cierre de sesión.</li>
+<li>Recuperación de contraseña vía correo.</li>
+<li>Invitación de usuarios por correo (rol admin/asesor).</li>
+<li>Cuatro roles: <strong>admin</strong>, <strong>asesor</strong>,
+<strong>analista</strong>, <strong>agricultor</strong>.</li>
+<li>Gestión de perfil: datos personales, cambio de contraseña.</li>
+<li>Manejo robusto de sesión (refresh automático, detección de token
+inválido).</li>
+</ul>
+<h3 id="módulo-de-caracterización-formulario-de-9-pasos">3.2 Módulo de
+Caracterización (formulario de 9 pasos)</h3>
+<p><strong>Paso 1 — Datos de la visita</strong> - Fecha y hora
+(inicio/fin), nombre del técnico. - Código, versión y fecha de emisión
+del formulario. - Ubicación administrativa: departamento, municipio,
+corregimiento, vereda. - Objetivo y observaciones.</p>
+<p><strong>Paso 2 — Beneficiario</strong> - Tipo y número de documento
+(CC, CE, TI, PAS, NIT). - Nombres y apellidos completos. - Edad, género,
+personas a cargo. - Teléfono, correo, ocupación principal. - Contacto
+secundario (nombre, teléfono, parentesco).</p>
+<p><strong>Paso 3 — Predio</strong> - Datos de ubicación administrativa
++ dirección + código catastral. - Tipo de tenencia (propia, posesión,
+arriendo, otro) y documento. - Área total y productiva (hectáreas). -
+Coordenadas GPS (captura automática o manual). - Dibujo de polígono del
+perímetro (opcional) o punto. - Altitud, vivienda en el predio, cultivos
+existentes.</p>
+<p><strong>Paso 4 — Caracterización del predio</strong> - Topografía
+(plana, inclinada, pendiente). - Tipo de suelo, erosión, drenaje,
+cobertura vegetal. - Ruta de acceso, distancia, tiempo de acceso. -
+Temperatura promedio, meses de lluvia. - Cobertura: bosque, cultivos,
+pastos, rastrojo.</p>
+<p><strong>Paso 5 — Abastecimiento de agua y riesgos</strong> - Fuentes
+de agua (múltiple selección). - Disponibilidad, calidad, concesión. -
+Riesgos identificados (inundación, sequía, viento, helada, otros).</p>
+<p><strong>Paso 6 — Área productiva</strong> - Cultivo principal, área,
+producción estimada, destino. - Ganado (tipo, cantidad). - Sistema
+productivo, asistencia técnica, uso de agroquímicos. - Infraestructura
+de procesamiento. - Interés en el programa, canales de comercialización.
+- Ingreso mensual por ventas.</p>
+<p><strong>Paso 7 — Información financiera</strong> - Ingresos
+(agropecuarios / otros). - Egresos mensuales. - Activos (totales /
+agropecuarios). - Pasivos totales. - Acceso a crédito: entidad, monto. -
+Subsidios recibidos.</p>
+<p><strong>Paso 8 — Fotos y firma</strong> - Foto del beneficiario
+(rostro). - Fotos del documento (frontal y trasero). - Fotos del predio
+(hasta 2). - Firma digital del productor (pantalla táctil / mouse). -
+Compresión automática de imágenes grandes.</p>
+<p><strong>Paso 9 — Autorización</strong> - Autorización de tratamiento
+de datos personales (obligatoria). - Autorización de aviso de privacidad
+(obligatoria). - Autorización de consulta de centrales de riesgo
+(opcional). - Autorización de uso de imagen (opcional). - Captcha
+Cloudflare Turnstile (si no hay sesión de asesor). - Envío al
+servidor.</p>
+<h3 id="módulo-de-dashboard-del-asesor">3.3 Módulo de Dashboard del
+Asesor</h3>
+<ul>
+<li>Resumen: total caracterizaciones registradas.</li>
+<li>Listado de registros en servidor.</li>
+<li>Buscador por radicado o nombre.</li>
+<li>Creación de nueva caracterización.</li>
+<li>Edición de caracterización existente.</li>
+<li>Descarga de ficha en PDF.</li>
+<li>Exportación a CSV.</li>
+</ul>
+<h3 id="módulo-de-dashboard-del-agricultor">3.4 Módulo de Dashboard del
+Agricultor</h3>
+<ul>
+<li>Vista de su caracterización con estado actual.</li>
+<li>Radicado oficial asignado.</li>
+<li>Código QR de verificación.</li>
+<li>Mapa con la ubicación del predio.</li>
+<li>Posibilidad de crear nueva caracterización si la anterior fue
+cancelada/rechazada.</li>
+<li>Acceso solo a sus propios datos (por <code>numero_documento</code> o
+correo).</li>
+</ul>
+<h3 id="módulo-de-administración">3.5 Módulo de Administración</h3>
+<p><strong>Gestión de usuarios (<code>/admin/usuarios</code>):</strong>
+- Listado con filtros por rol y estado. - Invitación por correo. -
+Cambio de rol. - Desactivación / activación. - Eliminación de
+usuario.</p>
+<p><strong>Gestión de caracterizaciones
+(<code>/admin/caracterizaciones</code>):</strong> - Listado completo
+paginado. - Filtros: estado, asesor, municipio, rango de fechas. -
+Reasignación de asesor. - Edición y eliminación. - Cambio de estado con
+matriz de transiciones por rol. - Descarga individual y masiva (PDF,
+CSV).</p>
+<p><strong>Estadísticas (<code>/admin/estadisticas</code>):</strong> -
+Distribución por estado, municipio, asesor. - Evolución temporal. - Tasa
+de aprobación. - Área total caracterizada. - Exportación de
+reportes.</p>
+<h3 id="módulo-de-mapas">3.6 Módulo de Mapas</h3>
+<ul>
+<li>Visor de mapas interactivo (Leaflet + OpenStreetMap).</li>
+<li>Visualización de polígonos y puntos de predios caracterizados.</li>
+<li>Herramientas de medición: círculo, rectángulo, polígono.</li>
+<li>Cálculo de área, perímetro, centroide.</li>
+</ul>
+<h3 id="módulo-de-estados-y-flujo-de-aprobación">3.7 Módulo de Estados y
+Flujo de Aprobación</h3>
+<p>Estados del proceso:</p>
+<ol type="1">
+<li><code>INICIADO</code> — recién registrado.</li>
+<li><code>REVISADO</code> — asesor confirmó los datos.</li>
+<li><code>EN_ESTUDIO_CREDITO</code> — analista evaluando.</li>
+<li><code>APROBADO</code> (“Viable”) — aprobado para el programa.</li>
+<li><code>CANCELADO</code> (“No Viable”) — no aplica.</li>
+</ol>
+<p>Transiciones permitidas por rol:</p>
+<table>
+<thead>
+<tr>
+<th>Desde → Hasta</th>
+<th>Admin</th>
+<th>Asesor</th>
+<th>Analista</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>INICIADO → REVISADO</td>
+<td>✅</td>
+<td>✅</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>REVISADO → EN_ESTUDIO_CREDITO</td>
+<td>✅</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>EN_ESTUDIO_CREDITO → APROBADO</td>
+<td>✅</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>EN_ESTUDIO_CREDITO → CANCELADO</td>
+<td>✅</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>(Cualquiera) — override</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+</tbody>
+</table>
+<h3 id="módulo-de-notificaciones-por-correo">3.8 Módulo de
+Notificaciones por Correo</h3>
+<ul>
+<li>Envío de correo de bienvenida con credenciales temporales
+(beneficiario sin cuenta).</li>
+<li>Confirmación de radicado para beneficiarios con cuenta
+existente.</li>
+<li>Invitación de usuarios por correo con enlace + token.</li>
+<li>Reintento automático en caso de fallo SMTP.</li>
+<li>Plantillas HTML personalizables.</li>
+</ul>
+<h3 id="módulo-de-seguridad">3.9 Módulo de Seguridad</h3>
+<ul>
+<li>Row Level Security (RLS) en todas las tablas.</li>
+<li>Cookies HttpOnly + Secure.</li>
+<li>Middleware de protección de rutas.</li>
+<li>Captcha en formulario público.</li>
+<li>Validación server-side de todos los inputs.</li>
+<li>Separación de claves públicas y de servicio.</li>
+</ul>
+<hr />
+<h2 id="arquitectura-resumida">4. Arquitectura resumida</h2>
+<table>
+<thead>
+<tr>
+<th>Componente</th>
+<th>Tecnología</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Frontend</td>
+<td>Next.js 16 + React 19 + TypeScript</td>
+</tr>
+<tr>
+<td>Estilos</td>
+<td>Tailwind CSS 4 + Radix UI (shadcn/ui)</td>
+</tr>
+<tr>
+<td>Base de datos</td>
+<td>PostgreSQL (Supabase)</td>
+</tr>
+<tr>
+<td>Auth</td>
+<td>Supabase Auth (JWT)</td>
+</tr>
+<tr>
+<td>Storage</td>
+<td>Supabase Storage (S3-compatible)</td>
+</tr>
+<tr>
+<td>Hosting</td>
+<td>Vercel (serverless + edge)</td>
+</tr>
+<tr>
+<td>Correos</td>
+<td>Nodemailer vía SMTP</td>
+</tr>
+<tr>
+<td>Captcha</td>
+<td>Cloudflare Turnstile</td>
+</tr>
+<tr>
+<td>Mapas</td>
+<td>Leaflet + OpenStreetMap</td>
+</tr>
+</tbody>
+</table>
+<p>Ver <strong>Manual Técnico y de Arquitectura</strong> para
+detalles.</p>
+<hr />
+<h2 id="entregables">5. Entregables</h2>
+<ol type="1">
+<li><strong>Código fuente</strong> completo en repositorio Git
+privado.</li>
+<li><strong>Aplicación desplegada</strong> en Vercel con dominio
+configurado.</li>
+<li><strong>Base de datos</strong> Supabase configurada con migraciones
+aplicadas.</li>
+<li><strong>Documentación</strong> completa (este conjunto de
+documentos).</li>
+<li><strong>Credenciales de administración</strong> entregadas por canal
+seguro.</li>
+<li><strong>Manuales</strong> de usuario, administrador, técnico e
+instalación.</li>
+<li><strong>Diccionario de datos</strong> con esquema completo.</li>
+</ol>
+<hr />
+<h2 id="fuera-de-alcance-no-cubierto-en-esta-versión">6. Fuera de
+alcance (No cubierto en esta versión)</h2>
+<ul>
+<li>Aplicación nativa móvil (Android/iOS).</li>
+<li>Integración con sistemas externos (ERP, CRM, bancos).</li>
+<li>Reportes PDF/Excel avanzados con plantillas personalizadas — se
+entrega PDF básico y CSV.</li>
+<li>Workflow complejo de aprobación multi-nivel — se entrega flujo
+lineal simple.</li>
+<li>Módulo de georeferenciación catastral oficial (IGAC) — solo
+coordenadas GPS y polígonos manuales.</li>
+<li>Facturación o gestión financiera integrada.</li>
+<li>Soporte multi-idioma — solo español.</li>
+<li>Auditoría detallada (log de cambios por usuario) — solo timestamps
+<code>created_at</code> / <code>updated_at</code>.</li>
+</ul>
+<hr />
+<h2 id="criterios-de-aceptación">7. Criterios de aceptación</h2>
+<p>La entrega se considera completa cuando:</p>
+<ul class="task-list">
+<li><label><input type="checkbox" checked="" />La aplicación está
+desplegada en el dominio acordado.</label></li>
+<li><label><input type="checkbox" checked="" />Todos los roles pueden
+autenticarse correctamente.</label></li>
+<li><label><input type="checkbox" checked="" />Un asesor puede completar
+y registrar una caracterización de prueba.</label></li>
+<li><label><input type="checkbox" checked="" />Los correos
+transaccionales se entregan correctamente.</label></li>
+<li><label><input type="checkbox" checked="" />El administrador puede
+crear, editar y eliminar usuarios.</label></li>
+<li><label><input type="checkbox" checked="" />El administrador puede
+cambiar estados y gestionar caracterizaciones.</label></li>
+<li><label><input type="checkbox" checked="" />El agricultor puede
+consultar su caracterización.</label></li>
+<li><label><input type="checkbox" checked="" />Los respaldos automáticos
+están habilitados en Supabase.</label></li>
+<li><label><input type="checkbox" checked="" />La documentación está
+entregada al operador.</label></li>
+<li><label><input type="checkbox" checked="" />Se puede generar ficha
+PDF y exportar CSV.</label></li>
+</ul>
+<hr />
+<h2 id="limitaciones-conocidas">8. Limitaciones conocidas</h2>
+<ol type="1">
+<li>Firma digital requiere pantalla táctil o mouse.</li>
+<li>Correos SMTP sin reintentos persistentes (reintento único tras 3
+s).</li>
+<li>Retención de logs de Vercel: 1 día (Hobby) / 7 días (Pro).</li>
+<li>Sin encriptación adicional en base de datos (confía en
+Supabase/PostgreSQL).</li>
+</ol>
+<hr />
+<p><em>Documento sujeto a ajustes según validación final con el
+operador.</em></p>
+</body>
+</html>

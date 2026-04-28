@@ -13,9 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { LocationPicker } from "./location-picker"
 import { SignaturePad } from "./signature-pad"
 import { PhotoUpload } from "./photo-upload"
-import { saveCaracterizacion, generateRadicadoLocal } from "@/lib/db/indexed-db"
 import { generateCaracterizacionPDF, pdfFromFormData } from "@/lib/generate-pdf"
-import { useOnlineStatus } from "@/hooks/use-online-status"
 import {
   User,
   MapPin,
@@ -41,13 +39,12 @@ import {
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ThemeToggle } from "./theme-toggle"
-import { ConnectionStatus } from "./connection-status"
-import { SyncButton } from "./sync-button"
 import { UserProfile } from "./user-profile"
 import { useAuth } from "@/hooks/use-auth"
 import { toast } from "sonner"
 import Link from "next/link"
 import { Turnstile } from "@marsidev/react-turnstile"
+import { LegalDocumentModal, LEGAL_DOCUMENTS } from "./legal-document-modal"
 
 // Municipios de Santander (sin duplicados)
 const municipiosSantander = [...new Set([
@@ -201,6 +198,8 @@ interface FormData {
   autorizaciones: {
     autorizacionDatosPersonales: boolean
     autorizacionConsultaCrediticia: boolean
+    autorizacionAvisoPrivacidad: boolean
+    autorizacionUsoImagen: boolean
   }
   // Observaciones generales
   observaciones: string
@@ -312,6 +311,8 @@ const initialFormData: FormData = {
   autorizaciones: {
     autorizacionDatosPersonales: false,
     autorizacionConsultaCrediticia: false,
+    autorizacionAvisoPrivacidad: false,
+    autorizacionUsoImagen: false,
   },
   observaciones: "",
 }
@@ -369,7 +370,6 @@ export function CharacterizationFormComplete({
   const router = useRouter()
   const { user, profile, isAuthenticated } = useAuth()
   const isAsesor = isAuthenticated && (profile?.rol === 'asesor' || profile?.rol === 'admin')
-  const { isOnline } = useOnlineStatus()
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<FormData>(() => {
     if (initialData) {
@@ -388,6 +388,9 @@ export function CharacterizationFormComplete({
   // Turnstile token (solo requerido para usuarios no autenticados como asesor)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const captchaValid = isAsesor || !!turnstileToken
+
+  // Estado de modales legales (null = ninguno abierto)
+  const [legalModalOpen, setLegalModalOpen] = useState<keyof typeof LEGAL_DOCUMENTS | null>(null)
 
   // Autocompletar desde documento previo (solo cuando está logueado)
   const [buscandoDocumento, setBuscandoDocumento] = useState(false)
@@ -547,6 +550,7 @@ export function CharacterizationFormComplete({
 
       case 9: // Autorizacion
         if (!formData.autorizaciones.autorizacionDatosPersonales) stepErrors['autorizaciones.autorizacionDatosPersonales'] = 'Debe autorizar el tratamiento de datos personales'
+        if (!formData.autorizaciones.autorizacionAvisoPrivacidad) stepErrors['autorizaciones.autorizacionAvisoPrivacidad'] = 'Debe confirmar que ha leído el Aviso de Privacidad y la Política de Tratamiento de Datos'
         break
     }
 
@@ -801,92 +805,67 @@ export function CharacterizationFormComplete({
         autorizacion: {
           autorizaTratamientoDatos: formData.autorizaciones.autorizacionDatosPersonales,
           autorizaConsultaCrediticia: formData.autorizaciones.autorizacionConsultaCrediticia,
+          autorizaAvisoPrivacidad: formData.autorizaciones.autorizacionAvisoPrivacidad,
+          autorizaUsoImagen: formData.autorizaciones.autorizacionUsoImagen,
           firmaDigital: formData.archivos.firmaProductorUrl,
           fechaAutorizacion: new Date().toISOString(),
         },
       }
 
-      // Online-first: intentar enviar directo al servidor
-      if (isOnline) {
-        try {
-          const tempRadicado = generateRadicadoLocal()
-          const payload = {
-            ...dataToSave,
-            radicadoLocal: tempRadicado,
-            estado: isEdit ? 'INICIADO' : 'PENDIENTE_SINCRONIZACION',
-            fechaRegistro: new Date().toISOString(),
-            fechaActualizacion: new Date().toISOString(),
-            intentosSincronizacion: 0,
-          }
-
-          if (isEdit && visitaId) {
-            // Logica de Actualizacion
-            const res = await fetch('/api/actualizar-formulario', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ visitaId, datos: dataToSave }),
-            })
-            if (res.ok) {
-              toast.success("Formulario actualizado correctamente", {
-                description: "Se han guardado los cambios.",
-                duration: 6000,
-              })
-              setSubmittedData({ radicado: formData.visita.codigoFormulario || tempRadicado, sincronizado: true })
-              // Redirigir al dashboard despues de editar
-              setTimeout(() => {
-                router.push("/dashboard")
-              }, 2000)
-              return
-            } else {
-              const err = await res.json()
-              throw new Error(err.error || "Error al actualizar formulario")
-            }
-          }
-
-          // Asesores usan /api/sync (autenticado), el publico usa /api/sync-public
-          const endpoint = isAsesor ? '/api/sync' : '/api/sync-public'
-          const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              caracterizaciones: [payload],
-              ...(!isAsesor && { turnstileToken }),
-            }),
-          })
-          if (res.ok) {
-            const result = await res.json()
-            const r0 = result.resultados?.[0]
-            const radicadoOficial = r0?.radicadoOficial || tempRadicado
-            const tienCorreo = !!formData.beneficiario.correo
-            const emailMsg = tienCorreo
-              ? r0?.usuarioNuevo
-                ? 'Recibirás un correo con tus credenciales de acceso.'
-                : 'Recibirás un correo de confirmación. Usa tus credenciales existentes para ingresar.'
-              : ''
-            toast.success("Formulario enviado correctamente", {
-              description: `Radicado: ${radicadoOficial}. ${emailMsg}`.trim(),
-              duration: 6000,
-            })
-            setSubmittedData({ radicado: radicadoOficial, sincronizado: true })
-            return
-          }
-          // Si el servidor falla, caer al offline
-        } catch {
-          // Ignorar error de red y guardar offline
+      // Edición: usa endpoint dedicado de actualización
+      if (isEdit && visitaId) {
+        const res = await fetch('/api/actualizar-formulario', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ visitaId, datos: dataToSave }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || 'Error al actualizar formulario')
         }
+        toast.success('Formulario actualizado correctamente', {
+          description: 'Se han guardado los cambios.',
+          duration: 5000,
+        })
+        setSubmittedData({ radicado: formData.visita.codigoFormulario || '', sincronizado: true })
+        setTimeout(() => router.push('/dashboard'), 2000)
+        return
       }
 
-      // Offline fallback: solo si no hay internet
-      const saved = await saveCaracterizacion(dataToSave)
-      toast.success("Formulario guardado localmente", {
-        description: "Sin conexión a internet. Se enviará al servidor cuando haya conexión.",
-        duration: 4000,
+      // Creación: enviar directo al servidor
+      const payload = {
+        ...dataToSave,
+        autorizaciones: formData.autorizaciones,
+        ...(!isAsesor && { turnstileToken }),
+      }
+
+      const res = await fetch('/api/caracterizaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       })
-      setSubmittedData({ radicado: saved.radicadoLocal, sincronizado: false })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al enviar el formulario')
+      }
+
+      const result = await res.json()
+      const radicadoOficial = result.radicadoOficial || ''
+      const tieneCorreo = !!formData.beneficiario.correo
+      const emailMsg = tieneCorreo
+        ? 'Recibirás un correo con la confirmación.'
+        : ''
+      toast.success('Formulario enviado correctamente', {
+        description: `Radicado: ${radicadoOficial}. ${emailMsg}`.trim(),
+        duration: 6000,
+      })
+      setSubmittedData({ radicado: radicadoOficial, sincronizado: true })
     } catch (error) {
-      console.error("Error saving:", error)
-      toast.error("Error al guardar el formulario", {
-        description: "Intente nuevamente. Si el problema persiste, descargue un respaldo.",
+      console.error('Error guardando:', error)
+      toast.error('No se pudo enviar el formulario', {
+        description: error instanceof Error ? error.message : 'Verifica tu conexión e inténtalo de nuevo.',
+        duration: 6000,
       })
     } finally {
       setIsSubmitting(false)
@@ -2149,62 +2128,119 @@ export function CharacterizationFormComplete({
                 />
               </div>
 
-              {/* Autorizaciones */}
-              <div className={`space-y-4 rounded-lg border p-4 ${errors['autorizaciones.autorizacionDatosPersonales'] ? 'border-red-500 bg-red-50 dark:bg-red-950/20' : 'border-border/50 bg-muted/30'}`}>
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    id="autorizacionDatosPersonales"
-                    checked={formData.autorizaciones.autorizacionDatosPersonales}
-                    onCheckedChange={(checked) => updateField("autorizaciones", "autorizacionDatosPersonales", checked)}
-                  />
-                  <div className="space-y-1">
-                    <Label htmlFor="autorizacionDatosPersonales" className="font-medium">
-                      Autorizacion de Tratamiento de Datos Personales <span className="text-red-500">*</span>
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Autorizo el tratamiento de mis datos personales conforme a la Ley 1581 de 2012
-                      y demas normas concordantes, para los fines del proyecto Agro360.
-                    </p>
-                    {errors['autorizaciones.autorizacionDatosPersonales'] && <p className="text-sm text-red-500 mt-2">{errors['autorizaciones.autorizacionDatosPersonales']}</p>}
+              {/* Autorizaciones (4 checks legales COA) */}
+              <div className="space-y-3">
+                {/* 1. Datos personales (obligatorio) */}
+                <div className={`rounded-lg border p-4 ${errors['autorizaciones.autorizacionDatosPersonales'] ? 'border-red-500 bg-red-50 dark:bg-red-950/20' : 'border-border/50 bg-muted/30'}`}>
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="autorizacionDatosPersonales"
+                      checked={formData.autorizaciones.autorizacionDatosPersonales}
+                      onCheckedChange={(checked) => updateField("autorizaciones", "autorizacionDatosPersonales", checked)}
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor="autorizacionDatosPersonales" className="font-medium">
+                        Autorización de Tratamiento de Datos Personales <span className="text-red-500">*</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Autorizo a COA el tratamiento de mis datos personales conforme a la Ley 1581 de 2012,
+                        incluyendo su transferencia a la entidad pública contratante.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setLegalModalOpen("autorizacionTratamientoDatos")}
+                        className="text-sm text-primary underline hover:text-primary/80 mt-1"
+                      >
+                        Ver documento completo
+                      </button>
+                      {errors['autorizaciones.autorizacionDatosPersonales'] && <p className="text-sm text-red-500 mt-2">{errors['autorizaciones.autorizacionDatosPersonales']}</p>}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    id="interesadoPrograma"
-                    checked={formData.areaProductiva.interesadoPrograma}
-                    onCheckedChange={(checked) => {
-                      updateField("areaProductiva", "interesadoPrograma", checked)
-                      updateField("autorizaciones", "autorizacionConsultaCrediticia", checked)
-                    }}
-                  />
-                  <div className="space-y-1">
-                    <Label htmlFor="interesadoPrograma" className="font-medium">
-                      Requiere acompañamiento para el trámite de financiación
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      El productor está interesado en opciones de financiación para su actividad agropecuaria y requiere acompañamiento para el trámite de financiación.
-                    </p>
+                {/* 2. Aviso de privacidad / Política (obligatorio) */}
+                <div className={`rounded-lg border p-4 ${errors['autorizaciones.autorizacionAvisoPrivacidad'] ? 'border-red-500 bg-red-50 dark:bg-red-950/20' : 'border-border/50 bg-muted/30'}`}>
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="autorizacionAvisoPrivacidad"
+                      checked={formData.autorizaciones.autorizacionAvisoPrivacidad}
+                      onCheckedChange={(checked) => updateField("autorizaciones", "autorizacionAvisoPrivacidad", checked)}
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor="autorizacionAvisoPrivacidad" className="font-medium">
+                        He leído el Aviso de Privacidad y la Política de Tratamiento de Datos <span className="text-red-500">*</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Declaro conocer la Política de Tratamiento de Datos de COA y mis derechos como titular.
+                      </p>
+                      <div className="flex flex-wrap gap-3 mt-1">
+                        <button
+                          type="button"
+                          onClick={() => setLegalModalOpen("avisoPrivacidad")}
+                          className="text-sm text-primary underline hover:text-primary/80"
+                        >
+                          Ver Aviso de Privacidad
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLegalModalOpen("politicaTratamientoDatos")}
+                          className="text-sm text-primary underline hover:text-primary/80"
+                        >
+                          Ver Política completa
+                        </button>
+                      </div>
+                      {errors['autorizaciones.autorizacionAvisoPrivacidad'] && <p className="text-sm text-red-500 mt-2">{errors['autorizaciones.autorizacionAvisoPrivacidad']}</p>}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    id="autorizacionConsultaCrediticia"
-                    checked={formData.autorizaciones.autorizacionConsultaCrediticia}
-                    onCheckedChange={(checked) => {
-                      updateField("autorizaciones", "autorizacionConsultaCrediticia", checked)
-                      updateField("areaProductiva", "interesadoPrograma", checked)
-                    }}
-                  />
-                  <div className="space-y-1">
-                    <Label htmlFor="autorizacionConsultaCrediticia" className="font-medium">
-                      Autorización de Consulta Crediticia
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Autorizo la consulta de mi historial crediticio en las centrales de riesgo
-                      para la evaluación de posibles beneficios del programa.
-                    </p>
+                {/* 3. Consulta crediticia (opcional) */}
+                <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="autorizacionConsultaCrediticia"
+                      checked={formData.autorizaciones.autorizacionConsultaCrediticia}
+                      onCheckedChange={(checked) => {
+                        updateField("autorizaciones", "autorizacionConsultaCrediticia", checked)
+                        updateField("areaProductiva", "interesadoPrograma", checked)
+                      }}
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor="autorizacionConsultaCrediticia" className="font-medium">
+                        Autorización de Consulta Crediticia <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Autorizo la consulta de mi historial crediticio en centrales de riesgo para la evaluación
+                        de opciones de financiación. También expreso mi interés en acompañamiento crediticio.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Uso de imagen (opcional) */}
+                <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="autorizacionUsoImagen"
+                      checked={formData.autorizaciones.autorizacionUsoImagen}
+                      onCheckedChange={(checked) => updateField("autorizaciones", "autorizacionUsoImagen", checked)}
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor="autorizacionUsoImagen" className="font-medium">
+                        Autorización de Uso de Imagen <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Autorizo a COA el uso público de mi imagen en las fotografías que se capturen durante esta visita,
+                        para materiales publicitarios, redes sociales y comunicaciones de COA.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setLegalModalOpen("autorizacionUsoImagen")}
+                        className="text-sm text-primary underline hover:text-primary/80 mt-1"
+                      >
+                        Ver documento completo
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2244,7 +2280,7 @@ export function CharacterizationFormComplete({
               {/* Botón de envío */}
               <Button
                 onClick={handleSubmit}
-                disabled={isSubmitting || !formData.autorizaciones.autorizacionDatosPersonales || !captchaValid}
+                disabled={isSubmitting || !formData.autorizaciones.autorizacionDatosPersonales || !formData.autorizaciones.autorizacionAvisoPrivacidad || !captchaValid}
                 className="w-full h-12 text-base"
               >
                 {isSubmitting ? (
@@ -2274,7 +2310,7 @@ export function CharacterizationFormComplete({
       const pdfData = pdfFromFormData(
         formData,
         submittedData.radicado,
-        submittedData.sincronizado ? 'SINCRONIZADO' : 'PENDIENTE_SINCRONIZACION'
+        'INICIADO'
       )
       generateCaracterizacionPDF(pdfData)
     }
@@ -2286,11 +2322,7 @@ export function CharacterizationFormComplete({
               <Image src="/icons/icon-192x192.png" alt="Agro360" width={36} height={36} className="rounded-lg" />
               <span className="text-lg font-semibold">Agro360</span>
             </Link>
-            <div className="flex items-center gap-3">
-              <ConnectionStatus />
-              <SyncButton variant="compact" />
             </div>
-          </div>
         </header>
         <main className="mx-auto max-w-2xl px-4 py-12">
           <Card className="text-center">
@@ -2299,59 +2331,46 @@ export function CharacterizationFormComplete({
                 <CheckCircle className="h-10 w-10 text-green-500" />
               </div>
               <CardTitle className="text-2xl">
-                {submittedData.sincronizado ? "¡Sincronizado!" : "Caracterizacion Guardada"}
+                ¡Registrado!
               </CardTitle>
               <CardDescription>
-                {submittedData.sincronizado
-                  ? "El formulario se guardó y sincronizó correctamente con el servidor"
-                  : "El formulario se guardó en tu dispositivo"}
+                El formulario se envió correctamente al servidor.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
-                <p className="mb-1 text-xs text-muted-foreground">
-                  {submittedData.sincronizado ? "Radicado oficial" : "Referencia local"}
-                </p>
+                <p className="mb-1 text-xs text-muted-foreground">Radicado oficial</p>
                 <code className="font-mono text-xs text-muted-foreground">{submittedData.radicado}</code>
               </div>
 
-              {submittedData.sincronizado ? (
-                <div className="space-y-3">
-                  <Alert className="border-green-500/20 bg-green-500/5">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-foreground">
-                      Tu registro fue recibido por el servidor y está disponible en el sistema.
-                    </AlertDescription>
-                  </Alert>
-                  {!isAuthenticated && formData.beneficiario.correo && (
-                    <Alert className="border-primary/20 bg-primary/5">
-                      <Info className="h-4 w-4 text-primary" />
-                      <AlertDescription className="text-foreground">
-                        Se enviará un correo a <strong>{formData.beneficiario.correo}</strong> con tus credenciales de acceso para consultar tus registros.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  {!isAuthenticated && !formData.beneficiario.correo && (
-                    <Alert>
-                      <Info className="h-4 w-4" />
-                      <AlertDescription>
-                        Para acceder a tus registros en el futuro,{" "}
-                        <Link href="/registro" className="text-primary underline font-medium">
-                          crea una cuenta de agricultor
-                        </Link>{" "}
-                        con el mismo correo que usarías.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </div>
-              ) : (
-                <Alert>
-                  <Cloud className="h-4 w-4" />
-                  <AlertDescription>
-                    Sin conexión a internet. El registro está guardado en este dispositivo. Cuando haya conexión, un asesor podrá sincronizarlo con el servidor.
+              <div className="space-y-3">
+                <Alert className="border-green-500/20 bg-green-500/5">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-foreground">
+                    Tu registro fue recibido por el servidor y está disponible en el sistema.
                   </AlertDescription>
                 </Alert>
-              )}
+                {!isAuthenticated && formData.beneficiario.correo && (
+                  <Alert className="border-primary/20 bg-primary/5">
+                    <Info className="h-4 w-4 text-primary" />
+                    <AlertDescription className="text-foreground">
+                      Se enviará un correo a <strong>{formData.beneficiario.correo}</strong> con tus credenciales de acceso para consultar tus registros.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {!isAuthenticated && !formData.beneficiario.correo && (
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      Para acceder a tus registros en el futuro,{" "}
+                      <Link href="/registro" className="text-primary underline font-medium">
+                        crea una cuenta de agricultor
+                      </Link>{" "}
+                      con el mismo correo que usarías.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
 
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-center">
                 <button
@@ -2402,8 +2421,6 @@ export function CharacterizationFormComplete({
             <span className="hidden sm:inline">{steps[currentStep - 1].title}</span>
           </div>
           <div className="flex items-center gap-2">
-            <ConnectionStatus showLabel={false} className="hidden sm:flex" />
-            {isAuthenticated && <SyncButton variant="compact" />}
             {!isAuthenticated && (
               <Button variant="outline" size="sm" asChild className="hidden sm:flex gap-1.5 text-xs">
                 <Link href={`/auth/login?redirectTo=/formulario`}>
@@ -2489,6 +2506,24 @@ export function CharacterizationFormComplete({
           )}
         </div>
       </main>
+
+      {/* Modal de documentos legales */}
+      {legalModalOpen && (
+        <LegalDocumentModal
+          open={legalModalOpen !== null}
+          onOpenChange={(open) => !open && setLegalModalOpen(null)}
+          title={LEGAL_DOCUMENTS[legalModalOpen].title}
+          description={LEGAL_DOCUMENTS[legalModalOpen].description}
+          documentUrl={LEGAL_DOCUMENTS[legalModalOpen].url}
+          showAcceptButton={false}
+          beneficiarioNombre={`${formData.beneficiario.nombres} ${formData.beneficiario.apellidos}`.trim() || undefined}
+          beneficiarioDoc={formData.beneficiario.numeroDocumento || undefined}
+          fechaFormulario={formData.visita.fechaVisita
+            ? new Date(formData.visita.fechaVisita + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            : undefined}
+          beneficiarioFirma={formData.archivos.firmaProductorUrl || undefined}
+        />
+      )}
     </div>
   )
 }

@@ -3,7 +3,6 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
-import { PWAProvider } from '@/components/pwa-provider'
 import { SessionValidator } from '@/components/session-validator'
 import { EnvVarChecker } from '@/components/env-var-checker'
 import { Toaster } from '@/components/ui/sonner'
@@ -16,13 +15,6 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'Agro360 - Sistema de Caracterizacion Predial',
   description: 'Sistema de caracterizacion predial con monitoreo NDVI, temperatura y precipitacion en Santander, Colombia',
-  generator: 'v0.app',
-  manifest: '/manifest.json',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: 'Agro360',
-  },
   formatDetection: {
     telephone: false,
   },
@@ -52,11 +44,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <PWAProvider>
-              <SessionValidator>
-                {children}
-              </SessionValidator>
-            </PWAProvider>
+            <SessionValidator>
+              {children}
+            </SessionValidator>
           </AuthProvider>
         </ThemeProvider>
         <Toaster richColors position="top-center" />

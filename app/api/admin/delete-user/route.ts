@@ -1,22 +1,21 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
 
-    // Verificar que el solicitante sea admin
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const { data: adminProfile } = await supabase
-      .from('profiles')
-      .select('rol')
-      .eq('id', user.id)
-      .single()
+    const adminProfile = await prisma.profiles.findUnique({
+      where: { id: user.id },
+      select: { rol: true },
+    })
 
     if (adminProfile?.rol !== 'admin') {
       return NextResponse.json({ error: 'Solo administradores pueden eliminar cuentas' }, { status: 403 })
@@ -32,23 +31,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No puedes eliminar tu propia cuenta' }, { status: 400 })
     }
 
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const targetProfile = await prisma.profiles.findUnique({
+      where:  { id: userId },
+      select: { rol: true, email: true, nombre_completo: true },
+    })
 
-    if (!serviceRoleKey || !supabaseUrl) {
-      return NextResponse.json({ error: 'Configuración de servidor incompleta' }, { status: 500 })
-    }
-
-    const supabaseAdmin = createAdminClient(supabaseUrl, serviceRoleKey)
-
-    // Obtener datos del usuario a eliminar (necesitamos el email para limpiar invitations)
-    const { data: targetProfile, error: profileFetchErr } = await supabaseAdmin
-      .from('profiles')
-      .select('rol, email, nombre_completo')
-      .eq('id', userId)
-      .single()
-
-    if (profileFetchErr || !targetProfile) {
+    if (!targetProfile) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
     }
 
@@ -56,38 +44,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No se puede eliminar a un administrador' }, { status: 400 })
     }
 
-    const userEmail = targetProfile.email
+    // ── 1. Desasociar visitas del asesor ────────────────────────────────────
+    await prisma.visitas.updateMany({
+      where: { asesor_id: userId },
+      data:  { asesor_id: null },
+    })
 
-    // 1. Desasociar visitas donde era asesor (conservar las caracterizaciones)
-    await supabaseAdmin
-      .from('visitas')
-      .update({ asesor_id: null })
-      .eq('asesor_id', userId)
-
-    // 2a. Eliminar invitaciones CREADAS por este usuario
-    await supabaseAdmin
-      .from('invitations')
-      .delete()
-      .eq('invitado_por', userId)
-
-    // 2b. Eliminar invitaciones DIRIGIDAS a este usuario (por email)
-    if (userEmail) {
-      await supabaseAdmin
-        .from('invitations')
-        .delete()
-        .eq('email', userEmail)
+    // ── 2. Eliminar invitaciones ────────────────────────────────────────────
+    await prisma.invitations.deleteMany({ where: { invitado_por: userId } })
+    if (targetProfile.email) {
+      await prisma.invitations.deleteMany({ where: { email: targetProfile.email } })
     }
 
-    // 3. Eliminar el perfil manualmente (aunque el cascade de auth.users también lo haría,
-    //    hacerlo explícito evita errores de FK si hay restricciones adicionales)
-    await supabaseAdmin
-      .from('profiles')
-      .delete()
-      .eq('id', userId)
+    // ── 3. Eliminar perfil ──────────────────────────────────────────────────
+    await prisma.profiles.delete({ where: { id: userId } })
 
-    // 4. Eliminar de auth.users — esto es la fuente de verdad en Supabase Auth
-    //    Al eliminarlo aquí, el trigger de Supabase también limpiaría profiles si
-    //    aún existiera (CASCADE). Si profiles ya no existe, la operación igual procede.
+    // ── 4. Eliminar de auth.users (Supabase Auth — no manejado por Prisma) ──
+    const supabaseAdmin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     const { error: authDeleteErr } = await supabaseAdmin.auth.admin.deleteUser(userId)
 
     if (authDeleteErr) {
@@ -99,7 +75,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      mensaje: `Usuario ${userEmail || targetProfile.nombre_completo} eliminado correctamente`,
+      mensaje: `Usuario ${targetProfile.email || targetProfile.nombre_completo} eliminado correctamente`,
     })
   } catch (err) {
     console.error('[DeleteUser] Error:', err)

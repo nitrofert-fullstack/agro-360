@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>03-manual-usuario</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">03-manual-usuario</h1>
+</header>
+<h1 id="manual-de-usuario-agro360">Manual de Usuario — Agro360</h1>
+<p><strong>Sistema de Caracterización Predial Agropecuaria</strong>
+<strong>Versión:</strong> 1.0 — Entrega formal COA
+<strong>Fecha:</strong> Abril 2026</p>
+<hr />
+<h2 id="introducción">1. Introducción</h2>
+<p>Agro360 es una aplicación web diseñada para que asesores técnicos
+agropecuarios caractericen predios rurales de Santander, Colombia. Los
+datos se capturan en línea y se envían directamente al servidor,
+generando un radicado oficial de inmediato.</p>
+<h3 id="perfiles-de-usuario">1.1 Perfiles de usuario</h3>
+<p>La aplicación maneja cuatro perfiles:</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Perfil</th>
+<th>Quién es</th>
+<th>Qué puede hacer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Agricultor / Productor</strong></td>
+<td>Beneficiario del programa</td>
+<td>Ver su caracterización, editar si fue rechazada, consultar
+estado</td>
+</tr>
+<tr>
+<td><strong>Asesor técnico</strong></td>
+<td>Funcionario de campo</td>
+<td>Levantar caracterizaciones, cambiar estado a
+<code>REVISADO</code></td>
+</tr>
+<tr>
+<td><strong>Analista</strong></td>
+<td>Evaluador crediticio</td>
+<td>Cambiar estado a <code>EN_ESTUDIO_CREDITO</code>,
+<code>APROBADO</code>, <code>CANCELADO</code></td>
+</tr>
+<tr>
+<td><strong>Administrador</strong></td>
+<td>Jefe / coordinador</td>
+<td>Gestión completa de usuarios, caracterizaciones y estadísticas</td>
+</tr>
+</tbody>
+</table>
+<h3 id="navegadores-soportados">1.2 Navegadores soportados</h3>
+<ul>
+<li>Google Chrome 100+ (recomendado)</li>
+<li>Microsoft Edge 100+</li>
+<li>Firefox 100+</li>
+<li>Safari 15+ (iOS y macOS)</li>
+</ul>
+<p><strong>Requisitos mínimos:</strong> 2 GB RAM, conexión a internet,
+acceso a cámara y GPS del dispositivo.</p>
+<hr />
+<h2 id="acceso-a-la-aplicación">2. Acceso a la aplicación</h2>
+<h3 id="url-de-acceso">2.1 URL de acceso</h3>
+<p>La aplicación está publicada en la URL proporcionada por el
+operador.</p>
+<h3 id="iniciar-sesión-asesor-analista-admin">2.2 Iniciar sesión
+(asesor, analista, admin)</h3>
+<ol type="1">
+<li>Abrir el navegador e ir a la URL de la aplicación.</li>
+<li>Presionar <strong>“Iniciar sesión”</strong> en la parte
+superior.</li>
+<li>Ingresar correo y contraseña entregados por el administrador.</li>
+<li>Al entrar por primera vez, el sistema solicitará cambiar la
+contraseña.</li>
+</ol>
+<h3 id="registro-de-agricultor">2.3 Registro de agricultor</h3>
+<p>El agricultor puede crear su cuenta desde
+<strong>“Registrarse”</strong>:</p>
+<ol type="1">
+<li>Ir a <code>/registro</code> o presionar
+<strong>“Registrarse”</strong> en la página principal.</li>
+<li>Completar: número de documento, correo, contraseña, nombre
+completo.</li>
+<li>Aceptar términos y crear cuenta.</li>
+<li>El sistema envía correo de confirmación.</li>
+</ol>
+<h3 id="recuperar-contraseña">2.4 Recuperar contraseña</h3>
+<ol type="1">
+<li>En la pantalla de login, presionar <strong>“¿Olvidaste tu
+contraseña?”</strong>.</li>
+<li>Ingresar el correo registrado.</li>
+<li>Revisar bandeja de entrada (y spam) — llega un enlace para
+restablecer.</li>
+</ol>
+<hr />
+<h2 id="uso-para-el-agricultor-productor">3. Uso para el Agricultor /
+Productor</h2>
+<h3 id="consultar-mi-caracterización">3.1 Consultar mi
+caracterización</h3>
+<p>Tras iniciar sesión, el agricultor ve su <strong>dashboard
+personal</strong> con:</p>
+<ul>
+<li><strong>Estado actual</strong> de su caracterización (Iniciado /
+Revisado / En estudio / Viable / No Viable).</li>
+<li><strong>Radicado oficial</strong> asignado.</li>
+<li><strong>Botón “Ver detalles”</strong> para ver todos los datos
+registrados.</li>
+<li><strong>Mapa</strong> con la ubicación del predio.</li>
+<li><strong>Código QR</strong> para verificación rápida.</li>
+</ul>
+<h3 id="editar-caracterización-rechazada">3.2 Editar caracterización
+rechazada</h3>
+<p>Si el estado es <strong>“No Viable”</strong> (CANCELADO) o
+<strong>“Rechazado”</strong>, el agricultor puede crear una nueva
+caracterización:</p>
+<ol type="1">
+<li>Presionar <strong>“Crear nueva caracterización”</strong> desde el
+dashboard.</li>
+<li>Completar el formulario (ver sección 4).</li>
+<li>Enviar — la caracterización anterior permanece como registro
+histórico.</li>
+</ol>
+<h3 id="llenar-formulario-sin-login">3.3 Llenar formulario sin
+login</h3>
+<p>Cualquier persona puede acceder a <code>/formulario</code> sin
+iniciar sesión. El formulario se envía directamente al servidor al
+completar el paso 9. El sistema asigna un radicado oficial de
+inmediato.</p>
+<hr />
+<h2 id="formulario-de-caracterización-9-pasos">4. Formulario de
+Caracterización (9 pasos)</h2>
+<p>El formulario se divide en 9 pasos. Es obligatorio completar cada
+paso para avanzar. Se requiere conexión a internet para enviar el
+formulario.</p>
+<h3 id="paso-1-datos-de-la-visita">Paso 1 — Datos de la Visita</h3>
+<ul>
+<li><strong>Fecha y hora de la visita</strong> (se completa
+automáticamente con el día actual).</li>
+<li><strong>Nombre del técnico</strong> (auto-llenado si el asesor
+inició sesión).</li>
+<li><strong>Código y versión del formulario</strong> (solo
+lectura).</li>
+<li><strong>Departamento, municipio, corregimiento,
+vereda</strong>.</li>
+<li><strong>Objetivo de la visita y observaciones</strong>.</li>
+</ul>
+<h3 id="paso-2-datos-del-beneficiario">Paso 2 — Datos del
+Beneficiario</h3>
+<ul>
+<li><strong>Tipo y número de documento</strong> (CC, CE, TI, Pasaporte,
+NIT).</li>
+<li><strong>Nombres completos</strong>: primer nombre, segundo nombre,
+primer apellido, segundo apellido.</li>
+<li><strong>Edad, género, personas a cargo</strong>.</li>
+<li><strong>Teléfono, correo electrónico</strong>.</li>
+<li><strong>Ocupación principal</strong>.</li>
+<li><strong>Contacto secundario</strong>: nombre, teléfono,
+parentesco.</li>
+</ul>
+<p><strong>Tip:</strong> el correo es importante — es la vía para que el
+beneficiario reciba sus credenciales de acceso tras el registro.</p>
+<h3 id="paso-3-datos-del-predio">Paso 3 — Datos del Predio</h3>
+<ul>
+<li><strong>Nombre del predio</strong> (opcional).</li>
+<li><strong>Departamento, municipio, vereda, dirección, código
+catastral</strong>.</li>
+<li><strong>Tipo de tenencia</strong>: Propia / Posesión / Arrendamiento
+/ Otro.</li>
+<li><strong>Documento de tenencia</strong> (opcional).</li>
+<li><strong>Área total y área productiva</strong> en hectáreas.</li>
+<li><strong>Cultivos existentes</strong> (texto libre).</li>
+<li><strong>Altitud, coordenadas X/Y</strong>.</li>
+<li><strong>Ubicación en el mapa</strong>:
+<ul>
+<li>Presionar <strong>“Ubicar en mapa”</strong> → usa GPS del
+dispositivo.</li>
+<li>O seleccionar <strong>“Dibujar polígono”</strong> para trazar el
+perímetro del predio manualmente.</li>
+</ul></li>
+<li><strong>¿Vive en el predio?</strong> (Sí / No / Cerca).</li>
+<li><strong>¿Tiene vivienda en el predio?</strong>.</li>
+</ul>
+<h3 id="paso-4-caracterización-del-predio">Paso 4 — Caracterización del
+Predio</h3>
+<ul>
+<li><strong>Topografía</strong>: 0–25% plana / 26–50% inclinada / 51%+
+pendiente.</li>
+<li><strong>Tipo de suelo, erosión, drenaje, cobertura
+vegetal</strong>.</li>
+<li><strong>Ruta de acceso, distancia (km), tiempo de
+acceso</strong>.</li>
+<li><strong>Temperatura (°C), meses de lluvia</strong>.</li>
+<li><strong>Cobertura</strong> (checkboxes): bosque, cultivos, pastos,
+rastrojo.</li>
+</ul>
+<h3 id="paso-5-abastecimiento-de-agua-y-riesgos">Paso 5 — Abastecimiento
+de Agua y Riesgos</h3>
+<p><strong>Fuentes de agua</strong> (marcar las que apliquen): -
+Nacimiento / manantial - Río / quebrada - Pozo - Acueducto rural - Canal
+de distrito de riego - Jagüey / reservorio - Agua lluvia - Otra fuente
+(especificar)</p>
+<p><strong>Disponibilidad y calidad del agua</strong>, concesión de
+aguas.</p>
+<p><strong>Riesgos identificados</strong> (marcar): inundación, sequía,
+viento, helada, otros.</p>
+<h3 id="paso-6-área-productiva">Paso 6 — Área Productiva</h3>
+<ul>
+<li><strong>Cultivo principal</strong> y área en hectáreas.</li>
+<li><strong>Sistema productivo</strong> (tecnificado / tradicional /
+mixto).</li>
+<li><strong>Estado del cultivo</strong>: Tecnificado / En mal estado /
+NS/NR.</li>
+<li><strong>Ganado</strong>: ¿tiene? tipo, cantidad.</li>
+<li><strong>Asistencia técnica, uso de agroquímicos</strong>.</li>
+<li><strong>Infraestructura de procesamiento</strong> (¿tiene?
+descripción).</li>
+<li><strong>Interés en el programa</strong> (Sí / No).</li>
+<li><strong>Dónde comercializa, ingreso mensual por
+ventas</strong>.</li>
+</ul>
+<h3 id="paso-7-información-financiera">Paso 7 — Información
+Financiera</h3>
+<ul>
+<li><strong>Ingresos mensuales</strong> agropecuarios y no agropecuarios
+(pesos colombianos).</li>
+<li><strong>Egresos mensuales</strong>.</li>
+<li><strong>Activos totales y activos agropecuarios</strong>.</li>
+<li><strong>Pasivos totales</strong>.</li>
+<li><strong>Acceso a crédito</strong>: entidad, monto.</li>
+<li><strong>Subsidios recibidos</strong>: tipos.</li>
+</ul>
+<h3 id="paso-8-fotos-y-firma">Paso 8 — Fotos y Firma</h3>
+<ul>
+<li><strong>Foto del beneficiario</strong> (rostro frontal).</li>
+<li><strong>Foto documento frontal</strong> y <strong>foto documento
+trasero</strong>.</li>
+<li><strong>Foto del predio 1</strong> y <strong>foto del predio
+2</strong> (opcional pero recomendado).</li>
+<li><strong>Firma digital del productor</strong> (pantalla táctil o
+mouse).</li>
+</ul>
+<p><strong>Captura:</strong> presionar el botón de cámara para tomar
+foto con el dispositivo. Se puede volver a capturar si sale borrosa.</p>
+<h3 id="paso-9-autorizaciones-y-envío">Paso 9 — Autorizaciones y
+Envío</h3>
+<ul>
+<li><strong>Autorización de tratamiento de datos personales</strong>
+(obligatoria).</li>
+<li><strong>Autorización de aviso de privacidad</strong>
+(obligatoria).</li>
+<li><strong>Autorización de consulta de centrales de riesgo</strong>
+(opcional).</li>
+<li><strong>Autorización de uso de imagen</strong> (opcional).</li>
+<li><strong>Captcha</strong> (Cloudflare Turnstile — solo si no hay
+sesión de asesor).</li>
+<li><strong>Botón “Enviar”</strong> — envía los datos al servidor y
+genera el radicado oficial.</li>
+</ul>
+<hr />
+<h2 id="registro-exitoso">5. Registro exitoso</h2>
+<p>Tras enviar el formulario, el sistema muestra la pantalla de
+confirmación con:</p>
+<ul>
+<li><strong>Radicado oficial</strong> asignado (código único de
+identificación).</li>
+<li>Confirmación de que los datos fueron recibidos por el servidor.</li>
+<li>Próximos pasos: revisión por técnico, notificación por correo,
+acceso con credenciales.</li>
+</ul>
+<p>Si el beneficiario tiene correo registrado, recibirá un correo de
+bienvenida con sus credenciales de acceso (si no tenía cuenta
+previa).</p>
+<hr />
+<h2 id="dashboard-del-asesor">6. Dashboard del Asesor</h2>
+<p>Tras iniciar sesión como asesor, se accede a <code>/dashboard</code>
+con:</p>
+<ul>
+<li><strong>Estadísticas</strong>: total caracterizaciones
+registradas.</li>
+<li><strong>Botón “Nueva caracterización”</strong> → abre el
+formulario.</li>
+<li><strong>Buscador</strong> por radicado o nombre.</li>
+<li><strong>Lista de registros</strong> con estado y fecha.</li>
+</ul>
+<h3 id="ver-detalle-de-una-caracterización">6.1 Ver detalle de una
+caracterización</h3>
+<p>Presionar una caracterización en la lista → se abre la vista
+detallada con: - Todos los datos del formulario organizados por
+secciones. - Mapa con la ubicación y polígono del predio. - Botón <strong>”Descargar
+PDF”</strong> con ficha imprimible. - Botón <strong>“Descargar
+CSV”</strong> para exportación masiva. - Código QR.</p>
+<h3 id="cambiar-estado-asesor">6.2 Cambiar estado (asesor)</h3>
+<p>El asesor solo puede transicionar a <code>REVISADO</code>. Desde la
+vista detallada: 1. Presionar <strong>“Cambiar estado”</strong>. 2.
+Seleccionar <code>REVISADO</code>. 3. Confirmar.</p>
+<hr />
+<h2 id="estados-de-la-caracterización">7. Estados de la
+caracterización</h2>
+<table>
+<thead>
+<tr>
+<th>Estado</th>
+<th>Significado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>INICIADO</code></td>
+<td>Recién registrado, pendiente de revisión</td>
+</tr>
+<tr>
+<td><code>REVISADO</code></td>
+<td>El asesor confirmó los datos</td>
+</tr>
+<tr>
+<td><code>EN_ESTUDIO_CREDITO</code></td>
+<td>El analista está evaluando</td>
+</tr>
+<tr>
+<td><code>APROBADO</code> → <strong>“Viable”</strong></td>
+<td>Aprobado para el programa</td>
+</tr>
+<tr>
+<td><code>CANCELADO</code> → <strong>“No Viable”</strong></td>
+<td>No aplica para el programa</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id=”configuración-y-perfil”>8. Configuración y perfil</h2>
+<ul>
+<li><strong>Perfil</strong> (<code>/profile</code>): ver y editar datos
+personales, cambiar contraseña.</li>
+<li><strong>Cerrar sesión</strong>: menú superior derecho →
+<strong>“Salir”</strong>.</li>
+</ul>
+<hr />
+<h2 id="preguntas-frecuentes">9. Preguntas frecuentes</h2>
+<p><strong>¿Puedo llenar el formulario en mi celular?</strong> Sí. La
+aplicación es responsive y funciona en móviles (Android / iOS).</p>
+<p><strong>¿Qué pasa si se pierde internet durante el llenado?</strong>
+Los datos del formulario se conservan en la página mientras no se cierre
+el navegador. Recuperar la conexión y presionar “Enviar”.</p>
+<p><strong>¿Cómo sé si mi caracterización fue aprobada?</strong> El
+estado cambia a <strong>“Viable”</strong> en el dashboard. El agricultor
+recibe correo de notificación si el analista lo envía.</p>
+<p><strong>¿Puedo modificar datos después de enviar?</strong> Solo el
+asesor y el administrador pueden editar una caracterización ya
+registrada. Desde la vista detallada → <strong>“Editar”</strong>.</p>
+<p><strong>¿Qué hacer si la firma no se guarda?</strong> Asegurarse de
+haber trazado al menos una línea antes de presionar “Guardar firma”. Si
+persiste, usar otro dispositivo con pantalla táctil.</p>
+<hr />
+<h2 id="soporte">10. Soporte</h2>
+<p>Para soporte técnico utilizar el canal operativo acordado con el
+operador. Consultar el <strong>Documento de Soporte y Garantía</strong>
+para términos, SLAs y horarios de atención.</p>
+</body>
+</html>

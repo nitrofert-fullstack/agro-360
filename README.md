@@ -1,182 +1,195 @@
-# AgroSantander360 - Sistema de Caracterización Predial
+# Agro360 — Sistema de Caracterización Predial Agropecuaria
 
-Sistema integral de caracterización predial para Santander, Colombia, con soporte offline-first, sincronización con Supabase, monitoreo NDVI, y gestión de asesores.
+Aplicación web progresiva (PWA) **offline-first** para la caracterización de predios rurales de pequeños y medianos productores agropecuarios en Santander, Colombia. Permite a asesores técnicos, analistas y administradores levantar fichas completas de caracterización con datos del beneficiario, predio, producción, información financiera, fotos, firma digital y autorización de tratamiento de datos.
 
-## Configuración Inicial
+- **Stack**: Next.js 16 (App Router) · React 19 · TypeScript · Supabase · Dexie (IndexedDB) · Tailwind CSS · Radix UI · Leaflet.
+- **Despliegue**: Vercel (frontend + serverless) + Supabase (PostgreSQL + Auth + Storage).
+- **Capacidades offline**: trabajo sin conexión, sincronización diferida al recuperar internet.
+- **Roles**: admin, asesor, analista, agricultor.
 
-### Variables de Entorno Requeridas
+## Documentación de entrega
 
-Esta aplicación requiere las siguientes variables de entorno configuradas en tu proyecto de Vercel:
+Toda la documentación formal (para el operador COA) se encuentra en `docs/entrega-coa/`:
 
-```
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key-here
-```
-
-**Cómo obtenerlas:**
-1. Ve a tu proyecto en [Supabase Dashboard](https://supabase.com/dashboard)
-2. Abre Settings → API
-3. Copia la URL del proyecto y la clave anon
-
-**Dónde configurarlas en Vercel:**
-1. Ve a tu proyecto en [Vercel Dashboard](https://vercel.com/dashboard)
-2. Settings → Environment Variables
-3. Agrega las tres variables
-4. Redeploya la app (git push o redeploy manual)
-
-### ¿Las variables no se leen después de configurar?
-
-Si después de configurar las variables de entorno en Vercel la app sigue diciendo "Variables de entorno faltantes", es porque:
-
-**Problema**: Las variables se cargan durante el BUILD de Next.js, no en tiempo de ejecución.
-
-**Solución**:
-1. Configura las variables en Vercel Settings → Environment Variables
-2. **Redeploya la app** (git push a main o usa el botón "Deploy" en Vercel)
-3. Espera a que el build termine
-4. Una vez el deploy esté listo, recarga la página (F5)
-
-**Si aún no funcionan:**
-- Verifica que las variables estén configuradas SIN espacios en blanco al inicio/final
-- Asegúrate de que copias la URL completa (incluyendo https://)
-- Copia la clave anon (no la clave de servicio)
-
-## Flujo de la Aplicación
-
-### Para Campesinos/Productores (Sin Login)
-1. Acceden a `/formulario` o presionan "Iniciar Caracterización" en el home
-2. Llenan el formulario completo con datos del predio, producción, etc.
-3. El sistema guarda TODO en IndexedDB (almacenamiento local del navegador)
-4. Los datos se guardan incluso sin conexión a internet
-5. El campesino puede salir y volver después sin perder datos
-
-### Para Asesores (Con Login)
-1. Inician sesión con sus credenciales
-2. Van al `/dashboard` y ven:
-   - Estadísticas de caracterizaciones (total, pendientes, sincronizados)
-   - Actividad reciente (registros locales + sincronizados en servidor)
-   - Botón para sincronizar formularios pendientes
-3. Pueden:
-   - Crear nuevos formularios (se guardan con su ID automáticamente)
-   - Sincronizar formularios con Supabase
-   - Consultar formularios ya sincronizados
-   - Ver el mapa NDVI
-   - Gestionar su perfil
-
-### Sincronización
-- **Solo disponible con login y conexión a internet**
-- Al presionar "Sincronizar", envia todos los formularios pendientes a Supabase
-- Los formularios de asesores logueados se guardan con `asesor_id`
-- Los formularios de campesinos sin login se guardan con `asesor_id = null`
-
-## Estructura de Datos
-
-### IndexedDB (Almacenamiento Local)
-- **caracterizaciones**: Formularios locales completos
-- Cada registro tiene:
-  - `radicadoLocal`: ID único local (AUTO-GENERADO)
-  - `estado`: PENDIENTE_SINCRONIZACION | SINCRONIZADO | ERROR_SINCRONIZACION
-  - `asesorId`: UUID del asesor (o undefined si es campesino)
-  - Todos los datos del formulario
-
-### Supabase (Servidor)
-Cuando se sincroniza, se crea un registro con:
-- **caracterizaciones**: Tabla principal
-  - `radicado_local`: Tomado de IndexedDB
-  - `radicado_oficial`: Asignado por el sistema
-  - `asesor_id`: UUID del asesor que registró
-  - `beneficiario_id`: FK a beneficiarios
-  - `predio_id`: FK a predios
-  - `visita_id`: FK a visitas
-
-Las otras tablas (beneficiarios, predios, etc.) se crean automáticamente durante la sincronización.
-
-## Funcionalidades Principales
-
-### 1. Formulario Completo
-- Datos personales del productor
-- Información del predio
-- Caracterización técnica del predio
-- Área productiva y cultivos
-- Información financiera
-- Firmas digitales (campesino + asesor)
-- Fotos del predio y del campesino
-- Autorizaciones legales
-
-### 2. Dashboard del Asesor
-- Visualización de estadísticas
-- Lista de registros locales y sincronizados
-- Botón de sincronización con feedback
-- Conexión de estado (online/offline)
-
-### 3. Página de Consulta Pública
-- Buscar caracterizaciones por radicado o documento
-- Ver estado de la caracterización
-- Disponible con o sin login
-
-### 4. Autenticación
-- Login con email/password
-- Recovery de contraseña
-- Gestión de sesiones
-- Redirección automática según permisos
-
-## Depuración
-
-### Ver qué está pasando
-Abre la consola del navegador (F12) y busca logs con el prefijo `[v0]`:
-```
-[v0] Loading server stats for user: abc123...
-[v0] Error loading server stats: ...
-```
-
-### Problemas comunes
-
-**"Variables de entorno faltantes" aparece en la app**
-→ Configura las variables en Vercel y redeploya
-
-**Los registros no aparecen en "Actividad reciente"**
-→ El usuario puede no tener registros sincronizados todavía
-→ Verifica que estén en la tabla `caracterizaciones` de Supabase con `asesor_id` correcto
-
-**El formulario no se sincroniza**
-→ Verifica que tengas conexión a internet
-→ Revisa la consola del navegador para errores
-→ Asegúrate de estar logueado (solo asesores pueden sincronizar)
-
-## Deployment
-
-1. Push a main branch
-2. Vercel despliega automáticamente
-3. **IMPORTANTE**: Si agregaste variables de entorno nuevas, asegúrate de que estén configuradas en Settings → Environment Variables
-4. Espera a que el build termine
-
-## Estructura del Proyecto
-
-```
-/app
-  /api/sync         - API para sincronizar con Supabase
-  /auth             - Páginas de autenticación
-  /dashboard        - Dashboard del asesor
-  /formulario       - Formulario principal
-  /consultar        - Página pública de consulta
-  
-/components
-  /characterization-form-complete.tsx - Formulario completo
-  /admin-dashboard.tsx - Dashboard del asesor
-  /sync-button.tsx - Botón de sincronización
-  
-/lib
-  /supabase         - Clientes de Supabase
-  /db/indexed-db.ts - Funciones de IndexedDB
-  
-/hooks
-  /use-auth.ts      - Hook de autenticación
-  /use-sync.ts      - Hook de sincronización
-```
+| # | Documento | Descripción |
+|---|---|---|
+| 1 | Acta de entrega | (elaborado por el cliente) |
+| 2 | [Alcance funcional final](docs/entrega-coa/02-alcance-funcional.md) | Funcionalidades del sistema |
+| 3 | [Manual de usuario](docs/entrega-coa/03-manual-usuario.md) | Uso de la aplicación |
+| 4 | [Manual de administrador](docs/entrega-coa/04-manual-administrador.md) | Operación administrativa |
+| 5 | [Manual técnico y de arquitectura](docs/entrega-coa/05-manual-tecnico-arquitectura.md) | Stack, flujos, patrones |
+| 6 | [Guía de instalación y despliegue](docs/entrega-coa/06-guia-instalacion-despliegue.md) | Setup Supabase + Vercel |
+| 7 | Código fuente + README | Este repositorio |
+| 8 | [Diccionario de datos](docs/entrega-coa/08-diccionario-datos.md) | Esquema BD completo |
+| 9 | Soporte y garantía | (elaborado por el cliente) |
 
 ---
 
-**Deployed on Vercel** | **Built with v0.app**
-# agro-360
-# agro-360
+## Inicio rápido (desarrollo local)
+
+```bash
+# 1. Clonar e instalar
+git clone <repo-url> agro-360
+cd agro-360
+pnpm install
+
+# 2. Configurar .env.local (ver sección "Variables de entorno")
+cp .env.example .env.local   # editar con tus credenciales
+
+# 3. Levantar servidor de desarrollo
+pnpm dev
+# → http://localhost:3000
+```
+
+### Scripts disponibles
+
+| Comando | Acción |
+|---|---|
+| `pnpm dev` | Servidor de desarrollo (hot reload) |
+| `pnpm build` | Build de producción |
+| `pnpm start` | Servir build de producción |
+| `pnpm lint` | Ejecutar ESLint |
+| `npx tsc --noEmit` | Verificar tipos sin emitir |
+
+---
+
+## Variables de entorno
+
+Archivo `.env.local` (desarrollo) o en Vercel → **Settings → Environment Variables** (producción).
+
+**Requeridas:**
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=ey...
+SUPABASE_SERVICE_ROLE_KEY=ey...         # Secreto, solo servidor
+NEXT_PUBLIC_APP_URL=https://tu-dominio
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x...
+TURNSTILE_SECRET_KEY=0x...
+SMTP_HOST=smtp.tu-proveedor.com
+SMTP_PORT=587
+SMTP_USER=noreply@tu-dominio
+SMTP_PASS=xxxxxxxx
+SMTP_FROM="Agro360 <noreply@tu-dominio>"
+```
+
+**Opcionales** (NDVI y clima):
+
+```env
+AGROMONITORING_API_KEY=xxxxxxxxxxxxxxxx
+OPENWEATHER_API_KEY=xxxxxxxxxxxxxxxx
+```
+
+Para detalles de cada variable y obtención de claves, consultar [guía de instalación](docs/entrega-coa/06-guia-instalacion-despliegue.md).
+
+---
+
+## Estructura del proyecto
+
+```
+agro-360/
+├── app/                   # Next.js App Router (páginas + API)
+│   ├── (rutas)/           # formulario, dashboard, admin, mapa...
+│   └── api/               # Route handlers serverless
+├── components/            # Componentes React
+│   ├── characterization-form-complete.tsx   # Formulario 9 pasos
+│   ├── admin-dashboard.tsx
+│   └── ui/                # shadcn/ui primitives
+├── context/               # AuthContext (estado de sesión)
+├── hooks/                 # use-auth, use-sync, use-online-status...
+├── lib/
+│   ├── db/indexed-db.ts   # Dexie schema (IndexedDB)
+│   ├── supabase/          # Clientes Supabase
+│   ├── email/             # Templates de correo
+│   └── utils.ts
+├── supabase/migrations/   # Migraciones SQL
+├── scripts/               # SQL inicial
+├── public/                # Assets estáticos + PWA (sw.js, manifest.json)
+├── types/                 # Declaraciones ambient
+├── proxy.ts               # Middleware Next.js 16 (auth)
+└── docs/entrega-coa/      # Documentación formal
+```
+
+Ver [manual técnico](docs/entrega-coa/05-manual-tecnico-arquitectura.md) para arquitectura completa.
+
+---
+
+## Flujos principales
+
+- **Asesor autenticado** → `/formulario` → guarda en IndexedDB → botón Sincronizar → `POST /api/sync` → datos en Supabase.
+- **Agricultor sin login** → `/formulario` con Turnstile → `POST /api/sync-public` → creación de cuenta con credenciales temporales.
+- **Agricultor autenticado** → `/dashboard` → ve su caracterización, estado y QR.
+- **Admin** → `/admin` → gestión total de usuarios y caracterizaciones.
+- **Analista** → cambia estado `EN_ESTUDIO_CREDITO` → `APROBADO` / `CANCELADO`.
+
+---
+
+## Despliegue
+
+### Producción
+
+1. Crear proyecto en [Supabase](https://supabase.com) y aplicar migraciones (`scripts/` + `supabase/migrations/`).
+2. Subir repo a GitHub.
+3. Importar repo en [Vercel](https://vercel.com) → configurar variables de entorno → **Deploy**.
+4. Configurar dominio personalizado en Vercel.
+5. Actualizar Site URL y Redirect URLs en Supabase → **Auth**.
+
+Detalles en [guía de instalación](docs/entrega-coa/06-guia-instalacion-despliegue.md).
+
+### CI/CD
+
+Cada `git push` a `main` desencadena un nuevo deploy automático en Vercel. Los pull requests obtienen un preview deploy único.
+
+---
+
+## Documentos legales (protección de datos)
+
+La carpeta `agro360 docs/` contiene las plantillas legales que respaldan el tratamiento de datos personales bajo la Ley 1581 de 2012 y normas concordantes:
+
+- `Politica-Tratamiento-Datos.docx`
+- `Aviso-Privacidad.docx`
+- `Autorizacion-Tratamiento-Datos.docx`
+- `Autorizacion-Uso-Imagen.docx`
+
+El operador debe publicar los dos primeros en un enlace público. Los dos últimos alimentan las autorizaciones que el agricultor acepta en el formulario de caracterización.
+
+---
+
+## Base de datos
+
+El esquema principal se define en:
+
+- `scripts/003_complete_agrosantander_schema.sql` — tablas base + RLS + triggers.
+- `supabase/migrations/*.sql` — ampliaciones y ajustes cronológicos.
+
+Tablas principales:
+
+- `visitas`, `beneficiarios`, `predios`, `caracterizacion_predio`.
+- `abastecimiento_agua`, `riesgos_predio`, `area_productiva`, `informacion_financiera`.
+- `caracterizaciones` (tabla central; URLs de fotos/firma se guardan en sus propias columnas).
+- `profiles` (extensión de `auth.users` con rol y metadata), `invitations`.
+
+Consultar [diccionario de datos](docs/entrega-coa/08-diccionario-datos.md) para esquema detallado.
+
+---
+
+## Seguridad
+
+- **Row Level Security (RLS)** habilitado en todas las tablas.
+- **JWT** en cookies `HttpOnly`, `Secure`, `SameSite=Lax`.
+- **Doble capa de auth**: middleware `proxy.ts` (servidor) + `AuthContext` (cliente).
+- **Claves de servicio** (`SUPABASE_SERVICE_ROLE_KEY`) solo en endpoints del servidor.
+- **Captcha** (Cloudflare Turnstile) en formulario público.
+- **HTTPS** forzado por Vercel.
+
+---
+
+## Soporte
+
+Para soporte técnico, contactar al canal operativo acordado con el operador. Para niveles de servicio y garantía, ver el **Documento de Soporte y Garantía** entregado por separado.
+
+---
+
+## Licencia
+
+Software entregado formalmente al operador. Todos los derechos reservados bajo los términos del contrato de servicio.

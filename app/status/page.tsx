@@ -10,18 +10,14 @@ export default function StatusPage() {
   const [status, setStatus] = useState<{
     supabaseUrl: boolean
     supabaseKey: boolean
-    indexedDb: boolean
     localStorage: boolean
-    serviceWorker: boolean
     online: boolean
     healthCheck: boolean
     loading: boolean
   }>({
     supabaseUrl: false,
     supabaseKey: false,
-    indexedDb: false,
     localStorage: false,
-    serviceWorker: false,
     online: false,
     healthCheck: false,
     loading: true,
@@ -35,15 +31,6 @@ export default function StatusPage() {
       const hasUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL
       const hasKey = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-      // Check IndexedDB
-      let hasIndexedDb = false
-      try {
-        const db = indexedDB.open("test")
-        hasIndexedDb = true
-      } catch {
-        hasIndexedDb = false
-      }
-
       // Check localStorage
       let hasLocalStorage = false
       try {
@@ -52,17 +39,6 @@ export default function StatusPage() {
         hasLocalStorage = true
       } catch {
         hasLocalStorage = false
-      }
-
-      // Check service worker
-      let hasServiceWorker = false
-      if ("serviceWorker" in navigator) {
-        try {
-          const reg = await navigator.serviceWorker.getRegistrations()
-          hasServiceWorker = reg.length > 0
-        } catch {
-          hasServiceWorker = false
-        }
       }
 
       // Check online
@@ -80,9 +56,7 @@ export default function StatusPage() {
       setStatus({
         supabaseUrl: hasUrl,
         supabaseKey: hasKey,
-        indexedDb: hasIndexedDb,
         localStorage: hasLocalStorage,
-        serviceWorker: hasServiceWorker,
         online,
         healthCheck: healthOk,
         loading: false,
@@ -100,7 +74,6 @@ export default function StatusPage() {
   const allOk =
     status.supabaseUrl &&
     status.supabaseKey &&
-    status.indexedDb &&
     status.localStorage &&
     status.online &&
     status.healthCheck
@@ -161,23 +134,9 @@ export default function StatusPage() {
             }
           />
           <StatusItem
-            label="IndexedDB"
-            ok={status.indexedDb}
-            detail={status.indexedDb ? "Disponible" : "No disponible"}
-          />
-          <StatusItem
             label="LocalStorage"
             ok={status.localStorage}
             detail={status.localStorage ? "Disponible" : "No disponible"}
-          />
-          <StatusItem
-            label="Service Worker"
-            ok={status.serviceWorker}
-            detail={
-              status.serviceWorker
-                ? "Registrado"
-                : "No registrado (PWA puede no funcionar)"
-            }
           />
           <StatusItem
             label="Conexión a Internet"

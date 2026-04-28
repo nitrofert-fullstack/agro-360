@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   nombre_completo TEXT,
-  rol TEXT CHECK (rol IN ('asesor', 'admin', 'campesino')) DEFAULT 'asesor',
+  rol TEXT CHECK (rol IN ('asesor', 'admin', 'agricultor', 'analista')) DEFAULT 'asesor',
   telefono TEXT,
   estado TEXT CHECK (estado IN ('activo', 'inactivo', 'suspendido')) DEFAULT 'activo',
   foto_perfil_url TEXT,
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS public.caracterizaciones (
   -- Relaciones
   asesor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   asesor_email TEXT,
-  campesino_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  agricultor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   
   -- Datos del técnico
   nombre_tecnico TEXT NOT NULL,
@@ -110,14 +110,14 @@ CREATE TABLE IF NOT EXISTS public.caracterizaciones (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   
   -- Índices compuestos
-  CONSTRAINT unique_documento_campesino UNIQUE (numero_documento)
+  CONSTRAINT unique_documento_agricultor UNIQUE (numero_documento)
 );
 
 -- Tabla de invitaciones
 CREATE TABLE IF NOT EXISTS public.invitations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT NOT NULL,
-  rol TEXT CHECK (rol IN ('asesor', 'campesino')) NOT NULL,
+  rol TEXT CHECK (rol IN ('asesor', 'agricultor')) NOT NULL,
   token TEXT UNIQUE NOT NULL,
   invited_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   estado TEXT CHECK (estado IN ('pendiente', 'aceptada', 'expirada', 'rechazada')) DEFAULT 'pendiente',
@@ -180,7 +180,7 @@ CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING
 
 -- Políticas para caracterizaciones
 CREATE POLICY "Asesores can view own caracterizaciones" ON public.caracterizaciones 
-  FOR SELECT USING (asesor_id = auth.uid() OR campesino_id = auth.uid());
+  FOR SELECT USING (asesor_id = auth.uid() OR agricultor_id = auth.uid());
   
 CREATE POLICY "Asesores can insert caracterizaciones" ON public.caracterizaciones 
   FOR INSERT WITH CHECK (asesor_id = auth.uid());
@@ -194,7 +194,7 @@ CREATE POLICY "Users can view related archivos" ON public.archivos
     EXISTS (
       SELECT 1 FROM public.caracterizaciones 
       WHERE caracterizaciones.id = archivos.caracterizacion_id 
-      AND (caracterizaciones.asesor_id = auth.uid() OR caracterizaciones.campesino_id = auth.uid())
+      AND (caracterizaciones.asesor_id = auth.uid() OR caracterizaciones.agricultor_id = auth.uid())
     )
   );
 

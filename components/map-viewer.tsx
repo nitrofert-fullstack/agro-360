@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import type L from "leaflet"
+import L from "leaflet"
 
 type LayerType = "ndvi" | "satellite" | "temperature" | "precipitation"
 type DrawMode = "none" | "circle" | "rectangle" | "polygon"
@@ -206,7 +206,7 @@ function createColorRemapTileLayer(LeafletLib: typeof L) {
       }
 
       img.onerror = (e) => {
-        done(e as Error, tile)
+        done(e as unknown as Error, tile)
       }
 
       return tile
@@ -554,10 +554,10 @@ export function MapViewer({
       setIsMapReady(true)
       setCurrentZoom(map.getZoom())
 
-      const ColorRemapTileLayer = createColorRemapTileLayer(L.default)
+      const ColorRemapTileLayer = createColorRemapTileLayer(L.default) as any
       Object.entries(layers).forEach(([key, config]) => {
         let layer: L.TileLayer
-        
+
         if (config.useColorRemap) {
           layer = new ColorRemapTileLayer(config.url, {
             attribution: config.attribution,
@@ -914,7 +914,7 @@ export function MapViewer({
       setNdviData(data.sort((a, b) => a.dt - b.dt))
 
       // Cargar capa de imagen satelital (en paralelo, no bloquea)
-      loadNDVIImagery(polyId, start, end)
+      if (polyId) loadNDVIImagery(polyId, start, end)
     } catch (err: any) {
       setNdviError(err.message)
     } finally {

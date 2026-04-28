@@ -1,46 +1,42 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { sendEmail, buildCredentialsEmail } from '@/lib/email/mailer'
 
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
+
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Solo admins pueden crear cuentas
-    const { data: callerProfile } = await supabase
-      .from('profiles')
-      .select('rol')
-      .eq('id', user.id)
-      .single()
+    const callerProfile = await prisma.profiles.findUnique({
+      where: { id: user.id },
+      select: { rol: true },
+    })
 
     if (callerProfile?.rol !== 'admin') {
       return NextResponse.json({ error: 'Solo administradores pueden crear cuentas' }, { status: 403 })
     }
 
-    const { email, nombreCompleto, visitaId, telefono, rol: rolParam } = await request.json()
+    const { email, nombreCompleto, telefono, rol: rolParam } = await request.json()
 
-    // Validar formato de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!email || !emailRegex.test(email)) {
       return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
     }
-
-    if (!email || !nombreCompleto) {
+    if (!nombreCompleto) {
       return NextResponse.json({ error: 'email y nombreCompleto son requeridos' }, { status: 400 })
     }
 
-    // Verificar si ya existe un perfil con ese email
-    const { data: existingProfile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle()
+    const existingProfile = await prisma.profiles.findFirst({
+      where: { email },
+      select: { id: true },
+    })
 
     if (existingProfile) {
       return NextResponse.json({
@@ -49,88 +45,67 @@ export async function POST(request: Request) {
       }, { status: 409 })
     }
 
-    // Usar el rol recibido, validarlo y fallback a campesino
-    const rolesValidos = ['admin', 'asesor', 'campesino', 'analista']
-    const rol = rolesValidos.includes(rolParam) ? rolParam : 'campesino'
+    const rolesValidos = ['admin', 'asesor', 'agricultor', 'analista']
+    const rol = rolesValidos.includes(rolParam) ? rolParam : 'agricultor'
 
-    // Generar credenciales temporales
     const tempPassword = `Agro${crypto.randomBytes(4).toString('hex').toUpperCase()}!`
     const token = crypto.randomBytes(32).toString('hex')
 
-    // Intentar crear usuario con admin client (service role key)
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAdmin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
     let userId: string | null = null
     let method: 'admin' | 'invitation' = 'invitation'
 
-    if (serviceRoleKey && supabaseUrl) {
-      // Usar admin API para crear usuario directamente
-      const supabaseAdmin = createAdminClient(supabaseUrl, serviceRoleKey)
+    const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { nombre_completo: nombreCompleto, telefono: telefono || null, rol },
+    })
 
-      const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password: tempPassword,
-        email_confirm: true,
-        user_metadata: {
-          nombre_completo: nombreCompleto,
-          telefono: telefono || null,
-          rol,
-        },
-      })
-
-      if (createErr) {
-        // Si el usuario ya existe, no es un error fatal
-        if (createErr.message?.includes('already been registered') || createErr.message?.includes('already exists')) {
-          return NextResponse.json({
-            error: 'Este correo ya tiene una cuenta registrada.',
-          }, { status: 409 })
-        }
-        console.error('[Invitar] Error creando usuario:', createErr.message)
-        return NextResponse.json({ error: `Error creando usuario: ${createErr.message}` }, { status: 500 })
+    if (createErr) {
+      if (createErr.message?.includes('already been registered') || createErr.message?.includes('already exists')) {
+        return NextResponse.json({ error: 'Este correo ya tiene una cuenta registrada.' }, { status: 409 })
       }
-
-      if (newUser?.user) {
-        userId = newUser.user.id
-        method = 'admin'
-
-        // Crear perfil con el rol correcto
-        await supabaseAdmin.from('profiles').upsert({
-          id: userId,
-          email,
-          nombre_completo: nombreCompleto,
-          telefono: telefono || null,
-          rol,
-          activo: true,
-        })
-      }
-    } else {
-      // Sin service role key: solo crear registro de invitacion
-      method = 'invitation'
+      console.error('[Invitar] Error creando usuario:', createErr.message)
+      return NextResponse.json({ error: `Error creando usuario: ${createErr.message}` }, { status: 500 })
     }
 
-    // Crear registro de invitacion
+    if (newUser?.user) {
+      userId = newUser.user.id
+      method = 'admin'
+
+      await prisma.profiles.upsert({
+        where:  { id: userId },
+        create: { id: userId, email, nombre_completo: nombreCompleto, telefono: telefono || null, rol, activo: true },
+        update: { email, nombre_completo: nombreCompleto, telefono: telefono || null, rol, activo: true, updated_at: new Date() },
+      })
+    }
+
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 30)
 
-    await supabase.from('invitations').insert({
-      email,
-      token,
-      rol,
-      invitado_por: user.id,
-      usado: method === 'admin',
-      expires_at: expiresAt.toISOString(),
+    await prisma.invitations.create({
+      data: {
+        email,
+        token,
+        rol,
+        invitado_por: user.id,
+        usado: method === 'admin',
+        expires_at: expiresAt,
+      },
     })
 
-    // Enviar email con credenciales si se creó la cuenta directamente
     let emailEnviado = false
     if (method === 'admin') {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
-      const html = buildCredentialsEmail({ nombreCompleto, email, password: tempPassword, rol, appUrl })
       emailEnviado = await sendEmail({
         to: email,
         subject: 'Bienvenido a Agro360 — Tus credenciales de acceso',
-        html,
+        html: buildCredentialsEmail({ nombreCompleto, email, password: tempPassword, rol, appUrl }),
       })
     }
 
@@ -146,7 +121,7 @@ export async function POST(request: Request) {
         ? emailEnviado
           ? `Cuenta creada y credenciales enviadas por email a ${email}.`
           : `Cuenta creada. Email: ${email} | Contraseña temporal: ${tempPassword}`
-        : `Invitacion creada. Comparta este enlace con el beneficiario para que complete su registro.`,
+        : 'Invitación creada.',
     })
   } catch (err) {
     console.error('[Invitar] Error:', err)

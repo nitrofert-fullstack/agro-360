@@ -1,25 +1,23 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import { sendEmail, buildEstadoNotificationEmail } from '@/lib/email/mailer'
 
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
 
-    // Verificar que sea asesor, analista o admin
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('rol')
-      .eq('id', user.id)
-      .single()
+    const profile = await prisma.profiles.findUnique({
+      where: { id: user.id },
+      select: { rol: true },
+    })
 
-    if (!['admin', 'asesor', 'analista'].includes(profile?.rol)) {
+    if (!['admin', 'asesor', 'analista'].includes(profile?.rol ?? '')) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
@@ -34,100 +32,78 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Estado invalido. Válidos: ${estadosValidos.join(', ')}` }, { status: 400 })
     }
 
-    // Validar matriz de transiciones por rol
-    const rol = profile?.rol
+    const rol = profile?.rol ?? ''
     const estadosPorRol: Record<string, string[]> = {
-      admin: estadosValidos,
-      asesor: ['REVISADO'],
+      admin:    estadosValidos,
+      asesor:   ['REVISADO'],
       analista: ['EN_ESTUDIO_CREDITO', 'APROBADO', 'CANCELADO'],
     }
     if (rol !== 'admin' && !estadosPorRol[rol]?.includes(nuevoEstado)) {
       return NextResponse.json({ error: `El rol ${rol} no puede asignar el estado ${nuevoEstado}` }, { status: 403 })
     }
 
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+    // ── Obtener caracterización ─────────────────────────────────────────────
+    const carac = await prisma.caracterizaciones.findUnique({
+      where: { id },
+      select: { id: true, id_visita: true, id_beneficiario: true },
+    })
 
-    if (!serviceRoleKey || !supabaseUrl) {
-      return NextResponse.json({ error: 'Configuración del servidor incompleta' }, { status: 500 })
-    }
-
-    const adminClient = createAdminClient(supabaseUrl, serviceRoleKey)
-
-    // 1. Obtener id_visita e id_beneficiario de la caracterización (sin joins para evitar PGRST204)
-    const { data: caracBase, error: caracErr } = await adminClient
-      .from('caracterizaciones')
-      .select('id, id_visita, id_beneficiario, observaciones')
-      .eq('id', id)
-      .single()
-
-    if (caracErr || !caracBase) {
+    if (!carac) {
       return NextResponse.json({ error: 'Caracterización no encontrada' }, { status: 404 })
     }
 
-    const visitaId = caracBase.id_visita
+    // ── Actualizar estado ───────────────────────────────────────────────────
+    await prisma.caracterizaciones.update({
+      where: { id },
+      data: {
+        estado:     nuevoEstado,
+        updated_at: new Date(),
+        ...(observaciones !== undefined ? { observaciones } : {}),
+      },
+    })
 
-    // 2. Actualizar estado (y opcionalmente observaciones) en caracterizaciones
-    const updatePayload: Record<string, unknown> = {
-      estado: nuevoEstado,
-      updated_at: new Date().toISOString(),
-    }
-    if (observaciones !== undefined) {
-      updatePayload.observaciones = observaciones
-    }
-
-    const { error: caracUpdateErr } = await adminClient
-      .from('caracterizaciones')
-      .update(updatePayload)
-      .eq('id', id)
-
-    if (caracUpdateErr) throw caracUpdateErr
-
-    // 4. Enviar email de notificación al beneficiario (queries separadas para evitar errores de schema cache)
+    // ── Notificación por email (no bloquea) ─────────────────────────────────
     try {
-      // Obtener datos del beneficiario
-      const { data: benef } = caracBase.id_beneficiario
-        ? await adminClient.from('beneficiarios').select('correo, nombres, apellidos').eq('id', caracBase.id_beneficiario).single()
-        : { data: null }
+      const [benef, visita] = await Promise.all([
+        prisma.beneficiarios.findUnique({
+          where:  { id: carac.id_beneficiario },
+          select: { correo: true, nombres: true, apellidos: true },
+        }),
+        prisma.visitas.findUnique({
+          where:  { id: carac.id_visita },
+          select: { radicado_oficial: true },
+        }),
+      ])
 
-      // Obtener radicado_oficial de la visita
-      const { data: visitaData } = await adminClient
-        .from('visitas')
-        .select('radicado_oficial')
-        .eq('id', visitaId)
-        .single()
-
-      const correo = (benef as any)?.correo
-      const nombres = (benef as any)?.nombres || ''
-      const apellidos = (benef as any)?.apellidos || ''
-      const nombreCompleto = `${nombres} ${apellidos}`.trim() || 'Productor'
-      const radicadoOficial = (visitaData as any)?.radicado_oficial || id
-
+      const correo = benef?.correo
       if (correo) {
-        const html = buildEstadoNotificationEmail({
-          nombreCompleto,
-          radicadoOficial,
-          nuevoEstado,
-          observaciones: observaciones || null,
-          appUrl,
-        })
+        const nombreCompleto = `${benef?.nombres || ''} ${benef?.apellidos || ''}`.trim() || 'Productor'
+        const radicadoOficial = visita?.radicado_oficial || id
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
 
         const estadoLabel: Record<string, string> = {
-          INICIADO: 'ha sido iniciada',
-          REVISADO: 'fue revisada',
+          INICIADO:           'ha sido iniciada',
+          REVISADO:           'fue revisada',
           EN_ESTUDIO_CREDITO: 'está en evaluación de crédito',
-          APROBADO: 'fue aprobada',
-          CANCELADO: 'fue cancelada',
+          APROBADO:           'fue aprobada',
+          CANCELADO:          'fue cancelada',
         }
         const asunto = `Tu caracterización ${estadoLabel[nuevoEstado] ?? `cambió a ${nuevoEstado}`} — Agro360`
 
-        await sendEmail({ to: correo, subject: asunto, html })
-        console.log(`[UpdateEstado] Email de estado "${nuevoEstado}" enviado a ${correo}`)
+        await sendEmail({
+          to: correo,
+          subject: asunto,
+          html: buildEstadoNotificationEmail({
+            nombreCompleto,
+            radicadoOficial,
+            nuevoEstado,
+            observaciones: observaciones || null,
+            appUrl,
+          }),
+        })
       }
     } catch (emailErr) {
-      // El error de email no debe bloquear la respuesta
-      console.error('[UpdateEstado] Error enviando email de estado:', emailErr)
+      console.error('[UpdateEstado] Error enviando email:', emailErr)
     }
 
     return NextResponse.json({ success: true, mensaje: 'Estado actualizado correctamente' })

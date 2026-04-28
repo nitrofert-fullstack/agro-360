@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email VARCHAR(255),
   nombre_completo VARCHAR(200),
-  rol VARCHAR(50) DEFAULT 'asesor' CHECK (rol IN ('admin', 'asesor', 'campesino')),
+  rol VARCHAR(50) DEFAULT 'asesor' CHECK (rol IN ('admin', 'asesor', 'agricultor', 'analista')),
   telefono VARCHAR(20),
   activo BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),

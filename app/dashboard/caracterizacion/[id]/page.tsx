@@ -11,10 +11,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/hooks/use-auth"
 import { toast } from "sonner"
-import {
-  getCaracterizacionByRadicado,
-  type CaracterizacionLocal,
-} from "@/lib/db/indexed-db"
 import { createClient } from "@/lib/supabase/client"
 import {
   ArrowLeft,
@@ -40,7 +36,7 @@ import {
   Mail,
   Download,
 } from "lucide-react"
-import { generateCaracterizacionPDF, pdfFromServerData, pdfFromLocalData } from "@/lib/generate-pdf"
+import { generateCaracterizacionPDF, pdfFromServerData } from "@/lib/generate-pdf"
 
 const MapViewer = dynamic(
   () => import("@/components/map-viewer").then((mod) => mod.MapViewer),
@@ -134,10 +130,8 @@ export default function CaracterizacionDetailPage() {
   const router = useRouter()
   const { loading: authLoading, isAuthenticated, profile } = useAuth()
   const [serverData, setServerData] = useState<ServerData | null>(null)
-  const [localData, setLocalData] = useState<CaracterizacionLocal | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [source, setSource] = useState<"server" | "local" | null>(null)
   const [photoModal, setPhotoModal] = useState<string | null>(null)
 
   const id = params.id as string
@@ -151,21 +145,10 @@ export default function CaracterizacionDetailPage() {
       if (res.ok) {
         const data = await res.json()
         setServerData(data)
-        setSource("server")
         setIsLoading(false)
         return
       }
-    } catch { /* try local */ }
-
-    try {
-      const local = await getCaracterizacionByRadicado(id)
-      if (local) {
-        setLocalData(local)
-        setSource("local")
-        setIsLoading(false)
-        return
-      }
-    } catch { /* ignore */ }
+    } catch { /* fallthrough */ }
 
     setError("No se encontró la caracterización")
     setIsLoading(false)
@@ -201,7 +184,7 @@ export default function CaracterizacionDetailPage() {
     )
   }
 
-  if (source === "server" && serverData) {
+  if (serverData) {
     return (
       <ServerDetailView
         data={serverData}
@@ -211,10 +194,6 @@ export default function CaracterizacionDetailPage() {
         onReload={loadData}
       />
     )
-  }
-
-  if (source === "local" && localData) {
-    return <LocalDetailView data={localData} photoModal={photoModal} setPhotoModal={setPhotoModal} />
   }
 
   return null
@@ -563,7 +542,7 @@ function ServerDetailView({
               <EstIcon className="h-3 w-3" />
               <span className="hidden sm:inline">{est.label}</span>
             </Badge>
-            {((profile?.rol === "campesino" && !["CANCELADO", "RECHAZADO"].includes(caracterizacion?.estado)) || ["admin", "asesor"].includes(profile?.rol)) && (
+            {((profile?.rol === "agricultor" && !["CANCELADO", "RECHAZADO"].includes(caracterizacion?.estado)) || ["admin", "asesor"].includes(profile?.rol)) && (
               <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => router.push(`/formulario/editar/${visita?.id}`)} title="Editar">
                 <PenTool className="h-4 w-4" />
               </Button>
@@ -864,8 +843,14 @@ function ServerDetailView({
               <Badge variant="outline" className={caracterizacion?.autorizacion_datos_personales ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
                 {caracterizacion?.autorizacion_datos_personales ? "Autoriza" : "No autoriza"} tratamiento datos personales
               </Badge>
+              <Badge variant="outline" className={(caracterizacion as any)?.autorizacion_aviso_privacidad ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
+                {(caracterizacion as any)?.autorizacion_aviso_privacidad ? "Leyó" : "No leyó"} aviso de privacidad
+              </Badge>
               <Badge variant="outline" className={caracterizacion?.autorizacion_consulta_crediticia ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
                 {caracterizacion?.autorizacion_consulta_crediticia ? "Autoriza" : "No autoriza"} consulta crediticia
+              </Badge>
+              <Badge variant="outline" className={(caracterizacion as any)?.autorizacion_uso_imagen ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
+                {(caracterizacion as any)?.autorizacion_uso_imagen ? "Autoriza" : "No autoriza"} uso de imagen
               </Badge>
               <Badge variant="outline" className={areaProductiva?.interesado_programa ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
                 {areaProductiva?.interesado_programa ? "Requiere financiación" : "No requiere financiación"}
@@ -876,312 +861,6 @@ function ServerDetailView({
                 <InfoRow label="Observaciones" value={caracterizacion.observaciones} />
               </div>
             )}
-          </SectionCard>
-        </div>
-      </main>
-
-      {photoModal && <PhotoModal url={photoModal} label="imagen" onClose={() => setPhotoModal(null)} />}
-    </div>
-  )
-}
-
-// ==================== LOCAL DETAIL VIEW ====================
-function LocalDetailView({
-  data,
-  photoModal,
-  setPhotoModal,
-}: {
-  data: CaracterizacionLocal
-  photoModal: string | null
-  setPhotoModal: (url: string | null) => void
-}) {
-  const router = useRouter()
-  const nombre = data.nombreProductor || `${data.beneficiario?.primerNombre || ""} ${data.beneficiario?.primerApellido || ""}`.trim() || "Sin nombre"
-  const lat = data.predio?.latitud
-  const lng = data.predio?.longitud
-  const hasCoords = lat !== null && lat !== undefined && lng !== null && lng !== undefined && !isNaN(lat) && !isNaN(lng)
-  const est = getEstado(data.estado)
-  const EstIcon = est.icon
-
-  const photos = [
-    { label: "Foto 1", url: data.archivos?.foto1Url },
-    { label: "Foto 2", url: data.archivos?.foto2Url },
-  ].filter((p) => p.url)
-  const firma = data.archivos?.firmaProductorUrl || data.autorizacion?.firmaDigital
-
-  return (
-    <div className="min-h-screen bg-background pb-12">
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-2 md:px-6 md:py-3">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => router.push("/dashboard")}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="min-w-0">
-              <h1 className="text-sm font-bold leading-tight">Detalle Caracterización</h1>
-              <p className="truncate text-xs font-mono text-muted-foreground">{data.radicadoLocal}</p>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <Badge variant="outline" className={`${est.color} gap-1`}>
-              <EstIcon className="h-3 w-3" />
-              <span className="hidden sm:inline">{est.label}</span>
-            </Badge>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => generateCaracterizacionPDF(pdfFromLocalData(data))} title="Descargar PDF">
-              <Download className="h-4 w-4" />
-            </Button>
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-7xl px-4 py-6 md:px-6">
-        {data.estado === "PENDIENTE_SINCRONIZACION" && (
-          <Card className="mb-6 border-yellow-500/20 bg-yellow-500/5">
-            <CardContent className="flex items-center gap-3 p-4">
-              <Clock className="h-5 w-5 text-yellow-500" />
-              <div>
-                <p className="text-sm font-medium">Registro local - pendiente de sincronizacion</p>
-                <p className="text-xs text-muted-foreground">Las imagenes se guardaron localmente. Se subiran al servidor cuando sincronices.</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Summary */}
-        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="border-primary/20 bg-primary/5">
-            <CardContent className="flex items-center gap-3 p-4">
-              <User className="h-8 w-8 shrink-0 text-primary" />
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Productor</p>
-                <p className="truncate text-sm font-semibold">{nombre}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <MapPin className="h-8 w-8 shrink-0 text-green-600" />
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Predio</p>
-                <p className="truncate text-sm font-semibold">{data.predio?.nombrePredio || "Sin nombre"}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <Calendar className="h-8 w-8 shrink-0 text-blue-600" />
-              <div>
-                <p className="text-xs text-muted-foreground">Fecha visita</p>
-                <p className="text-sm font-semibold">{data.visita?.fechaVisita ? new Date(data.visita.fechaVisita + "T12:00:00").toLocaleDateString("es-CO") : "N/A"}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <FileText className="h-8 w-8 shrink-0 text-orange-600" />
-              <div>
-                <p className="text-xs text-muted-foreground">Tecnico</p>
-                <p className="text-sm font-semibold">{data.visita?.nombreTecnico || "N/A"}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Map */}
-        {hasCoords && (
-          <Card className="mb-6 overflow-hidden">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <MapPin className="h-5 w-5 text-primary" />
-                Ubicacion del Predio
-                <span className="ml-auto text-xs font-normal text-muted-foreground">
-                  {lat!.toFixed(6)}, {lng!.toFixed(6)}
-                  {data.predio?.altitudMsnm && ` | ${data.predio.altitudMsnm} msnm`}
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 pb-0">
-              <div className="h-[500px] md:h-[600px]">
-                <MapViewer
-                  initialCenter={[lat!, lng!]}
-                  initialZoom={14}
-                  markerPosition={[lat!, lng!]}
-                  polygonCoords={parsePoligono(data.predio?.poligono)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Insights: clima + NDVI */}
-        {hasCoords && (
-          <div className="mb-6">
-            <PredioInsights
-              lat={lat!}
-              lng={lng!}
-              areaTotalHa={data.predio?.areaTotalHectareas}
-              areaProductivaHa={data.predio?.areaProductivaHectareas}
-            />
-          </div>
-        )}
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <SectionCard title="Datos del Beneficiario" icon={User}>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <InfoRow label="Primer nombre" value={data.beneficiario?.primerNombre} />
-              <InfoRow label="Segundo nombre" value={data.beneficiario?.segundoNombre} />
-              <InfoRow label="Primer apellido" value={data.beneficiario?.primerApellido} />
-              <InfoRow label="Segundo apellido" value={data.beneficiario?.segundoApellido} />
-              <InfoRow label="Tipo documento" value={data.beneficiario?.tipoDocumento} />
-              <InfoRow label="No. documento" value={data.beneficiario?.numeroDocumento} />
-              <InfoRow label="Edad" value={data.beneficiario?.edad} />
-              <InfoRow label="Telefono" value={data.beneficiario?.telefono} />
-              <InfoRow label="Email" value={data.beneficiario?.email} />
-              <InfoRow label="Ocupacion principal" value={data.beneficiario?.ocupacionPrincipal} />
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Datos del Predio" icon={MapPin}>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <InfoRow label="Nombre predio" value={data.predio?.nombrePredio} />
-              <InfoRow label="Departamento" value={data.predio?.departamento} />
-              <InfoRow label="Municipio" value={data.predio?.municipio} />
-              <InfoRow label="Vereda" value={data.predio?.vereda} />
-              <InfoRow label="Direccion" value={data.predio?.direccion} />
-              <InfoRow label="Tipo tenencia" value={data.predio?.tipoTenencia} />
-              <InfoRow label="Area total (ha)" value={data.predio?.areaTotalHectareas} />
-              <InfoRow label="Area productiva (ha)" value={data.predio?.areaProductivaHectareas} />
-              <InfoRow label="Cultivos existentes" value={data.predio?.cultivosExistentes} />
-            </div>
-          </SectionCard>
-
-          {data.caracterizacion && (
-            <SectionCard title="Caracterizacion del Predio" icon={Mountain}>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <InfoRow label="Topografía" value={data.caracterizacion.topografia} />
-                <InfoRow label="Ruta de acceso" value={data.caracterizacion.rutaAcceso} />
-                <InfoRow label="Distancia (km)" value={data.caracterizacion.distanciaKm} />
-                <InfoRow label="Tiempo de acceso" value={data.caracterizacion.tiempoAcceso} />
-                <InfoRow label="Temperatura (°C)" value={data.caracterizacion.temperaturaCelsius} />
-                <InfoRow label="Meses de lluvia" value={data.caracterizacion.mesesLluvia} />
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <BooleanTag label="Bosque" active={data.caracterizacion.coberturaBosque} />
-                <BooleanTag label="Cultivos" active={data.caracterizacion.coberturaCultivos} />
-                <BooleanTag label="Pastos" active={data.caracterizacion.coberturaPastos} />
-                <BooleanTag label="Rastrojo" active={data.caracterizacion.coberturaRastrojo} />
-              </div>
-            </SectionCard>
-          )}
-
-          {data.aguaRiesgos && (
-            <SectionCard title="Abastecimiento de Agua" icon={Droplets}>
-              <div className="flex flex-wrap gap-2">
-                <BooleanTag label="Nacimiento / Manantial" active={data.aguaRiesgos.nacimientoManantial} />
-                <BooleanTag label="Rio / Quebrada" active={data.aguaRiesgos.rioQuebrada} />
-                <BooleanTag label="Pozo" active={data.aguaRiesgos.pozo} />
-                <BooleanTag label="Acueducto rural" active={data.aguaRiesgos.acueductoRural} />
-                <BooleanTag label="Canal distrito riego" active={data.aguaRiesgos.canalDistritoRiego} />
-                <BooleanTag label="Jagüey / Reservorio" active={data.aguaRiesgos.jagueyReservorio} />
-                <BooleanTag label="Agua lluvia" active={data.aguaRiesgos.aguaLluvia} />
-              </div>
-            </SectionCard>
-          )}
-
-          {data.aguaRiesgos && (
-            <SectionCard title="Riesgos del Predio" icon={AlertTriangle}>
-              <div className="flex flex-wrap gap-2">
-                <BooleanTag label="Inundacion" active={data.aguaRiesgos.inundacion} />
-                <BooleanTag label="Sequia" active={data.aguaRiesgos.sequia} />
-                <BooleanTag label="Viento" active={data.aguaRiesgos.viento} />
-                <BooleanTag label="Helada" active={data.aguaRiesgos.helada} />
-              </div>
-            </SectionCard>
-          )}
-
-          {data.areaProductiva && (
-            <SectionCard title="Area Productiva" icon={Sprout}>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <InfoRow label="Sistema productivo" value={data.areaProductiva.sistemaProduccion} />
-                <InfoRow label="Caracterización del cultivo" value={data.areaProductiva.caracterizacionCultivo} />
-                <InfoRow label="Estado cultivo" value={data.areaProductiva.estadoCultivo} />
-                <InfoRow label="Donde comercializa" value={data.areaProductiva.dondeComercializa} />
-              </div>
-            </SectionCard>
-          )}
-
-          {data.infoFinanciera && (
-            <SectionCard title="Informacion Financiera" icon={DollarSign}>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <InfoRow label="Ingresos agropecuaria" value={data.infoFinanciera.ingresosMensualesAgropecuaria ? `$${data.infoFinanciera.ingresosMensualesAgropecuaria.toLocaleString("es-CO")}` : null} />
-                <InfoRow label="Egresos mensuales" value={data.infoFinanciera.egresosMensuales ? `$${data.infoFinanciera.egresosMensuales.toLocaleString("es-CO")}` : null} />
-              </div>
-            </SectionCard>
-          )}
-        </div>
-
-        {/* Fotos y Firma */}
-        {(photos.length > 0 || firma) && (
-          <div className="mt-6">
-            <SectionCard title="Fotos y Firma" icon={Camera}>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {photos.map((photo, idx) => (
-                  <div key={idx} className="group relative">
-                    <div className="mb-2 flex items-center justify-between">
-                      <p className="text-xs font-medium text-muted-foreground">{photo.label}</p>
-                      <button
-                        onClick={() => downloadImage(photo.url!, `${slugify(photo.label)}.jpg`)}
-                        title="Descargar imagen"
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-muted hover:bg-primary hover:text-white transition-colors"
-                      >
-                        <Download className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <div className="relative cursor-pointer overflow-hidden rounded-lg border border-border bg-muted" onClick={() => setPhotoModal(photo.url!)}>
-                      <img src={photo.url} alt={photo.label} className="h-48 w-full object-cover transition-transform group-hover:scale-105" />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
-                        <Eye className="h-8 w-8 text-white opacity-0 transition-opacity group-hover:opacity-100" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {firma && (
-                  <div className="group relative">
-                    <div className="mb-2 flex items-center justify-between">
-                      <p className="text-xs font-medium text-muted-foreground">Firma del Productor</p>
-                      <button
-                        onClick={() => downloadImage(firma, 'firma-productor.png')}
-                        title="Descargar firma"
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-muted hover:bg-primary hover:text-white transition-colors"
-                      >
-                        <Download className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <div className="rounded-lg border border-border bg-white p-2 cursor-pointer" onClick={() => setPhotoModal(firma)}>
-                      <img src={firma} alt="Firma" className="h-44 w-full object-contain" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </SectionCard>
-          </div>
-        )}
-
-        {/* Autorizaciones */}
-        <div className="mt-6">
-          <SectionCard title="Autorizaciones" icon={PenTool}>
-            <div className="flex flex-wrap gap-3">
-              <Badge variant="outline" className={data.autorizacion?.autorizaTratamientoDatos ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
-                {data.autorizacion?.autorizaTratamientoDatos ? "Autoriza" : "No autoriza"} tratamiento datos personales
-              </Badge>
-              <Badge variant="outline" className={data.autorizacion?.autorizaConsultaCrediticia ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
-                {data.autorizacion?.autorizaConsultaCrediticia ? "Autoriza" : "No autoriza"} consulta crediticia
-              </Badge>
-              <Badge variant="outline" className={data.areaProductiva?.interesadoPrograma ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
-                {data.areaProductiva?.interesadoPrograma ? "Requiere financiación" : "No requiere financiación"}
-              </Badge>
-            </div>
           </SectionCard>
         </div>
       </main>

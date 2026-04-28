@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Camera, Upload, X, Loader2, Image as ImageIcon } from 'lucide-react'
+import { Camera, Upload, X, Loader2, Image as ImageIcon, SwitchCamera } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface PhotoUploadProps {
@@ -84,6 +84,7 @@ export function PhotoUpload({
   const videoRef = useRef<HTMLVideoElement>(null)
   const [cameraMode, setCameraMode] = useState(false)
   const [stream, setStream] = useState<MediaStream | null>(null)
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
 
   const stopCamera = useCallback(() => {
     if (stream) {
@@ -93,15 +94,19 @@ export function PhotoUpload({
     setCameraMode(false)
   }, [stream])
 
-  const startCamera = useCallback(async () => {
+  const startCamera = useCallback(async (facing: 'environment' | 'user' = 'environment') => {
     try {
       setError(null)
+      // Detener stream previo si existe
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop())
+        setStream(null)
+      }
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }
       })
       setStream(mediaStream)
       setCameraMode(true)
-      // Asignar el stream al video cuando este listo
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream
@@ -113,7 +118,13 @@ export function PhotoUpload({
       setError('No se pudo acceder a la camara. Intente subir un archivo.')
       setCameraMode(false)
     }
-  }, [])
+  }, [stream])
+
+  const switchCamera = useCallback(() => {
+    const newFacing = facingMode === 'environment' ? 'user' : 'environment'
+    setFacingMode(newFacing)
+    startCamera(newFacing)
+  }, [facingMode, startCamera])
 
   const capturePhoto = useCallback(async () => {
     if (!videoRef.current) return
@@ -215,7 +226,7 @@ export function PhotoUpload({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={startCamera}
+                onClick={() => startCamera(facingMode)}
                 disabled={isProcessing}
                 className="gap-2"
               >
@@ -247,7 +258,7 @@ export function PhotoUpload({
             playsInline
             muted
           />
-          <div className="flex gap-2 justify-center">
+          <div className="flex gap-2 justify-center flex-wrap">
             <Button
               type="button"
               variant="default"
@@ -261,6 +272,18 @@ export function PhotoUpload({
               ) : (
                 <><Camera className="h-4 w-4" /> Capturar</>
               )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={switchCamera}
+              disabled={isProcessing}
+              className="gap-2"
+              title={facingMode === 'environment' ? 'Cambiar a cámara frontal' : 'Cambiar a cámara trasera'}
+            >
+              <SwitchCamera className="h-4 w-4" />
+              {facingMode === 'environment' ? 'Frontal' : 'Trasera'}
             </Button>
             <Button type="button" variant="outline" size="sm" onClick={stopCamera} disabled={isProcessing}>
               Cancelar

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
 export async function GET() {
   try {
@@ -11,42 +11,42 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('rol')
-      .eq('id', user.id)
-      .single()
+    const profile = await prisma.profiles.findUnique({
+      where: { id: user.id },
+      select: { rol: true },
+    })
 
-    if (!['admin', 'analista'].includes(profile?.rol || '')) {
+    if (!['admin', 'analista'].includes(profile?.rol ?? '')) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-
-    // Fetch minimal data for stats (límite razonable; agregación en JS)
-    const [
-      { data: caracs },
-      { data: predios },
-      { data: beneficiarios },
-      { data: visitas },
-    ] = await Promise.all([
-      supabaseAdmin.from('caracterizaciones').select('estado, created_at').limit(2000),
-      supabaseAdmin.from('predios').select('municipio, departamento, area_total_hectareas').limit(2000),
-      supabaseAdmin.from('beneficiarios').select('genero, edad, personas_a_cargo').limit(2000),
-      supabaseAdmin.from('visitas').select('asesor_id, created_at').limit(2000),
+    const [caracs, predios, beneficiarios, visitas] = await Promise.all([
+      prisma.caracterizaciones.findMany({
+        select: { estado: true, created_at: true },
+        take: 2000,
+      }),
+      prisma.predios.findMany({
+        select: { municipio: true, departamento: true, area_total_hectareas: true },
+        take: 2000,
+      }),
+      prisma.beneficiarios.findMany({
+        select: { genero: true, edad: true, personas_a_cargo: true },
+        take: 2000,
+      }),
+      prisma.visitas.findMany({
+        select: { asesor_id: true, created_at: true },
+        take: 2000,
+      }),
     ])
 
-    // By estado
+    // Por estado
     const porEstado: Record<string, number> = {}
-    for (const c of caracs || []) {
+    for (const c of caracs) {
       const key = (c.estado || 'INICIADO').toUpperCase()
       porEstado[key] = (porEstado[key] || 0) + 1
     }
 
-    // By month — last 12
+    // Por mes — últimos 12
     const now = new Date()
     const porMes: { mes: string; total: number }[] = []
     for (let i = 11; i >= 0; i--) {
@@ -54,7 +54,7 @@ export async function GET() {
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       porMes.push({ mes: key, total: 0 })
     }
-    for (const c of caracs || []) {
+    for (const c of caracs) {
       if (!c.created_at) continue
       const d = new Date(c.created_at)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -62,46 +62,44 @@ export async function GET() {
       if (item) item.total++
     }
 
-    // By municipio — top 8
+    // Por municipio — top 8
     const muniCount: Record<string, number> = {}
-    for (const p of predios || []) {
+    for (const p of predios) {
       const key = p.municipio || 'Sin municipio'
       muniCount[key] = (muniCount[key] || 0) + 1
     }
     const porMunicipio = Object.entries(muniCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
+      .sort((a, b) => b[1] - a[1]).slice(0, 8)
       .map(([municipio, total]) => ({ municipio, total }))
 
-    // By departamento — top 6
+    // Por departamento — top 6
     const deptCount: Record<string, number> = {}
-    for (const p of predios || []) {
+    for (const p of predios) {
       const key = p.departamento || 'Sin departamento'
       deptCount[key] = (deptCount[key] || 0) + 1
     }
     const porDepartamento = Object.entries(deptCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
+      .sort((a, b) => b[1] - a[1]).slice(0, 6)
       .map(([departamento, total]) => ({ departamento, total }))
 
-    // By género
+    // Por género
     const generoCount: Record<string, number> = {}
-    for (const b of beneficiarios || []) {
+    for (const b of beneficiarios) {
       const key = b.genero || 'No especificado'
       generoCount[key] = (generoCount[key] || 0) + 1
     }
     const porGenero = Object.entries(generoCount).map(([genero, total]) => ({ genero, total }))
 
-    // Promedios demográficos
-    const edades = (beneficiarios || []).map(b => b.edad).filter((e): e is number => e != null)
-    const personas = (beneficiarios || []).map(b => b.personas_a_cargo).filter((p): p is number => p != null)
-    const hectareas = (predios || []).map(p => p.area_total_hectareas).filter((h): h is number => h != null)
+    // Promedios
+    const edades    = beneficiarios.map(b => b.edad).filter((e): e is number => e != null)
+    const personas  = beneficiarios.map(b => b.personas_a_cargo).filter((p): p is number => p != null)
+    const hectareas = predios.map(p => Number(p.area_total_hectareas)).filter((h): h is number => !isNaN(h) && h != null)
 
-    const avg = (arr: number[]) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10 : null
+    const avg = (arr: number[]) =>
+      arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10 : null
 
-    // Asignación de asesores
-    const conAsesor = (visitas || []).filter(v => v.asesor_id).length
-    const sinAsesor = (visitas || []).filter(v => !v.asesor_id).length
+    const conAsesor = visitas.filter(v => v.asesor_id).length
+    const sinAsesor = visitas.filter(v => !v.asesor_id).length
 
     const response = NextResponse.json({
       porEstado,
@@ -109,15 +107,14 @@ export async function GET() {
       porMunicipio,
       porDepartamento,
       porGenero,
-      totalRegistros: caracs?.length || 0,
+      totalRegistros: caracs.length,
       promedios: {
-        edad: avg(edades),
+        edad:          avg(edades),
         personasACargo: avg(personas),
-        hectareas: avg(hectareas),
+        hectareas:     avg(hectareas),
       },
       asignacion: { conAsesor, sinAsesor },
     })
-    // Cache 5 minutos en el browser y en CDN
     response.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=60')
     return response
   } catch (err) {

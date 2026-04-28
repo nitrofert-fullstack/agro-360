@@ -132,12 +132,6 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            <p className="text-center text-xs text-muted-foreground">
-              Asesores y admins:{" "}
-              <Link href="/auth/invitation" className="text-primary hover:underline">
-                acceso por invitación
-              </Link>
-            </p>
           </CardFooter>
         </form>
       </Card>

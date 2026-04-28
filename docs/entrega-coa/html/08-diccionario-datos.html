@@ -1,0 +1,2025 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>08-diccionario-datos</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">08-diccionario-datos</h1>
+</header>
+<h1 id="diccionario-de-datos-agro360">Diccionario de Datos —
+Agro360</h1>
+<p><strong>Sistema de Caracterización Predial Agropecuaria</strong>
+<strong>Versión:</strong> 1.0 — Entrega formal COA
+<strong>Fecha:</strong> Abril 2026</p>
+<hr />
+<h2 id="introducción">1. Introducción</h2>
+<p>Este documento describe el esquema relacional de la base de datos
+PostgreSQL gestionada por Supabase para Agro360. Incluye las tablas
+principales, sus columnas, tipos de dato, restricciones, claves
+foráneas, índices y políticas de Row Level Security (RLS).</p>
+<p><strong>Base de datos:</strong> PostgreSQL 15+
+<strong>Schema:</strong> <code>public</code> (y <code>auth</code> de
+Supabase) <strong>Row Level Security:</strong> habilitado en todas las
+tablas de <code>public</code></p>
+<hr />
+<h2 id="diagrama-relacional-alto-nivel">2. Diagrama relacional (alto
+nivel)</h2>
+<pre><code>auth.users  ─────┬─────→  profiles
+                 │
+                 └─────→  visitas (asesor_id)
+                              │
+                              └─────→  beneficiarios
+                                           │
+                                           ├─────→  informacion_financiera
+                                           │
+                                           └─────→  predios
+                                                        │
+                                                        ├─→ caracterizacion_predio (1:1)
+                                                        ├─→ abastecimiento_agua
+                                                        ├─→ riesgos_predio
+                                                        └─→ area_productiva
+
+caracterizaciones  ──→  visitas (id_visita)
+                   ──→  beneficiarios (id_beneficiario)
+                   ──→  predios (id_predio)
+
+archivos           ──→  caracterizaciones
+
+invitations        ──→  auth.users (invitado_por)</code></pre>
+<hr />
+<h2 id="tablas">3. Tablas</h2>
+<h3 id="profiles">3.1 <code>profiles</code></h3>
+<p>Extiende <code>auth.users</code> con información de rol y estado.</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Columna</th>
+<th>Tipo</th>
+<th>Nullable</th>
+<th>Default</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td>—</td>
+<td>PK, FK → <code>auth.users(id)</code> ON DELETE CASCADE</td>
+</tr>
+<tr>
+<td><code>email</code></td>
+<td>VARCHAR(255)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Correo electrónico</td>
+</tr>
+<tr>
+<td><code>nombre_completo</code></td>
+<td>VARCHAR(200)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Nombre completo</td>
+</tr>
+<tr>
+<td><code>rol</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td><code>'asesor'</code></td>
+<td>CHECK IN (<code>'admin'</code>, <code>'asesor'</code>,
+<code>'agricultor'</code>, <code>'analista'</code>)</td>
+</tr>
+<tr>
+<td><code>numero_documento</code></td>
+<td>VARCHAR(20)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Documento del usuario (clave para agricultores)</td>
+</tr>
+<tr>
+<td><code>telefono</code></td>
+<td>VARCHAR(20)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Teléfono</td>
+</tr>
+<tr>
+<td><code>activo</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>TRUE</td>
+<td>Si FALSE, no puede iniciar sesión</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Triggers:</strong> - <code>on_auth_user_created</code> →
+<code>handle_new_user()</code>: al crearse usuario en
+<code>auth.users</code>, inserta automáticamente en
+<code>profiles</code> con rol por defecto.</p>
+<p><strong>Políticas RLS:</strong> - SELECT: propio usuario o admin. -
+INSERT: propio usuario. - UPDATE: propio usuario o admin.</p>
+<hr />
+<h3 id="visitas">3.2 <code>visitas</code></h3>
+<p>Cada visita técnica realizada al predio.</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Columna</th>
+<th>Tipo</th>
+<th>Nullable</th>
+<th>Default</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td><code>gen_random_uuid()</code></td>
+<td>PK</td>
+</tr>
+<tr>
+<td><code>fecha_visita</code></td>
+<td>DATE</td>
+<td>NO</td>
+<td>—</td>
+<td>Fecha de la visita</td>
+</tr>
+<tr>
+<td><code>nombre_tecnico</code></td>
+<td>VARCHAR(100)</td>
+<td>NO</td>
+<td>—</td>
+<td>Técnico que realizó la visita</td>
+</tr>
+<tr>
+<td><code>codigo_formulario</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Código del formulario</td>
+</tr>
+<tr>
+<td><code>version_formulario</code></td>
+<td>VARCHAR(20)</td>
+<td>SÍ</td>
+<td><code>'1.0'</code></td>
+<td>Versión del formulario</td>
+</tr>
+<tr>
+<td><code>fecha_emision_formulario</code></td>
+<td>DATE</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Fecha de emisión del formato</td>
+</tr>
+<tr>
+<td><code>radicado_local</code></td>
+<td>VARCHAR(100)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>UNIQUE, asignado por cliente (<code>RAD-LOCAL-...</code>)</td>
+</tr>
+<tr>
+<td><code>radicado_oficial</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>UNIQUE, asignado por servidor (<code>RAD-000001</code>)</td>
+</tr>
+<tr>
+<td><code>estado</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td><code>'PENDIENTE_SINCRONIZACION'</code></td>
+<td>Estado legacy — hoy se usa
+<code>caracterizaciones.estado</code></td>
+</tr>
+<tr>
+<td><code>asesor_id</code></td>
+<td>UUID</td>
+<td>SÍ</td>
+<td>—</td>
+<td>FK → <code>auth.users(id)</code></td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Índices:</strong> - <code>idx_visitas_fecha</code>,
+<code>idx_visitas_asesor</code>, <code>idx_visitas_estado</code>,
+<code>idx_visitas_radicado_local</code>.</p>
+<p><strong>Políticas RLS:</strong> - SELECT/UPDATE: propio asesor o
+admin. - INSERT: solo con <code>asesor_id = auth.uid()</code>. - DELETE:
+solo admin.</p>
+<hr />
+<h3 id="beneficiarios">3.3 <code>beneficiarios</code></h3>
+<p>Información personal del productor.</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Columna</th>
+<th>Tipo</th>
+<th>Nullable</th>
+<th>Default</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td><code>gen_random_uuid()</code></td>
+<td>PK</td>
+</tr>
+<tr>
+<td><code>id_visita</code></td>
+<td>UUID</td>
+<td>SÍ</td>
+<td>—</td>
+<td>FK → <code>visitas(id)</code> ON DELETE CASCADE</td>
+</tr>
+<tr>
+<td><code>nombres</code></td>
+<td>VARCHAR(100)</td>
+<td>NO</td>
+<td>—</td>
+<td>Nombres completos</td>
+</tr>
+<tr>
+<td><code>apellidos</code></td>
+<td>VARCHAR(100)</td>
+<td>NO</td>
+<td>—</td>
+<td>Apellidos completos</td>
+</tr>
+<tr>
+<td><code>tipo_documento</code></td>
+<td>VARCHAR(10)</td>
+<td>NO</td>
+<td>—</td>
+<td>CHECK IN (<code>'CC'</code>, <code>'CE'</code>, <code>'TI'</code>,
+<code>'PAS'</code>, <code>'NIT'</code>)</td>
+</tr>
+<tr>
+<td><code>numero_documento</code></td>
+<td>VARCHAR(20)</td>
+<td>NO</td>
+<td>—</td>
+<td>Número de documento</td>
+</tr>
+<tr>
+<td><code>fecha_nacimiento</code></td>
+<td>DATE</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Fecha de nacimiento</td>
+</tr>
+<tr>
+<td><code>edad</code></td>
+<td>INTEGER</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Edad</td>
+</tr>
+<tr>
+<td><code>genero</code></td>
+<td>VARCHAR(20)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Género</td>
+</tr>
+<tr>
+<td><code>personas_a_cargo</code></td>
+<td>INTEGER</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Número de personas a cargo</td>
+</tr>
+<tr>
+<td><code>telefono</code></td>
+<td>VARCHAR(20)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Teléfono principal</td>
+</tr>
+<tr>
+<td><code>correo</code></td>
+<td>VARCHAR(100)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Correo electrónico</td>
+</tr>
+<tr>
+<td><code>ocupacion_principal</code></td>
+<td>VARCHAR(100)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Ocupación principal</td>
+</tr>
+<tr>
+<td><code>nombre_contacto_secundario</code></td>
+<td>VARCHAR(200)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Nombre contacto secundario</td>
+</tr>
+<tr>
+<td><code>telefono_secundario</code></td>
+<td>VARCHAR(20)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Teléfono del contacto</td>
+</tr>
+<tr>
+<td><code>parentesco_contacto_secundario</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Relación del contacto</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Índices:</strong>
+<code>idx_beneficiarios_documento</code>.</p>
+<p><strong>Políticas RLS:</strong> heredadas vía <code>id_visita</code>
+→ <code>visitas.asesor_id</code> o admin.</p>
+<hr />
+<h3 id="predios">3.4 <code>predios</code></h3>
+<p>Información del predio rural.</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Columna</th>
+<th>Tipo</th>
+<th>Nullable</th>
+<th>Default</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td><code>gen_random_uuid()</code></td>
+<td>PK</td>
+</tr>
+<tr>
+<td><code>id_beneficiario</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td>—</td>
+<td>FK → <code>beneficiarios(id)</code> ON DELETE CASCADE</td>
+</tr>
+<tr>
+<td><code>nombre_predio</code></td>
+<td>VARCHAR(100)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Nombre del predio</td>
+</tr>
+<tr>
+<td><code>departamento</code></td>
+<td>VARCHAR(50)</td>
+<td>NO</td>
+<td><code>'Santander'</code></td>
+<td>Departamento</td>
+</tr>
+<tr>
+<td><code>municipio</code></td>
+<td>VARCHAR(50)</td>
+<td>NO</td>
+<td>—</td>
+<td>Municipio</td>
+</tr>
+<tr>
+<td><code>vereda</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Vereda</td>
+</tr>
+<tr>
+<td><code>direccion</code></td>
+<td>VARCHAR(200)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Dirección</td>
+</tr>
+<tr>
+<td><code>codigo_catastral</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Código catastral IGAC</td>
+</tr>
+<tr>
+<td><code>documento_tenencia</code></td>
+<td>VARCHAR(100)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Documento de tenencia</td>
+</tr>
+<tr>
+<td><code>tipo_tenencia</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>CHECK IN (<code>'Propia'</code>, <code>'Posesion'</code>,
+<code>'Arriendo'</code>, <code>'Otro'</code>)</td>
+</tr>
+<tr>
+<td><code>tipo_tenencia_otro</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Texto libre si tipo = Otro</td>
+</tr>
+<tr>
+<td><code>coordenada_x</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Coordenada X (MAGNA-SIRGAS, opcional)</td>
+</tr>
+<tr>
+<td><code>coordenada_y</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Coordenada Y</td>
+</tr>
+<tr>
+<td><code>latitud</code></td>
+<td>DECIMAL(10,8)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Latitud GPS</td>
+</tr>
+<tr>
+<td><code>longitud</code></td>
+<td>DECIMAL(11,8)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Longitud GPS</td>
+</tr>
+<tr>
+<td><code>altitud_msnm</code></td>
+<td>DECIMAL(8,2)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Altitud metros sobre nivel del mar</td>
+</tr>
+<tr>
+<td><code>poligono</code></td>
+<td>JSONB</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Array de <code>[lat, lng]</code> del perímetro</td>
+</tr>
+<tr>
+<td><code>tipo_ubicacion</code></td>
+<td>VARCHAR(20)</td>
+<td>SÍ</td>
+<td>—</td>
+<td><code>'punto'</code> o <code>'poligono'</code></td>
+</tr>
+<tr>
+<td><code>vive_en_predio</code></td>
+<td>VARCHAR(10)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>CHECK IN (<code>'Si'</code>, <code>'No'</code>,
+<code>'Cerca'</code>)</td>
+</tr>
+<tr>
+<td><code>tiene_vivienda</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td>Vivienda en el predio</td>
+</tr>
+<tr>
+<td><code>area_total_hectareas</code></td>
+<td>DECIMAL(10,2)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Área total (ha)</td>
+</tr>
+<tr>
+<td><code>area_productiva_hectareas</code></td>
+<td>DECIMAL(10,2)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Área cultivable (ha)</td>
+</tr>
+<tr>
+<td><code>cultivos_existentes</code></td>
+<td>TEXT</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Descripción texto libre</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Índices:</strong> <code>idx_predios_municipio</code>.</p>
+<p><strong>Políticas RLS:</strong> cascada vía
+<code>beneficiarios → visitas → asesor_id</code> o admin.</p>
+<hr />
+<h3 id="caracterizacion_predio">3.5
+<code>caracterizacion_predio</code></h3>
+<p>Datos técnicos del predio (1:1 con <code>predios</code>).</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Columna</th>
+<th>Tipo</th>
+<th>Nullable</th>
+<th>Default</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td><code>gen_random_uuid()</code></td>
+<td>PK</td>
+</tr>
+<tr>
+<td><code>id_predio</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td>—</td>
+<td>UNIQUE, FK → <code>predios(id)</code> ON DELETE CASCADE</td>
+</tr>
+<tr>
+<td><code>ruta_acceso</code></td>
+<td>TEXT</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Descripción de acceso</td>
+</tr>
+<tr>
+<td><code>distancia_km</code></td>
+<td>DECIMAL(6,2)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Distancia desde cabecera (km)</td>
+</tr>
+<tr>
+<td><code>tiempo_acceso</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Tiempo aproximado</td>
+</tr>
+<tr>
+<td><code>temperatura_celsius</code></td>
+<td>DECIMAL(4,1)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Temperatura promedio</td>
+</tr>
+<tr>
+<td><code>meses_lluvia</code></td>
+<td>VARCHAR(100)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Meses de lluvia</td>
+</tr>
+<tr>
+<td><code>topografia</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>CHECK IN (<code>'0-25% Plana'</code>,
+<code>'26-50% Inclinada'</code>, <code>'51%&gt; Pendiente'</code>)</td>
+</tr>
+<tr>
+<td><code>cobertura_bosque</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>cobertura_cultivos</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>cobertura_pastos</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>cobertura_rastrojo</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="abastecimiento_agua">3.6 <code>abastecimiento_agua</code></h3>
+<p>Fuentes de abastecimiento de agua.</p>
+<table>
+<thead>
+<tr>
+<th>Columna</th>
+<th>Tipo</th>
+<th>Nullable</th>
+<th>Default</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td><code>gen_random_uuid()</code></td>
+<td>PK</td>
+</tr>
+<tr>
+<td><code>id_predio</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td>—</td>
+<td>FK → <code>predios(id)</code> ON DELETE CASCADE</td>
+</tr>
+<tr>
+<td><code>nacimiento_manantial</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>rio_quebrada</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>pozo</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>acueducto_rural</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>canal_distrito_riego</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>jaguey_reservorio</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>agua_lluvia</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>otra_fuente</code></td>
+<td>VARCHAR(100)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Otra fuente (texto libre)</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="riesgos_predio">3.7 <code>riesgos_predio</code></h3>
+<p>Riesgos identificados en el predio.</p>
+<table>
+<thead>
+<tr>
+<th>Columna</th>
+<th>Tipo</th>
+<th>Nullable</th>
+<th>Default</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td><code>gen_random_uuid()</code></td>
+<td>PK</td>
+</tr>
+<tr>
+<td><code>id_predio</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td>—</td>
+<td>FK → <code>predios(id)</code> ON DELETE CASCADE</td>
+</tr>
+<tr>
+<td><code>inundacion</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>sequia</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>viento</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>helada</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>otros_riesgos</code></td>
+<td>TEXT</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Otros riesgos (texto libre)</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="area_productiva">3.8 <code>area_productiva</code></h3>
+<p>Datos productivos del predio.</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Columna</th>
+<th>Tipo</th>
+<th>Nullable</th>
+<th>Default</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td><code>gen_random_uuid()</code></td>
+<td>PK</td>
+</tr>
+<tr>
+<td><code>id_predio</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td>—</td>
+<td>FK → <code>predios(id)</code> ON DELETE CASCADE</td>
+</tr>
+<tr>
+<td><code>sistema_productivo</code></td>
+<td>VARCHAR(100)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Sistema productivo</td>
+</tr>
+<tr>
+<td><code>caracterizacion_cultivo</code></td>
+<td>TEXT</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Descripción del cultivo</td>
+</tr>
+<tr>
+<td><code>cantidad_produccion</code></td>
+<td>VARCHAR(100)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Cantidad de producción</td>
+</tr>
+<tr>
+<td><code>estado_cultivo</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>CHECK IN (<code>'Tecnificado'</code>, <code>'En mal estado'</code>,
+<code>'NS/NR'</code>)</td>
+</tr>
+<tr>
+<td><code>tiene_infraestructura_procesamiento</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>estructuras</code></td>
+<td>TEXT</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Descripción de estructuras</td>
+</tr>
+<tr>
+<td><code>interesado_programa</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td>Interés en el programa</td>
+</tr>
+<tr>
+<td><code>donde_comercializa</code></td>
+<td>TEXT</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Canales de comercialización</td>
+</tr>
+<tr>
+<td><code>ingreso_mensual_ventas</code></td>
+<td>DECIMAL(12,2)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Ingreso mensual por ventas</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="informacion_financiera">3.9
+<code>informacion_financiera</code></h3>
+<p>Información financiera del beneficiario.</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Columna</th>
+<th>Tipo</th>
+<th>Nullable</th>
+<th>Default</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td><code>gen_random_uuid()</code></td>
+<td>PK</td>
+</tr>
+<tr>
+<td><code>id_beneficiario</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td>—</td>
+<td>FK → <code>beneficiarios(id)</code> ON DELETE CASCADE</td>
+</tr>
+<tr>
+<td><code>ingresos_mensuales_agropecuaria</code></td>
+<td>DECIMAL(12,2)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Ingresos agropecuarios</td>
+</tr>
+<tr>
+<td><code>ingresos_mensuales_otros</code></td>
+<td>DECIMAL(12,2)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Otros ingresos</td>
+</tr>
+<tr>
+<td><code>egresos_mensuales</code></td>
+<td>DECIMAL(12,2)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Egresos mensuales</td>
+</tr>
+<tr>
+<td><code>activos_totales</code></td>
+<td>DECIMAL(15,2)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Activos totales</td>
+</tr>
+<tr>
+<td><code>activos_agropecuaria</code></td>
+<td>DECIMAL(15,2)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Activos agropecuarios</td>
+</tr>
+<tr>
+<td><code>pasivos_totales</code></td>
+<td>DECIMAL(15,2)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Pasivos totales</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="caracterizaciones">3.10 <code>caracterizaciones</code></h3>
+<p>Tabla central que relaciona visita + beneficiario + predio.</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Columna</th>
+<th>Tipo</th>
+<th>Nullable</th>
+<th>Default</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td><code>gen_random_uuid()</code></td>
+<td>PK</td>
+</tr>
+<tr>
+<td><code>id_visita</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td>—</td>
+<td>FK → <code>visitas(id)</code> ON DELETE CASCADE</td>
+</tr>
+<tr>
+<td><code>id_beneficiario</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td>—</td>
+<td>FK → <code>beneficiarios(id)</code> ON DELETE CASCADE</td>
+</tr>
+<tr>
+<td><code>id_predio</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td>—</td>
+<td>FK → <code>predios(id)</code> ON DELETE CASCADE</td>
+</tr>
+<tr>
+<td><code>estado</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td><code>'INICIADO'</code></td>
+<td>Estado actual (INICIADO, REVISADO, EN_ESTUDIO_CREDITO, APROBADO,
+CANCELADO)</td>
+</tr>
+<tr>
+<td><code>observaciones</code></td>
+<td>TEXT</td>
+<td>SÍ</td>
+<td>—</td>
+<td>Observaciones generales</td>
+</tr>
+<tr>
+<td><code>foto_1_url</code></td>
+<td>VARCHAR(500)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>URL Storage de foto 1 del predio</td>
+</tr>
+<tr>
+<td><code>foto_2_url</code></td>
+<td>VARCHAR(500)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>URL Storage de foto 2 del predio</td>
+</tr>
+<tr>
+<td><code>foto_beneficiario_url</code></td>
+<td>VARCHAR(500)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>URL Storage de foto del productor</td>
+</tr>
+<tr>
+<td><code>foto_doc_frontal_url</code></td>
+<td>VARCHAR(500)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>URL Storage documento frontal</td>
+</tr>
+<tr>
+<td><code>foto_doc_trasera_url</code></td>
+<td>VARCHAR(500)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>URL Storage documento trasero</td>
+</tr>
+<tr>
+<td><code>firma_productor_url</code></td>
+<td>VARCHAR(500)</td>
+<td>SÍ</td>
+<td>—</td>
+<td>URL Storage firma digital</td>
+</tr>
+<tr>
+<td><code>autorizacion_datos_personales</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td>Autorización tratamiento datos</td>
+</tr>
+<tr>
+<td><code>autorizacion_consulta_crediticia</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td>Autorización centrales de riesgo</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Índices:</strong>
+<code>idx_caracterizaciones_visita</code>.</p>
+<p><strong>Estados posibles:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Valor</th>
+<th>Label UI</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>INICIADO</code></td>
+<td>“Iniciado”</td>
+<td>Recién registrado</td>
+</tr>
+<tr>
+<td><code>REVISADO</code></td>
+<td>“Revisado”</td>
+<td>Asesor confirmó</td>
+</tr>
+<tr>
+<td><code>EN_ESTUDIO_CREDITO</code></td>
+<td>“En estudio”</td>
+<td>Analista evaluando</td>
+</tr>
+<tr>
+<td><code>APROBADO</code></td>
+<td>“Viable”</td>
+<td>Aprobado para programa</td>
+</tr>
+<tr>
+<td><code>CANCELADO</code></td>
+<td>“No Viable”</td>
+<td>No aplica</td>
+</tr>
+<tr>
+<td><code>SINCRONIZADO</code> (legacy)</td>
+<td>—</td>
+<td>Compatibilidad retro</td>
+</tr>
+<tr>
+<td><code>EN_REVISION</code> (legacy)</td>
+<td>—</td>
+<td>Compatibilidad retro</td>
+</tr>
+<tr>
+<td><code>RECHAZADO</code> (legacy)</td>
+<td>—</td>
+<td>Compatibilidad retro</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="archivos-definida-pero-no-utilizada-actualmente">3.11
+<code>archivos</code> <em>(definida pero no utilizada
+actualmente)</em></h3>
+<p>Tabla de tracking de uploads definida en
+<code>scripts/002_complete_schema.sql</code>. La aplicación actual
+almacena las URLs directamente en columnas de
+<code>caracterizaciones</code> (<code>foto_1_url</code>,
+<code>foto_2_url</code>, <code>foto_beneficiario_url</code>,
+<code>foto_doc_frontal_url</code>, <code>foto_doc_trasera_url</code>,
+<code>firma_productor_url</code>), por lo que esta tabla no se usa en el
+flujo activo. Se conserva por compatibilidad y posible uso futuro.</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>Columna</th>
+<th>Tipo</th>
+<th>Nullable</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td>PK</td>
+</tr>
+<tr>
+<td><code>caracterizacion_id</code></td>
+<td>UUID</td>
+<td>SÍ</td>
+<td>FK → <code>caracterizaciones(id)</code> ON DELETE CASCADE</td>
+</tr>
+<tr>
+<td><code>tipo</code></td>
+<td>TEXT</td>
+<td>NO</td>
+<td>CHECK IN (<code>'firma'</code>, <code>'foto_productor'</code>,
+<code>'documento_adicional'</code>)</td>
+</tr>
+<tr>
+<td><code>nombre_archivo</code></td>
+<td>TEXT</td>
+<td>NO</td>
+<td>Nombre del archivo</td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td>TEXT</td>
+<td>NO</td>
+<td>URL pública o firmada</td>
+</tr>
+<tr>
+<td><code>size_bytes</code></td>
+<td>INTEGER</td>
+<td>SÍ</td>
+<td>Tamaño en bytes</td>
+</tr>
+<tr>
+<td><code>mime_type</code></td>
+<td>TEXT</td>
+<td>SÍ</td>
+<td>MIME type</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="sync_log-definida-pero-no-utilizada-actualmente">3.12
+<code>sync_log</code> <em>(definida pero no utilizada
+actualmente)</em></h3>
+<p>Tabla de log de registro en servidor. Definida en
+<code>scripts/002_complete_schema.sql</code> pero no se escribe desde el
+código actual.</p>
+<table>
+<thead>
+<tr>
+<th>Columna</th>
+<th>Tipo</th>
+<th>Nullable</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td>PK</td>
+</tr>
+<tr>
+<td><code>caracterizacion_id</code></td>
+<td>UUID</td>
+<td>SÍ</td>
+<td>FK → <code>caracterizaciones(id)</code></td>
+</tr>
+<tr>
+<td><code>asesor_id</code></td>
+<td>UUID</td>
+<td>SÍ</td>
+<td>FK → <code>profiles(id)</code></td>
+</tr>
+<tr>
+<td><code>estado</code></td>
+<td>TEXT</td>
+<td>NO</td>
+<td>CHECK IN (<code>'exitoso'</code>, <code>'fallido'</code>)</td>
+</tr>
+<tr>
+<td><code>radicado_generado</code></td>
+<td>TEXT</td>
+<td>SÍ</td>
+<td></td>
+</tr>
+<tr>
+<td><code>error_mensaje</code></td>
+<td>TEXT</td>
+<td>SÍ</td>
+<td></td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td>JSONB</td>
+<td>SÍ</td>
+<td></td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="invitations">3.13 <code>invitations</code></h3>
+<p>Tokens para invitar usuarios por correo.</p>
+<table>
+<thead>
+<tr>
+<th>Columna</th>
+<th>Tipo</th>
+<th>Nullable</th>
+<th>Default</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>UUID</td>
+<td>NO</td>
+<td><code>gen_random_uuid()</code></td>
+<td>PK</td>
+</tr>
+<tr>
+<td><code>email</code></td>
+<td>VARCHAR(255)</td>
+<td>NO</td>
+<td>—</td>
+<td>Correo invitado</td>
+</tr>
+<tr>
+<td><code>token</code></td>
+<td>VARCHAR(255)</td>
+<td>NO</td>
+<td>—</td>
+<td>UNIQUE, token único</td>
+</tr>
+<tr>
+<td><code>rol</code></td>
+<td>VARCHAR(50)</td>
+<td>SÍ</td>
+<td><code>'asesor'</code></td>
+<td>Rol a asignar</td>
+</tr>
+<tr>
+<td><code>invitado_por</code></td>
+<td>UUID</td>
+<td>SÍ</td>
+<td>—</td>
+<td>FK → <code>auth.users(id)</code></td>
+</tr>
+<tr>
+<td><code>usado</code></td>
+<td>BOOLEAN</td>
+<td>SÍ</td>
+<td>FALSE</td>
+<td>Si ya se redimió</td>
+</tr>
+<tr>
+<td><code>expires_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>NO</td>
+<td>—</td>
+<td>Expiración (24 h por defecto)</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>TIMESTAMPTZ</td>
+<td>SÍ</td>
+<td>NOW()</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Políticas RLS:</strong> - SELECT: admin o quien invitó. -
+INSERT: solo admin o asesor.</p>
+<hr />
+<h2 id="tipos-enumerados-check-constraints">4. Tipos enumerados (CHECK
+constraints)</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Tabla.columna</th>
+<th>Valores permitidos</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>profiles.rol</code></td>
+<td><code>admin</code>, <code>asesor</code>, <code>agricultor</code>,
+<code>analista</code></td>
+</tr>
+<tr>
+<td><code>beneficiarios.tipo_documento</code></td>
+<td><code>CC</code>, <code>CE</code>, <code>TI</code>, <code>PAS</code>,
+<code>NIT</code></td>
+</tr>
+<tr>
+<td><code>predios.tipo_tenencia</code></td>
+<td><code>Propia</code>, <code>Posesion</code>, <code>Arriendo</code>,
+<code>Otro</code></td>
+</tr>
+<tr>
+<td><code>predios.vive_en_predio</code></td>
+<td><code>Si</code>, <code>No</code>, <code>Cerca</code></td>
+</tr>
+<tr>
+<td><code>caracterizacion_predio.topografia</code></td>
+<td><code>0-25% Plana</code>, <code>26-50% Inclinada</code>,
+<code>51%&gt; Pendiente</code></td>
+</tr>
+<tr>
+<td><code>area_productiva.estado_cultivo</code></td>
+<td><code>Tecnificado</code>, <code>En mal estado</code>,
+<code>NS/NR</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="funciones-y-triggers">5. Funciones y triggers</h2>
+<h3 id="handle_new_user">5.1 <code>handle_new_user()</code></h3>
+<p>Trigger en <code>auth.users</code> AFTER INSERT. Crea automáticamente
+la fila correspondiente en <code>profiles</code> con rol
+<code>'asesor'</code> por defecto (o el rol especificado en
+<code>raw_user_meta_data</code>).</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REPLACE</span> <span class="kw">FUNCTION</span> <span class="kw">public</span>.handle_new_user()</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>RETURNS <span class="kw">TRIGGER</span> LANGUAGE plpgsql SECURITY <span class="kw">DEFINER</span> <span class="kw">AS</span> $$</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="cf">BEGIN</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">INSERT</span> <span class="kw">INTO</span> <span class="kw">public</span>.profiles (<span class="kw">id</span>, email, nombre_completo, rol)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">VALUES</span> (</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">NEW</span>.<span class="kw">id</span>,</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">NEW</span>.email,</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">COALESCE</span>(<span class="kw">NEW</span>.raw_user_meta_data <span class="op">-&gt;&gt;</span> <span class="st">&#39;nombre_completo&#39;</span>, <span class="kw">NEW</span>.email),</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">COALESCE</span>(<span class="kw">NEW</span>.raw_user_meta_data <span class="op">-&gt;&gt;</span> <span class="st">&#39;rol&#39;</span>, <span class="st">&#39;asesor&#39;</span>)</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  <span class="kw">ON</span> CONFLICT (<span class="kw">id</span>) DO <span class="kw">NOTHING</span>;</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>  <span class="kw">RETURN</span> <span class="kw">NEW</span>;</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="cf">END</span>;</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>$$;</span></code></pre></div>
+<h3 id="generar_radicado_oficial">5.2
+<code>generar_radicado_oficial()</code></h3>
+<p>Función PL/pgSQL que calcula el siguiente radicado oficial
+(<code>RAD-000001</code>, <code>RAD-000002</code>, …). Se invoca desde
+el endpoint <code>/api/caracterizaciones</code> al crear una visita.</p>
+<hr />
+<h2 id="storage-buckets-supabase-storage">6. Storage Buckets (Supabase
+Storage)</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Bucket</th>
+<th>Público</th>
+<th>Contenido</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fotos-productores</code></td>
+<td>NO</td>
+<td>Fotos de rostro de beneficiarios</td>
+</tr>
+<tr>
+<td><code>firmas</code></td>
+<td>NO</td>
+<td>Firmas digitales (PNG)</td>
+</tr>
+<tr>
+<td><code>fotos-predios</code></td>
+<td>NO</td>
+<td>Fotos del predio (hasta 2 por caracterización)</td>
+</tr>
+<tr>
+<td><code>documentos-identidad</code></td>
+<td>NO</td>
+<td>Fotos frontal/trasera del documento</td>
+</tr>
+</tbody>
+</table>
+<p>Acceso controlado por políticas RLS de Storage. Las URLs firmadas
+tienen validez 1 hora (configurable).</p>
+<hr />
+<h2 id="matriz-de-relaciones-cardinalidad">7. Matriz de relaciones
+(cardinalidad)</h2>
+<table>
+<thead>
+<tr>
+<th>Origen</th>
+<th>Relación</th>
+<th>Destino</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>auth.users</code></td>
+<td>1:1</td>
+<td><code>profiles</code></td>
+</tr>
+<tr>
+<td><code>auth.users</code> (asesor)</td>
+<td>1:N</td>
+<td><code>visitas</code></td>
+</tr>
+<tr>
+<td><code>visitas</code></td>
+<td>1:N</td>
+<td><code>beneficiarios</code></td>
+</tr>
+<tr>
+<td><code>beneficiarios</code></td>
+<td>1:N</td>
+<td><code>predios</code></td>
+</tr>
+<tr>
+<td><code>beneficiarios</code></td>
+<td>1:1</td>
+<td><code>informacion_financiera</code></td>
+</tr>
+<tr>
+<td><code>predios</code></td>
+<td>1:1</td>
+<td><code>caracterizacion_predio</code></td>
+</tr>
+<tr>
+<td><code>predios</code></td>
+<td>1:N</td>
+<td><code>abastecimiento_agua</code></td>
+</tr>
+<tr>
+<td><code>predios</code></td>
+<td>1:N</td>
+<td><code>riesgos_predio</code></td>
+</tr>
+<tr>
+<td><code>predios</code></td>
+<td>1:N</td>
+<td><code>area_productiva</code></td>
+</tr>
+<tr>
+<td><code>visitas</code> + <code>beneficiarios</code> +
+<code>predios</code></td>
+<td>1:1</td>
+<td><code>caracterizaciones</code></td>
+</tr>
+<tr>
+<td><code>auth.users</code> (invitado_por)</td>
+<td>1:N</td>
+<td><code>invitations</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="integridad-referencial">9. Integridad referencial</h2>
+<ul>
+<li>Todas las FK utilizan <strong>ON DELETE CASCADE</strong> salvo
+<code>visitas.asesor_id</code> (SET NULL implícito, el asesor puede
+eliminarse sin perder las visitas).</li>
+<li>Al eliminar una caracterización (admin) se eliminan en cascada:
+visita, beneficiario, predio y todas las sub-tablas.</li>
+<li><code>beneficiarios.numero_documento</code> NO es UNIQUE porque un
+mismo beneficiario puede tener múltiples visitas/caracterizaciones en el
+tiempo.</li>
+</ul>
+<hr />
+<h2 id="políticas-de-row-level-security">10. Políticas de Row Level
+Security</h2>
+<p>Todas las tablas tienen RLS habilitado. Patrón general:</p>
+<ul>
+<li><strong>SELECT</strong>: propio asesor (cadena
+<code>asesor_id = auth.uid()</code>) o <code>rol = 'admin'</code> o
+<code>rol = 'analista'</code>.</li>
+<li><strong>INSERT</strong>: solo con cadena que garantice
+<code>asesor_id = auth.uid()</code>.</li>
+<li><strong>UPDATE</strong>: propio asesor, admin o (para
+<code>caracterizaciones.estado</code>) analista.</li>
+<li><strong>DELETE</strong>: solo admin.</li>
+</ul>
+<p>Ver los archivos
+<code>scripts/003_complete_agrosantander_schema.sql</code> y
+<code>supabase/migrations/20260302_update_policies.sql</code> para el
+detalle completo de cada política.</p>
+<hr />
+<h2 id="migraciones-aplicadas">11. Migraciones aplicadas</h2>
+<p>En el repositorio se conservan dos conjuntos de scripts SQL:</p>
+<p><strong><code>scripts/</code></strong> — esquema inicial (orden de
+ejecución):</p>
+<ol type="1">
+<li><code>001_create_schema.sql</code> — tablas base.</li>
+<li><code>002_complete_schema.sql</code> — ampliación (incluye
+<code>predios.poligono</code>, <code>tipo_ubicacion</code>).</li>
+<li><code>003_complete_agrosantander_schema.sql</code> — esquema
+completo + RLS + triggers + funciones.</li>
+<li><code>004_insert_test_user_asesor.sql</code> — usuario de prueba
+(opcional).</li>
+<li><code>005_public_registros_rls.sql</code> — políticas para
+formulario público.</li>
+</ol>
+<p><strong><code>supabase/migrations/</code></strong> — cambios
+incrementales posteriores (orden por fecha):</p>
+<ol start="6" type="1">
+<li><code>20260309_fecha_nacimiento.sql</code> — añade
+<code>beneficiarios.fecha_nacimiento</code> (DATE).</li>
+<li><code>20260309_migracion_completa.sql</code> — consolidación
+idempotente: asegura <code>caracterizaciones.estado</code> con default
+<code>INICIADO</code>, elimina <code>visitas.estado</code> legacy,
+elimina <code>beneficiarios.foto_url</code>, crea política UPDATE en
+<code>caracterizaciones</code>.</li>
+<li><code>20260422_campos_adicionales.sql</code> — consolida los campos
+agregados durante el desarrollo: contacto secundario en
+<code>beneficiarios</code>,
+<code>foto_beneficiario_url</code>/<code>foto_doc_frontal_url</code>/<code>foto_doc_trasera_url</code>
+en <code>caracterizaciones</code>, <code>numero_documento</code> en
+<code>profiles</code>, y rol <code>analista</code> en el CHECK
+constraint de <code>profiles.rol</code>. Idempotente.</li>
+</ol>
+<blockquote>
+<p><strong>Para un despliegue fresco:</strong> ejecutar <strong>scripts
+001–005</strong> en orden y luego las tres migraciones en
+<code>supabase/migrations/</code> por fecha. El resultado es el esquema
+completo vigente en producción.</p>
+</blockquote>
+<hr />
+<h2 id="convenciones">12. Convenciones</h2>
+<ul>
+<li><strong>UUID v4</strong> como PK en todas las tablas (generación en
+BD).</li>
+<li><strong>TIMESTAMPTZ</strong> (con zona horaria) para todos los
+timestamps.</li>
+<li><strong>DECIMAL</strong> para valores monetarios y áreas (no
+<code>FLOAT</code>).</li>
+<li><strong>snake_case</strong> en nombres de tabla y columna.</li>
+<li><strong>CHECK constraints</strong> para enumerados pequeños
+(alternativa a tipos enum PostgreSQL).</li>
+<li>Estados en mayúsculas constantes (<code>INICIADO</code>,
+<code>REVISADO</code>, etc.), labels UI en español humano.</li>
+</ul>
+<hr />
+<p><em>Para ampliar el esquema, crear una nueva migración SQL con nombre
+<code>YYYYMMDD_&lt;descripcion&gt;.sql</code> en
+<code>supabase/migrations/</code> y actualizar este documento.</em></p>
+</body>
+</html>

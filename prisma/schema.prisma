@@ -1,0 +1,224 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── visitas ─────────────────────────────────────────────────────────────────
+model visitas {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fecha_visita             DateTime  @db.Date
+  nombre_tecnico           String    @db.VarChar
+  codigo_formulario        String?   @db.VarChar
+  version_formulario       String?   @db.VarChar
+  fecha_emision_formulario DateTime? @db.Date
+  radicado_local           String?   @unique @db.VarChar
+  radicado_oficial         String?   @unique @db.VarChar
+  asesor_id                String?   @db.Uuid
+  created_at               DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime? @default(now()) @db.Timestamptz(6)
+
+  beneficiarios     beneficiarios[]
+  caracterizaciones caracterizaciones[]
+}
+
+// ─── beneficiarios ───────────────────────────────────────────────────────────
+model beneficiarios {
+  id                             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id_visita                      String?   @db.Uuid
+  nombres                        String    @db.VarChar
+  apellidos                      String    @db.VarChar
+  tipo_documento                 String    @db.VarChar
+  numero_documento               String    @db.VarChar
+  edad                           Int?
+  telefono                       String?   @db.VarChar
+  correo                         String?   @db.VarChar
+  ocupacion_principal            String?   @db.VarChar
+  created_at                     DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime? @default(now()) @db.Timestamptz(6)
+  nombre_contacto_secundario     String?
+  telefono_secundario            String?
+  parentesco_contacto_secundario String?
+  genero                         String?
+  personas_a_cargo               Int?
+  fecha_nacimiento               DateTime? @db.Date
+
+  visitas                visitas?               @relation(fields: [id_visita], references: [id], onDelete: Cascade)
+  predios                predios[]
+  informacion_financiera informacion_financiera[]
+  caracterizaciones      caracterizaciones[]
+}
+
+// ─── predios ─────────────────────────────────────────────────────────────────
+model predios {
+  id                        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id_beneficiario           String    @db.Uuid
+  nombre_predio             String?   @db.VarChar
+  departamento              String    @db.VarChar
+  municipio                 String    @db.VarChar
+  vereda                    String?   @db.VarChar
+  direccion                 String?   @db.VarChar
+  codigo_catastral          String?   @db.VarChar
+  documento_tenencia        String?   @db.VarChar
+  tipo_tenencia             String?   @db.VarChar
+  tipo_tenencia_otro        String?   @db.VarChar
+  coordenada_x              String?   @db.VarChar
+  coordenada_y              String?   @db.VarChar
+  latitud                   Decimal?
+  longitud                  Decimal?
+  altitud_msnm              Decimal?
+  vive_en_predio            String?   @db.VarChar
+  tiene_vivienda            Boolean?
+  area_total_hectareas      Decimal?
+  area_productiva_hectareas Decimal?
+  cultivos_existentes       String?
+  created_at                DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime? @default(now()) @db.Timestamptz(6)
+  poligono                  Json?
+
+  beneficiarios          beneficiarios          @relation(fields: [id_beneficiario], references: [id], onDelete: Cascade)
+  caracterizacion_predio caracterizacion_predio?
+  abastecimiento_agua    abastecimiento_agua[]
+  riesgos_predio         riesgos_predio[]
+  area_productiva        area_productiva[]
+  caracterizaciones      caracterizaciones[]
+}
+
+// ─── caracterizacion_predio ──────────────────────────────────────────────────
+model caracterizacion_predio {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id_predio           String    @unique @db.Uuid
+  ruta_acceso         String?
+  distancia_km        Decimal?
+  tiempo_acceso       String?   @db.VarChar
+  temperatura_celsius Decimal?
+  meses_lluvia        String?   @db.VarChar
+  topografia          String?   @db.VarChar
+  cobertura_bosque    Boolean?
+  cobertura_cultivos  Boolean?
+  cobertura_pastos    Boolean?
+  cobertura_rastrojo  Boolean?
+  created_at          DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime? @default(now()) @db.Timestamptz(6)
+
+  predios predios @relation(fields: [id_predio], references: [id], onDelete: Cascade)
+}
+
+// ─── abastecimiento_agua ─────────────────────────────────────────────────────
+model abastecimiento_agua {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id_predio            String    @db.Uuid
+  nacimiento_manantial Boolean?
+  rio_quebrada         Boolean?
+  pozo                 Boolean?
+  acueducto_rural      Boolean?
+  canal_distrito_riego Boolean?
+  jaguey_reservorio    Boolean?
+  agua_lluvia          Boolean?
+  otra_fuente          String?   @db.VarChar
+  created_at           DateTime? @default(now()) @db.Timestamptz(6)
+
+  predios predios @relation(fields: [id_predio], references: [id], onDelete: Cascade)
+}
+
+// ─── riesgos_predio ──────────────────────────────────────────────────────────
+model riesgos_predio {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id_predio     String    @db.Uuid
+  inundacion    Boolean?
+  sequia        Boolean?
+  viento        Boolean?
+  helada        Boolean?
+  otros_riesgos String?
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  predios predios @relation(fields: [id_predio], references: [id], onDelete: Cascade)
+}
+
+// ─── area_productiva ─────────────────────────────────────────────────────────
+model area_productiva {
+  id                                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id_predio                           String    @db.Uuid
+  sistema_productivo                  String?   @db.VarChar
+  caracterizacion_cultivo             String?
+  cantidad_produccion                 String?   @db.VarChar
+  estado_cultivo                      String?   @db.VarChar
+  tiene_infraestructura_procesamiento Boolean?
+  estructuras                         String?
+  interesado_programa                 Boolean?
+  donde_comercializa                  String?
+  ingreso_mensual_ventas              Decimal?
+  created_at                          DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                          DateTime? @default(now()) @db.Timestamptz(6)
+
+  predios predios @relation(fields: [id_predio], references: [id], onDelete: Cascade)
+}
+
+// ─── informacion_financiera ──────────────────────────────────────────────────
+model informacion_financiera {
+  id                              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id_beneficiario                 String    @db.Uuid
+  ingresos_mensuales_agropecuaria Decimal?
+  ingresos_mensuales_otros        Decimal?
+  egresos_mensuales               Decimal?
+  activos_totales                 Decimal?
+  activos_agropecuaria            Decimal?
+  pasivos_totales                 Decimal?
+  created_at                      DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                      DateTime? @default(now()) @db.Timestamptz(6)
+
+  beneficiarios beneficiarios @relation(fields: [id_beneficiario], references: [id], onDelete: Cascade)
+}
+
+// ─── caracterizaciones ───────────────────────────────────────────────────────
+model caracterizaciones {
+  id                              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id_visita                       String    @db.Uuid
+  id_beneficiario                 String    @db.Uuid
+  id_predio                       String    @db.Uuid
+  observaciones                   String?
+  foto_1_url                      String?   @db.VarChar
+  foto_2_url                      String?   @db.VarChar
+  firma_productor_url             String?   @db.VarChar
+  autorizacion_datos_personales   Boolean?
+  autorizacion_consulta_crediticia Boolean?
+  created_at                      DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                      DateTime? @default(now()) @db.Timestamptz(6)
+  foto_doc_frontal_url            String?
+  foto_doc_trasera_url            String?
+  foto_beneficiario_url           String?
+  estado                          String?   @db.VarChar
+  autorizacion_aviso_privacidad   Boolean?
+  autorizacion_uso_imagen         Boolean?
+
+  visitas       visitas       @relation(fields: [id_visita],       references: [id], onDelete: Cascade)
+  beneficiarios beneficiarios @relation(fields: [id_beneficiario], references: [id], onDelete: Cascade)
+  predios       predios       @relation(fields: [id_predio],       references: [id], onDelete: Cascade)
+}
+
+// ─── profiles ────────────────────────────────────────────────────────────────
+model profiles {
+  id               String    @id @db.Uuid
+  email            String?   @db.VarChar
+  nombre_completo  String?   @db.VarChar
+  rol              String?   @db.VarChar
+  telefono         String?   @db.VarChar
+  activo           Boolean?
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime? @default(now()) @db.Timestamptz(6)
+  numero_documento String?   @db.VarChar
+}
+
+// ─── invitations ─────────────────────────────────────────────────────────────
+model invitations {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String    @db.VarChar
+  token        String    @unique @db.VarChar
+  rol          String?   @db.VarChar
+  invitado_por String?   @db.Uuid
+  usado        Boolean?
+  expires_at   DateTime  @db.Timestamptz(6)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+}

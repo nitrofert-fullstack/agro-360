@@ -13,8 +13,8 @@ export default async function FormularioPage() {
       .eq("id", user.id)
       .single()
 
-    // Si es campesino, verificamos si ya tiene un formulario activo
-    if (profile?.rol === "campesino") {
+    // Si es agricultor, verificamos si ya tiene un formulario activo
+    if (profile?.rol === "agricultor") {
       // Buscar por número de documento (más confiable que el correo).
       // Fallback a correo si el perfil aún no tiene número de documento guardado.
       const numDoc = (profile as { numero_documento?: string | null }).numero_documento

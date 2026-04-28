@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>06-guia-instalacion-despliegue</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">06-guia-instalacion-despliegue</h1>
+</header>
+<h1 id="guía-de-instalación-y-despliegue-agro360">Guía de Instalación y
+Despliegue — Agro360</h1>
+<p><strong>Sistema de Caracterización Predial Agropecuaria</strong>
+<strong>Versión:</strong> 1.0 — Entrega formal COA
+<strong>Fecha:</strong> Abril 2026</p>
+<hr />
+<h2 id="resumen">1. Resumen</h2>
+<p>Agro360 se despliega en <strong>dos servicios externos</strong>:</p>
+<ol type="1">
+<li><strong>Supabase</strong> (base de datos PostgreSQL + Auth +
+Storage) — https://supabase.com</li>
+<li><strong>Vercel</strong> (hosting frontend + funciones serverless) —
+https://vercel.com</li>
+</ol>
+<p>Ambos servicios tienen planes gratuitos suficientes para piloto. Para
+producción con volumen se recomienda al menos <strong>Supabase
+Pro</strong> y <strong>Vercel Pro</strong>.</p>
+<hr />
+<h2 id="requisitos-previos">2. Requisitos previos</h2>
+<h3 id="cuentas-y-accesos">2.1 Cuentas y accesos</h3>
+<ul>
+<li>Cuenta en <a href="https://supabase.com/">Supabase</a> (plan mínimo
+Free; recomendado Pro).</li>
+<li>Cuenta en <a href="https://vercel.com/">Vercel</a> (plan mínimo
+Hobby; recomendado Pro).</li>
+<li>Cuenta en <a href="https://github.com/">GitHub</a> (para alojar el
+repositorio privado).</li>
+<li>Credenciales SMTP para correo saliente (Gmail, SendGrid, AWS SES u
+otro).</li>
+<li>Cuenta en <a
+href="https://www.cloudflare.com/products/turnstile/">Cloudflare
+Turnstile</a> (captcha).</li>
+</ul>
+<h3 id="software-local-solo-para-desarrollo-o-primer-deploy-manual">2.2
+Software local (solo para desarrollo o primer deploy manual)</h3>
+<ul>
+<li><strong>Node.js</strong> 20.x o superior.</li>
+<li><strong>pnpm</strong> 8.x (o npm/yarn).</li>
+<li><strong>Git</strong>.</li>
+</ul>
+<h3 id="conocimiento-técnico">2.3 Conocimiento técnico</h3>
+<ul>
+<li>Nociones básicas de despliegue en Vercel.</li>
+<li>SQL básico (para aplicar migraciones en Supabase).</li>
+<li>Variables de entorno.</li>
+</ul>
+<hr />
+<h2 id="configuración-de-supabase-primera-vez">3. Configuración de
+Supabase (primera vez)</h2>
+<h3 id="crear-proyecto">3.1 Crear proyecto</h3>
+<ol type="1">
+<li>Entrar a https://supabase.com/dashboard.</li>
+<li><strong>New Project</strong> → asignar nombre (ej.
+<code>agro360-prod</code>).</li>
+<li>Seleccionar región cercana (ej.
+<code>South America (São Paulo)</code>).</li>
+<li>Establecer <strong>Database Password</strong> (guardar en gestor de
+contraseñas).</li>
+<li>Esperar 2–3 minutos a que se aprovisione.</li>
+</ol>
+<h3 id="obtener-credenciales">3.2 Obtener credenciales</h3>
+<p>En el proyecto → <strong>Settings → API</strong>:</p>
+<ul>
+<li><code>Project URL</code> →
+<strong><code>NEXT_PUBLIC_SUPABASE_URL</code></strong>.</li>
+<li><code>anon public</code> →
+<strong><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code></strong>.</li>
+<li><code>service_role</code> →
+<strong><code>SUPABASE_SERVICE_ROLE_KEY</code></strong> ⚠️ secreto, NO
+exponer al cliente.</li>
+</ul>
+<p>Guardar los tres valores.</p>
+<h3 id="aplicar-esquema-de-base-de-datos">3.3 Aplicar esquema de base de
+datos</h3>
+<p><strong>Orden de ejecución</strong> (SQL Editor → pegar y
+<strong>Run</strong>):</p>
+<ol type="1">
+<li><code>scripts/001_create_schema.sql</code> — tablas base.</li>
+<li><code>scripts/002_complete_schema.sql</code> — ampliación de
+tablas.</li>
+<li><code>scripts/003_complete_agrosantander_schema.sql</code> — esquema
+completo + RLS + triggers.</li>
+<li><code>scripts/005_public_registros_rls.sql</code> — políticas para
+formulario público.</li>
+<li>Migraciones en <code>supabase/migrations/</code> (orden por fecha):
+<ul>
+<li><code>20260309_fecha_nacimiento.sql</code> — añade
+<code>beneficiarios.fecha_nacimiento</code>.</li>
+<li><code>20260309_migracion_completa.sql</code> — consolidación
+idempotente (estado default <code>INICIADO</code>, limpieza de columnas
+legacy, política UPDATE en <code>caracterizaciones</code>).</li>
+<li><code>20260422_campos_adicionales.sql</code> — contacto secundario,
+fotos adicionales, <code>numero_documento</code> en
+<code>profiles</code>, rol <code>analista</code> en CHECK
+constraint.</li>
+</ul></li>
+</ol>
+<blockquote>
+<p><strong>Atajo:</strong> todas las migraciones son idempotentes
+(<code>IF NOT EXISTS</code> / <code>IF EXISTS</code>) — seguras de
+reejecutar sin perder datos.</p>
+</blockquote>
+<h3 id="crear-storage-buckets">3.4 Crear Storage buckets</h3>
+<p>Los buckets se crean <strong>automáticamente</strong> en el primer
+envío de caracterización (ver <code>lib/supabase/storage.ts</code>). Se
+pueden crear manualmente en <strong>Storage → New bucket</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Bucket</th>
+<th>Público</th>
+<th>Propósito</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fotos-productores</code></td>
+<td>No</td>
+<td>Fotos de rostro del beneficiario</td>
+</tr>
+<tr>
+<td><code>firmas</code></td>
+<td>No</td>
+<td>Firmas digitales</td>
+</tr>
+<tr>
+<td><code>fotos-predios</code></td>
+<td>No</td>
+<td>Fotos del predio</td>
+</tr>
+<tr>
+<td><code>documentos-identidad</code></td>
+<td>No</td>
+<td>Foto frontal y trasera del documento</td>
+</tr>
+</tbody>
+</table>
+<p>Tras creación, aplicar políticas: <strong>Storage → Policies</strong>
+→ para cada bucket:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Permitir a usuarios autenticados subir/leer</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> POLICY <span class="ot">&quot;authenticated_upload&quot;</span> <span class="kw">ON</span> <span class="kw">storage</span>.objects</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="cf">FOR</span> <span class="kw">INSERT</span> <span class="kw">TO</span> <span class="kw">authenticated</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">WITH</span> <span class="kw">CHECK</span> (bucket_id <span class="op">=</span> <span class="st">&#39;fotos-productores&#39;</span>);</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> POLICY <span class="ot">&quot;authenticated_read&quot;</span> <span class="kw">ON</span> <span class="kw">storage</span>.objects</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">FOR</span> <span class="kw">SELECT</span> <span class="kw">TO</span> <span class="kw">authenticated</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">USING</span> (bucket_id <span class="op">=</span> <span class="st">&#39;fotos-productores&#39;</span>);</span></code></pre></div>
+<p>(Repetir para los otros buckets.)</p>
+<h3 id="configurar-duración-del-jwt">3.5 Configurar duración del
+JWT</h3>
+<p><strong>Settings → Auth → JWT Expiry:</strong> - Recomendado:
+<strong>18000 segundos</strong> (5 horas) — balance entre seguridad y UX
+móvil. - Default: 3600 (1 hora).</p>
+<h3 id="configurar-provider-de-auth-por-email">3.6 Configurar provider
+de Auth por email</h3>
+<p><strong>Settings → Auth → Providers → Email:</strong> -
+<strong>Enable Email Provider</strong>: ON. - <strong>Confirm
+Email</strong>: ON (recomendado). - <strong>Secure Email
+Change</strong>: ON.</p>
+<p><strong>Settings → Auth → URL Configuration:</strong> - <strong>Site
+URL</strong>: <code>https://&lt;dominio-producción&gt;</code>. -
+<strong>Redirect URLs</strong>: agregar: -
+<code>https://&lt;dominio-producción&gt;/auth/callback</code> -
+<code>https://&lt;dominio-producción&gt;/auth/confirm</code></p>
+<h3 id="crear-usuario-admin-inicial">3.7 Crear usuario admin
+inicial</h3>
+<p>Opción A — desde SQL:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Después de crear el usuario via Supabase Dashboard → Authentication → Users → Add user</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">UPDATE</span> <span class="kw">public</span>.profiles</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> rol <span class="op">=</span> <span class="st">&#39;admin&#39;</span>, activo <span class="op">=</span> <span class="kw">true</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> email <span class="op">=</span> <span class="st">&#39;admin@tudominio.com&#39;</span>;</span></code></pre></div>
+<p>Opción B — desde la UI una vez desplegada la app:</p>
+<ol type="1">
+<li>Registrarse normalmente.</li>
+<li>Desde SQL Editor:
+<code>UPDATE profiles SET rol = 'admin' WHERE email = '...'</code>.</li>
+</ol>
+<hr />
+<h2 id="configuración-de-servicios-externos">4. Configuración de
+servicios externos</h2>
+<h3 id="cloudflare-turnstile">4.1 Cloudflare Turnstile</h3>
+<ol type="1">
+<li>Cuenta Cloudflare → <strong>Turnstile</strong> → <strong>Add
+site</strong>.</li>
+<li>Domain: el dominio de la app (y <code>localhost</code> para
+dev).</li>
+<li>Obtener <strong>Site Key</strong> →
+<code>NEXT_PUBLIC_TURNSTILE_SITE_KEY</code>.</li>
+<li>Obtener <strong>Secret Key</strong> →
+<code>TURNSTILE_SECRET_KEY</code>.</li>
+</ol>
+<h3 id="smtp-correo-saliente">4.2 SMTP (correo saliente)</h3>
+<p>Cualquier proveedor SMTP es válido. Ejemplo Gmail (contraseña de
+aplicación):</p>
+<ul>
+<li><code>SMTP_HOST</code>: <code>smtp.gmail.com</code></li>
+<li><code>SMTP_PORT</code>: <code>587</code></li>
+<li><code>SMTP_USER</code>: cuenta de envío.</li>
+<li><code>SMTP_PASS</code>: contraseña de aplicación (no la
+principal).</li>
+<li><code>SMTP_FROM</code>:
+<code>"Agro360 &lt;noreply@tudominio.com&gt;"</code></li>
+</ul>
+<p>Para producción se recomienda <strong>SendGrid</strong>, <strong>AWS
+SES</strong> o <strong>Mailgun</strong> por confiabilidad y límites.</p>
+<hr />
+<h2 id="variables-de-entorno">5. Variables de entorno</h2>
+<p>Lista completa:</p>
+<pre class="env"><code># --- Supabase (REQUERIDAS) ---
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=ey...
+SUPABASE_SERVICE_ROLE_KEY=ey...   # SECRETO, solo en servidor
+
+# --- App ---
+NEXT_PUBLIC_APP_URL=https://agro360.tudominio.com
+
+# --- Captcha (REQUERIDAS en producción) ---
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAAA...
+TURNSTILE_SECRET_KEY=0x4AAAAAAA...
+
+# --- SMTP (REQUERIDAS para correos) ---
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=noreply@tudominio.com
+SMTP_PASS=xxxxxxxxxxxx
+SMTP_FROM=&quot;Agro360 &lt;noreply@tudominio.com&gt;&quot;</code></pre>
+<hr />
+<h2 id="despliegue-en-vercel">6. Despliegue en Vercel</h2>
+<h3 id="opción-a-deploy-automático-desde-github-recomendado">6.1 Opción
+A — Deploy automático desde GitHub (recomendado)</h3>
+<ol type="1">
+<li>Subir el código a un repositorio GitHub privado.</li>
+<li>Vercel → <strong>New Project</strong> → <strong>Import Git
+Repository</strong> → seleccionar el repo.</li>
+<li><strong>Framework Preset</strong>: Next.js (se detecta
+automáticamente).</li>
+<li><strong>Root Directory</strong>: <code>.</code> (raíz).</li>
+<li><strong>Build Command</strong>: <code>next build</code>
+(default).</li>
+<li><strong>Output Directory</strong>: <code>.next</code>
+(default).</li>
+<li><strong>Install Command</strong>: <code>pnpm install</code> (ajustar
+si se usa npm/yarn).</li>
+<li><strong>Environment Variables</strong>: agregar todas las del punto
+5.</li>
+<li>Presionar <strong>Deploy</strong>.</li>
+<li>Esperar 3–5 minutos — la URL queda publicada.</li>
+</ol>
+<p><strong>Cada <code>git push</code> a <code>main</code></strong>
+redesplegará automáticamente.</p>
+<h3 id="opción-b-deploy-manual-con-vercel-cli">6.2 Opción B — Deploy
+manual con Vercel CLI</h3>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Instalar CLI</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> install <span class="at">-g</span> vercel</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Desde la raíz del proyecto</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="ex">vercel</span> login</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="ex">vercel</span> <span class="at">--prod</span></span></code></pre></div>
+<p>Seguir las indicaciones interactivas.</p>
+<h3 id="configurar-dominio-personalizado">6.3 Configurar dominio
+personalizado</h3>
+<ol type="1">
+<li>Vercel → Project → <strong>Settings → Domains</strong> → <strong>Add
+Domain</strong>.</li>
+<li>Ingresar el dominio (ej. <code>agro360.tu-dominio.com</code>).</li>
+<li>Agregar el registro CNAME o A indicado en el DNS del dominio.</li>
+<li>Esperar propagación DNS (puede tardar hasta 24 h, normalmente
+minutos).</li>
+<li>Vercel genera certificado TLS automático (Let’s Encrypt).</li>
+</ol>
+<h3 id="actualizar-next_public_app_url">6.4 Actualizar
+<code>NEXT_PUBLIC_APP_URL</code></h3>
+<p>Tras asignar dominio:</p>
+<ol type="1">
+<li>Vercel → <strong>Settings → Environment Variables</strong> → editar
+<code>NEXT_PUBLIC_APP_URL</code> con la URL final.</li>
+<li><strong>Settings → Deployments → Redeploy</strong> el último
+deploy.</li>
+</ol>
+<h3 id="actualizar-supabase-auth-urls">6.5 Actualizar Supabase Auth
+URLs</h3>
+<p>En Supabase → <strong>Auth → URL Configuration</strong>, actualizar
+Site URL y Redirect URLs con el dominio final.</p>
+<hr />
+<h2 id="desarrollo-local">7. Desarrollo local</h2>
+<h3 id="clonar-e-instalar">7.1 Clonar e instalar</h3>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone <span class="op">&lt;</span>repo-url<span class="op">&gt;</span> agro-360</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> agro-360</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="ex">pnpm</span> install</span></code></pre></div>
+<h3 id="crear-.env.local">7.2 Crear <code>.env.local</code></h3>
+<p>Copiar las variables del punto 5 en un archivo
+<code>.env.local</code> en la raíz.</p>
+<h3 id="ejecutar-en-modo-desarrollo">7.3 Ejecutar en modo
+desarrollo</h3>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pnpm</span> dev</span></code></pre></div>
+<p>La app se abre en <code>http://localhost:3000</code>.</p>
+<h3 id="build-local">7.4 Build local</h3>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pnpm</span> build</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="ex">pnpm</span> start</span></code></pre></div>
+<h3 id="lint-y-typecheck">7.5 Lint y typecheck</h3>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pnpm</span> lint          <span class="co"># ESLint</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npx</span> tsc <span class="at">--noEmit</span>   <span class="co"># TypeScript sin emitir</span></span></code></pre></div>
+<hr />
+<h2 id="primeros-pasos-después-del-despliegue">8. Primeros pasos después
+del despliegue</h2>
+<ol type="1">
+<li><strong>Verificar <code>/status</code></strong>: debe retornar
+<strong>“ok”</strong>.</li>
+<li><strong>Crear usuario admin</strong> (ver 3.7).</li>
+<li><strong>Iniciar sesión</strong> con admin →
+<code>/admin</code>.</li>
+<li><strong>Invitar al primer asesor</strong> →
+<code>/admin/usuarios → Invitar</code>.</li>
+<li><strong>Crear caracterización de prueba</strong> →
+<code>/formulario</code>.</li>
+<li><strong>Verificar registro</strong> → debe aparecer en
+<code>/admin/caracterizaciones</code>.</li>
+<li><strong>Verificar correo</strong> → revisar que el asesor recibió la
+invitación.</li>
+</ol>
+<hr />
+<h2 id="actualizaciones">9. Actualizaciones</h2>
+<h3 id="push-de-cambios-de-código">9.1 Push de cambios de código</h3>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> add .</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> commit <span class="at">-m</span> <span class="st">&quot;descripción del cambio&quot;</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> push origin main</span></code></pre></div>
+<p>Vercel redespliega automáticamente. Verificar en
+<strong>Deployments</strong> que el build pasó.</p>
+<h3 id="aplicar-migración-de-bd">9.2 Aplicar migración de BD</h3>
+<ol type="1">
+<li>Colocar el nuevo archivo SQL en
+<code>supabase/migrations/YYYYMMDD_nombre.sql</code>.</li>
+<li>Commit + push (para que quede en el repo).</li>
+<li>Ir a Supabase → <strong>SQL Editor</strong> → pegar el contenido →
+<strong>Run</strong>.</li>
+<li>Verificar que no hubo errores.</li>
+</ol>
+<h3 id="actualizar-dependencias">9.3 Actualizar dependencias</h3>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pnpm</span> update</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">pnpm</span> audit</span></code></pre></div>
+<p>Revisar cambios breaking en <code>CHANGELOG</code> de las
+dependencias mayores.</p>
+<hr />
+<h2 id="rollback">10. Rollback</h2>
+<h3 id="rollback-de-frontend">10.1 Rollback de frontend</h3>
+<p>Vercel → <strong>Deployments</strong> → seleccionar un deploy
+anterior → <strong>“Promote to Production”</strong>.</p>
+<h3 id="rollback-de-bd">10.2 Rollback de BD</h3>
+<ol type="1">
+<li>Supabase → <strong>Database → Backups</strong> → seleccionar backup
+anterior → <strong>Restore</strong>.</li>
+<li>Advertencia: se pierden los datos posteriores al backup.</li>
+</ol>
+<h3 id="rollback-con-migración-inversa">10.3 Rollback con migración
+inversa</h3>
+<p>Para migraciones que no deben restaurarse desde backup:</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Ejemplo: revertir una columna añadida</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> caracterizaciones <span class="kw">DROP</span> <span class="kw">COLUMN</span> <span class="cf">IF</span> <span class="kw">EXISTS</span> nueva_columna;</span></code></pre></div>
+<hr />
+<h2 id="checklist-de-salida-a-producción">11. Checklist de salida a
+producción</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" />Supabase configurado y migraciones
+aplicadas.</label></li>
+<li><label><input type="checkbox" />Storage buckets creados con
+políticas.</label></li>
+<li><label><input type="checkbox" />Variables de entorno en Vercel
+completas.</label></li>
+<li><label><input type="checkbox" />Dominio personalizado configurado y
+certificado TLS activo.</label></li>
+<li><label><input type="checkbox" />Auth Site URL y Redirect URLs
+correctas en Supabase.</label></li>
+<li><label><input type="checkbox" />Usuario admin creado.</label></li>
+<li><label><input type="checkbox" />SMTP funcionando (probar con correo
+de invitación).</label></li>
+<li><label><input type="checkbox" />Turnstile captcha
+funcionando.</label></li>
+<li><label><input type="checkbox" /><code>/status</code> responde
+OK.</label></li>
+<li><label><input type="checkbox" />Respaldos automáticos habilitados en
+Supabase.</label></li>
+<li><label><input type="checkbox" />Documentación entregada al
+operador.</label></li>
+</ul>
+<hr />
+<h2 id="troubleshooting">12. Troubleshooting</h2>
+<h3 id="variables-de-entorno-faltantes">“Variables de entorno
+faltantes”</h3>
+<p>→ Faltan <code>NEXT_PUBLIC_SUPABASE_URL</code> o
+<code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> en Vercel. Agregarlas y
+redesplegar.</p>
+<h3 id="error-could-not-fetch-user">“Error: Could not fetch user”</h3>
+<p>→ El JWT expiró o la URL de Supabase está mal. Revisar env vars.</p>
+<h3 id="no-se-envían-correos">“No se envían correos”</h3>
+<p>→ Verificar SMTP en logs de Vercel. Revisar spam del destinatario.
+Confirmar credenciales correctas.</p>
+<h3 id="rls-policy-violation">“RLS policy violation”</h3>
+<p>→ Falta una política o el rol no es correcto. Revisar
+<code>auth.uid()</code> y el valor de <code>profiles.rol</code> del
+usuario.</p>
+<h3 id="envío-falla-con-500">“Envío falla con 500”</h3>
+<p>→ Revisar logs del endpoint <code>/api/caracterizaciones</code>.
+Causa común: <code>SUPABASE_SERVICE_ROLE_KEY</code> faltante o
+incorrecta.</p>
+<hr />
+<h2 id="contacto">13. Contacto</h2>
+<p>Para soporte al despliegue, utilizar el canal operativo acordado con
+el operador. SLAs y términos en el <strong>Documento de Soporte y
+Garantía</strong>.</p>
+</body>
+</html>

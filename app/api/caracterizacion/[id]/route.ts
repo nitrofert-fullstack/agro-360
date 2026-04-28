@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(
   request: Request,
@@ -15,131 +15,74 @@ export async function GET(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Obtener el rol del usuario para verificar acceso
-    const { data: userProfile } = await supabase
-      .from('profiles')
-      .select('rol, numero_documento')
-      .eq('id', user.id)
-      .single()
+    const userProfile = await prisma.profiles.findUnique({
+      where: { id: user.id },
+      select: { rol: true, numero_documento: true },
+    })
 
-    // Determinar si buscar por visita ID o por radicado
+    // ── Obtener visita por UUID o radicado ──────────────────────────────────
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+    let visita = null
 
-    // 1. Obtener la visita
-    let visita: any = null
-    let visitaErr: any = null
     if (isUUID) {
-      const res = await supabase.from('visitas').select('*').eq('id', id).single()
-      visita = res.data; visitaErr = res.error
+      visita = await prisma.visitas.findUnique({ where: { id } })
     } else {
-      // Buscar primero por radicado_oficial, luego por radicado_local
-      const byOficial = await supabase.from('visitas').select('*').eq('radicado_oficial', id).maybeSingle()
-      if (byOficial.data) {
-        visita = byOficial.data; visitaErr = null
-      } else {
-        const byLocal = await supabase.from('visitas').select('*').eq('radicado_local', id).maybeSingle()
-        visita = byLocal.data; visitaErr = byLocal.data ? null : (byLocal.error ?? { message: 'No encontrado' })
-      }
+      visita = await prisma.visitas.findUnique({ where: { radicado_oficial: id } })
+        ?? await prisma.visitas.findUnique({ where: { radicado_local: id } })
     }
 
-    if (visitaErr || !visita) {
+    if (!visita) {
       return NextResponse.json({ error: 'Visita no encontrada' }, { status: 404 })
     }
 
-    // 2. Obtener la caracterización principal
-    const { data: carac } = await supabase
-      .from('caracterizaciones')
-      .select('*')
-      .eq('id_visita', visita.id)
-      .single()
+    // ── Caracterización principal ───────────────────────────────────────────
+    const carac = await prisma.caracterizaciones.findFirst({
+      where: { id_visita: visita.id },
+    })
 
     if (!carac) {
       return NextResponse.json({ error: 'Caracterización no encontrada' }, { status: 404 })
     }
 
-    // Verificar acceso según rol: campesino solo puede ver su propia caracterización
-    if (userProfile?.rol === 'campesino') {
-      const numDoc = (userProfile as any).numero_documento
-      if (numDoc) {
-        const { data: ownBenef } = await supabase
-          .from('beneficiarios')
-          .select('id')
-          .eq('numero_documento', numDoc)
-          .maybeSingle()
-        if (!ownBenef || ownBenef.id !== carac.id_beneficiario) {
-          return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
-        }
-      } else {
-        // Fallback: verificar por correo
-        const { data: ownBenef } = await supabase
-          .from('beneficiarios')
-          .select('id')
-          .eq('correo', user.email)
-          .maybeSingle()
-        if (!ownBenef || ownBenef.id !== carac.id_beneficiario) {
-          return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
-        }
+    // ── Verificar acceso agricultor ─────────────────────────────────────────
+    if (userProfile?.rol === 'agricultor') {
+      const numDoc = userProfile.numero_documento
+      const ownBenef = numDoc
+        ? await prisma.beneficiarios.findFirst({ where: { numero_documento: numDoc }, select: { id: true } })
+        : await prisma.beneficiarios.findFirst({ where: { correo: user.email ?? undefined }, select: { id: true } })
+
+      if (!ownBenef || ownBenef.id !== carac.id_beneficiario) {
+        return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
       }
     }
 
-    // 3. Obtener datos relacionados en paralelo
-    const [
-      { data: beneficiario },
-      { data: predio },
-    ] = await Promise.all([
-      supabase.from('beneficiarios').select('*').eq('id', carac.id_beneficiario).single(),
-      supabase.from('predios').select('*').eq('id', carac.id_predio).single(),
+    // ── Datos relacionados en paralelo ──────────────────────────────────────
+    const [beneficiario, predio, infoFinanciera] = await Promise.all([
+      prisma.beneficiarios.findUnique({ where: { id: carac.id_beneficiario } }),
+      prisma.predios.findUnique({
+        where: { id: carac.id_predio },
+        include: {
+          caracterizacion_predio: true,
+          abastecimiento_agua:    true,
+          riesgos_predio:         true,
+          area_productiva:        true,
+        },
+      }),
+      prisma.informacion_financiera.findFirst({
+        where:   { id_beneficiario: carac.id_beneficiario },
+        orderBy: { created_at: 'desc' },
+      }),
     ])
-
-    // 4. Con el predio, obtener sub-tablas en paralelo
-    let caracPredio = null
-    let abastecimientoAgua = null
-    let riesgosPredio = null
-    let areaProductiva = null
-    let infoFinanciera = null
-
-    if (predio) {
-      const [
-        { data: cp },
-        { data: aa },
-        { data: rp },
-        { data: ap },
-      ] = await Promise.all([
-        supabase.from('caracterizacion_predio').select('*').eq('id_predio', predio.id).single(),
-        supabase.from('abastecimiento_agua').select('*').eq('id_predio', predio.id).single(),
-        supabase.from('riesgos_predio').select('*').eq('id_predio', predio.id).single(),
-        supabase.from('area_productiva').select('*').eq('id_predio', predio.id).single(),
-      ])
-      caracPredio = cp
-      abastecimientoAgua = aa
-      riesgosPredio = rp
-      areaProductiva = ap
-    }
-
-    if (beneficiario) {
-      // Usar admin client para evitar problemas de RLS en informacion_financiera
-      const supabaseAdmin = createAdminClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      )
-      const { data: fiRows } = await supabaseAdmin
-        .from('informacion_financiera')
-        .select('*')
-        .eq('id_beneficiario', beneficiario.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-      infoFinanciera = fiRows?.[0] ?? null
-    }
 
     return NextResponse.json({
       visita,
-      caracterizacion: carac,
+      caracterizacion:    carac,
       beneficiario,
       predio,
-      caracterizacionPredio: caracPredio,
-      abastecimientoAgua,
-      riesgosPredio,
-      areaProductiva,
+      caracterizacionPredio: predio?.caracterizacion_predio ?? null,
+      abastecimientoAgua:    predio?.abastecimiento_agua?.[0] ?? null,
+      riesgosPredio:         predio?.riesgos_predio?.[0]      ?? null,
+      areaProductiva:        predio?.area_productiva?.[0]     ?? null,
       infoFinanciera,
     })
   } catch (err) {

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import type L from "leaflet"
+import L from "leaflet"
 import { Button } from "@/components/ui/button"
 import { MapPin, Pentagon, Trash2, Check } from "lucide-react"
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const AGRO_BASE = 'https://api.agromonitoring.com/agro/1.0'
-const API_KEY   = process.env.AGRO_API_KEY!
+const API_KEY   = process.env.AGROMONITORING_API_KEY!
 
 // Catch-all proxy for Agromonitoring tile requests.
 // URL pattern: /api/agro-tile/[...path]

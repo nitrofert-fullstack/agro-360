@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const apiKey = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY
+    const apiKey = process.env.OPENWEATHER_API_KEY
     
     if (!apiKey) {
       return NextResponse.json(

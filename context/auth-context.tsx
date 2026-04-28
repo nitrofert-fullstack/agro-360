@@ -9,7 +9,7 @@ interface Profile {
   email: string
   nombre_completo: string
   telefono: string | null
-  rol: 'admin' | 'asesor' | 'campesino' | 'analista'
+  rol: 'admin' | 'asesor' | 'agricultor' | 'analista'
   activo: boolean
   numero_documento: string | null
 }
@@ -246,8 +246,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resetPassword = useCallback(async (email: string) => {
     if (!supabase) return { error: 'Supabase not configured' }
     try {
+      // window.location.origin da el dominio+puerto real del navegador,
+      // que debe coincidir con lo configurado en Supabase → Redirect URLs.
+      // Redirige directo a la página cliente (no al server callback),
+      // porque el PKCE code_verifier está en el localStorage del navegador.
+      const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL ?? '')
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/reset-password`,
+        redirectTo: `${origin}/auth/reset-password`,
       })
       if (error) throw error
       return { error: null }

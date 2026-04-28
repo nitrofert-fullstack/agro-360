@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>04-manual-administrador</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">04-manual-administrador</h1>
+</header>
+<h1 id="manual-de-administrador-agro360">Manual de Administrador —
+Agro360</h1>
+<p><strong>Sistema de Caracterización Predial Agropecuaria</strong>
+<strong>Versión:</strong> 1.0 — Entrega formal COA
+<strong>Fecha:</strong> Abril 2026</p>
+<hr />
+<h2 id="alcance-del-rol-administrador">1. Alcance del rol
+administrador</h2>
+<p>El administrador (<code>rol = 'admin'</code>) tiene acceso completo
+al sistema:</p>
+<ul>
+<li>Gestión de usuarios (crear, desactivar, cambiar rol, eliminar).</li>
+<li>Gestión de todas las caracterizaciones (editar, cambiar estado,
+eliminar).</li>
+<li>Asignación de asesores a caracterizaciones huérfanas.</li>
+<li>Visualización de estadísticas agregadas.</li>
+<li>Invitación de nuevos usuarios por correo.</li>
+<li>Gestión de la base de datos (Supabase) — accesos separados.</li>
+</ul>
+<hr />
+<h2 id="acceso-al-panel-de-administración">2. Acceso al panel de
+administración</h2>
+<ol type="1">
+<li>Iniciar sesión con credenciales de administrador.</li>
+<li>Acceder a <code>/admin</code> desde el menú superior (solo visible
+para el rol admin).</li>
+<li>Se despliega el panel con cuatro secciones principales:
+<ul>
+<li><strong>Dashboard</strong> (<code>/admin</code>): resumen
+general.</li>
+<li><strong>Caracterizaciones</strong>
+(<code>/admin/caracterizaciones</code>): listado completo.</li>
+<li><strong>Usuarios</strong> (<code>/admin/usuarios</code>): gestión de
+cuentas.</li>
+<li><strong>Estadísticas</strong> (<code>/admin/estadisticas</code>):
+reportes y gráficos.</li>
+</ul></li>
+</ol>
+<hr />
+<h2 id="gestión-de-usuarios">3. Gestión de usuarios</h2>
+<h3 id="ver-listado">3.1 Ver listado</h3>
+<p>En <code>/admin/usuarios</code>:</p>
+<ul>
+<li>Tabla con todos los usuarios registrados.</li>
+<li>Columnas: nombre, correo, rol, estado (activo/inactivo), fecha de
+registro.</li>
+<li>Filtros por rol y estado.</li>
+<li>Buscador por nombre o correo.</li>
+</ul>
+<h3 id="crear-un-asesor-invitación-por-correo">3.2 Crear un asesor
+(invitación por correo)</h3>
+<ol type="1">
+<li>Presionar <strong>“Invitar usuario”</strong>.</li>
+<li>Ingresar correo electrónico.</li>
+<li>Seleccionar rol a asignar (<code>asesor</code>,
+<code>analista</code>, <code>admin</code>,
+<code>agricultor</code>).</li>
+<li>Enviar. El sistema dispara correo con enlace de invitación (24 h de
+validez).</li>
+<li>El usuario completa registro desde el enlace.</li>
+</ol>
+<p><strong>Flujo técnico:</strong> <code>POST /api/invitar</code> →
+genera token → inserta en tabla <code>invitations</code> → envía correo
+vía <code>nodemailer</code> (SMTP configurado).</p>
+<h3 id="cambiar-rol-de-un-usuario">3.3 Cambiar rol de un usuario</h3>
+<ol type="1">
+<li>En la fila del usuario, presionar el menú <strong>⋮</strong> →
+<strong>“Cambiar rol”</strong>.</li>
+<li>Seleccionar nuevo rol.</li>
+<li>Confirmar.</li>
+</ol>
+<p><strong>Restricciones:</strong> - No se puede quitar el rol admin al
+último administrador activo. - Cambiar a <code>agricultor</code> revoca
+accesos a dashboard y admin.</p>
+<p><strong>Endpoint:</strong> <code>POST /api/admin/change-role</code> —
+requiere rol admin.</p>
+<h3 id="desactivar-activar-usuario">3.4 Desactivar / activar
+usuario</h3>
+<ol type="1">
+<li>Menú <strong>⋮</strong> → <strong>“Desactivar”</strong> o
+<strong>“Activar”</strong>.</li>
+<li>Un usuario desactivado no puede iniciar sesión pero sus datos se
+conservan.</li>
+</ol>
+<p><strong>Endpoint:</strong>
+<code>POST /api/admin/toggle-user</code>.</p>
+<h3 id="eliminar-usuario">3.5 Eliminar usuario</h3>
+<p><strong>⚠️ Operación destructiva.</strong></p>
+<ol type="1">
+<li>Menú <strong>⋮</strong> → <strong>“Eliminar usuario”</strong>.</li>
+<li>Confirmar con el nombre del usuario.</li>
+<li>Se elimina de <code>profiles</code> y de <code>auth.users</code> de
+Supabase.</li>
+</ol>
+<p><strong>Nota:</strong> las caracterizaciones asociadas NO se eliminan
+— quedan con <code>asesor_id = null</code>. Luego se pueden reasignar
+(ver 3.6).</p>
+<p><strong>Endpoint:</strong>
+<code>POST /api/admin/delete-user</code>.</p>
+<h3 id="reasignar-asesor-de-una-caracterización">3.6 Reasignar asesor de
+una caracterización</h3>
+<p>Caracterizaciones huérfanas (sin asesor) se pueden reasignar:</p>
+<ol type="1">
+<li>Ir a <code>/admin/caracterizaciones</code>.</li>
+<li>Filtrar por <strong>“Sin asesor”</strong>.</li>
+<li>Seleccionar caracterización → <strong>“Asignar
+asesor”</strong>.</li>
+<li>Elegir del listado.</li>
+</ol>
+<p><strong>Endpoint:</strong>
+<code>POST /api/admin/assign-asesor</code>.</p>
+<hr />
+<h2 id="gestión-de-caracterizaciones">4. Gestión de
+caracterizaciones</h2>
+<h3 id="ver-listado-completo">4.1 Ver listado completo</h3>
+<p><code>/admin/caracterizaciones</code>:</p>
+<ul>
+<li>Tabla paginada con todas las caracterizaciones.</li>
+<li>Columnas: radicado, beneficiario, predio, estado, asesor,
+fecha.</li>
+<li>Filtros por estado, asesor, municipio, rango de fechas.</li>
+<li>Buscador por radicado o documento.</li>
+</ul>
+<h3 id="editar-una-caracterización">4.2 Editar una caracterización</h3>
+<ol type="1">
+<li>Presionar una fila → se abre la vista detallada.</li>
+<li>Presionar <strong>“Editar”</strong> (solo admin y asesores).</li>
+<li>Se abre el formulario pre-llenado.</li>
+<li>Modificar y guardar.</li>
+</ol>
+<p><strong>Endpoint:</strong>
+<code>POST /api/actualizar-formulario</code>.</p>
+<h3 id="cambiar-estado">4.3 Cambiar estado</h3>
+<p>El administrador puede transicionar a cualquier estado:</p>
+<table>
+<thead>
+<tr>
+<th>Desde → Hasta</th>
+<th>Admin</th>
+<th>Asesor</th>
+<th>Analista</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>INICIADO</code> → <code>REVISADO</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>REVISADO</code> → <code>EN_ESTUDIO_CREDITO</code></td>
+<td>✅</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>EN_ESTUDIO_CREDITO</code> → <code>APROBADO</code></td>
+<td>✅</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>EN_ESTUDIO_CREDITO</code> → <code>CANCELADO</code></td>
+<td>✅</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>APROBADO</code> / <code>CANCELADO</code> → (cualquier
+otro)</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Labels en UI:</strong> <code>APROBADO</code> → “Viable”,
+<code>CANCELADO</code> → “No Viable” (los valores en BD no cambian).</p>
+<p><strong>Endpoint:</strong>
+<code>POST /api/admin/update-estado</code>.</p>
+<h3 id="eliminar-una-caracterización">4.4 Eliminar una
+caracterización</h3>
+<p><strong>⚠️ Elimina todos los datos relacionados (cascada):</strong>
+visita, beneficiario (si no tiene otras visitas), predio,
+caracterización de predio, abastecimiento de agua, riesgos, área
+productiva, información financiera.</p>
+<ol type="1">
+<li>En la fila o desde la vista detallada, presionar
+<strong>“Eliminar”</strong>.</li>
+<li>Confirmar con el radicado.</li>
+<li>Operación irreversible.</li>
+</ol>
+<p><strong>Recomendación:</strong> antes de eliminar, descargar la ficha
+en PDF como respaldo.</p>
+<hr />
+<h2 id="estadísticas">5. Estadísticas</h2>
+<p><code>/admin/estadisticas</code> muestra:</p>
+<ul>
+<li><strong>Total de caracterizaciones</strong> por estado.</li>
+<li><strong>Distribución por municipio</strong> (gráfico).</li>
+<li><strong>Distribución por asesor</strong> (gráfico).</li>
+<li><strong>Evolución temporal</strong> (líneas — registros por
+mes).</li>
+<li><strong>Tasa de aprobación</strong> (Viable vs No Viable).</li>
+<li><strong>Área caracterizada</strong> (hectáreas totales).</li>
+</ul>
+<p>Los datos se pueden descargar como CSV con <strong>“Exportar
+estadísticas”</strong>.</p>
+<p><strong>Endpoint:</strong> <code>GET /api/admin/stats</code>.</p>
+<hr />
+<h2 id="verificación-de-salud-del-sistema">6. Verificación de salud del
+sistema</h2>
+<p><code>/status</code> (accesible solo para admin) muestra:</p>
+<ul>
+<li>Estado de la conexión con Supabase.</li>
+<li>Total de caracterizaciones registradas.</li>
+<li>Errores recientes en el log.</li>
+</ul>
+<p><strong>Endpoint:</strong> <code>GET /api/health</code> — retorna
+<code>{ status: "ok", ... }</code> si todos los servicios responden.</p>
+<hr />
+<h2 id="administración-de-la-base-de-datos-supabase">7. Administración
+de la base de datos (Supabase)</h2>
+<p>Se accede al panel de Supabase para operaciones avanzadas:</p>
+<ul>
+<li>URL:
+<code>https://supabase.com/dashboard/project/&lt;PROJECT_REF&gt;</code></li>
+<li>Credenciales: entregadas por separado al administrador.</li>
+</ul>
+<h3 id="operaciones-comunes-en-supabase">7.1 Operaciones comunes en
+Supabase</h3>
+<ul>
+<li><strong>SQL Editor</strong>: ejecutar queries, aplicar
+migraciones.</li>
+<li><strong>Authentication → Users</strong>: ver usuarios, resetear
+contraseñas.</li>
+<li><strong>Storage</strong>: revisar buckets
+<code>fotos-productores</code>, <code>firmas</code>,
+<code>fotos-predios</code>, <code>documentos-identidad</code>.</li>
+<li><strong>Database → Backups</strong>: configurar respaldos diarios
+(Supabase Pro).</li>
+</ul>
+<h3 id="aplicar-una-migración-sql">7.2 Aplicar una migración SQL</h3>
+<ol type="1">
+<li>Ir a <strong>SQL Editor</strong>.</li>
+<li>Abrir archivo
+<code>supabase/migrations/&lt;fecha&gt;_&lt;nombre&gt;.sql</code> del
+repositorio.</li>
+<li>Copiar contenido y pegar.</li>
+<li>Presionar <strong>“Run”</strong>.</li>
+</ol>
+<hr />
+<h2 id="configuración-del-entorno">8. Configuración del entorno</h2>
+<p>Las variables de entorno se gestionan en Vercel (producción) o en
+<code>.env.local</code> (desarrollo).</p>
+<p>Variables requeridas (ver <strong>Guía de Instalación</strong> para
+detalles):</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NEXT_PUBLIC_SUPABASE_URL</code></td>
+<td>URL del proyecto Supabase</td>
+</tr>
+<tr>
+<td><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code></td>
+<td>Clave pública de Supabase</td>
+</tr>
+<tr>
+<td><code>SUPABASE_SERVICE_ROLE_KEY</code></td>
+<td>Clave admin de Supabase (NO exponer al cliente)</td>
+</tr>
+<tr>
+<td><code>SMTP_HOST</code>, <code>SMTP_USER</code>,
+<code>SMTP_PASS</code></td>
+<td>Configuración correo saliente</td>
+</tr>
+<tr>
+<td><code>TURNSTILE_SECRET_KEY</code></td>
+<td>Captcha Cloudflare</td>
+</tr>
+<tr>
+<td><code>NEXT_PUBLIC_APP_URL</code></td>
+<td>URL pública de la app</td>
+</tr>
+</tbody>
+</table>
+<p><strong>⚠️ Nunca commitear claves al repositorio.</strong> Usar
+Vercel → Settings → Environment Variables.</p>
+<hr />
+<h2 id="respaldo-y-recuperación">9. Respaldo y recuperación</h2>
+<h3 id="respaldo-automático">9.1 Respaldo automático</h3>
+<ul>
+<li><strong>Supabase</strong> realiza respaldos diarios automáticos
+(plan Pro en adelante).</li>
+<li>Los respaldos se conservan 7 días por defecto (configurable).</li>
+</ul>
+<h3 id="exportación-manual">9.2 Exportación manual</h3>
+<ol type="1">
+<li>Supabase → <strong>Database → Backups → Download
+backup</strong>.</li>
+<li>Se descarga un archivo <code>.sql</code> (dump completo).</li>
+<li>Guardar en ubicación segura.</li>
+</ol>
+<h3 id="restauración">9.3 Restauración</h3>
+<ol type="1">
+<li>Crear proyecto Supabase nuevo o limpiar el existente.</li>
+<li>SQL Editor → importar el dump.</li>
+<li>Verificar que los buckets de Storage se migraron (se hacen
+aparte).</li>
+<li>Actualizar variables de entorno en Vercel si cambió la URL del
+proyecto.</li>
+</ol>
+<h3 id="export-csv-de-datos">9.4 Export CSV de datos</h3>
+<p>Desde <code>/admin/caracterizaciones</code> → <strong>“Exportar todo
+a CSV”</strong> — descarga un archivo con todas las
+caracterizaciones.</p>
+<hr />
+<h2 id="monitoreo">10. Monitoreo</h2>
+<h3 id="logs-de-aplicación">10.1 Logs de aplicación</h3>
+<ul>
+<li><strong>Vercel Dashboard</strong> → proyecto →
+<strong>“Logs”</strong>: logs en tiempo real de las funciones.</li>
+<li>Logs con prefijo <code>[v0]</code> son informativos.</li>
+<li>Errores <code>ERROR</code> deben revisarse.</li>
+</ul>
+<h3 id="correos-no-entregados">10.2 Correos no entregados</h3>
+<p>Si un beneficiario no recibe su correo:</p>
+<ol type="1">
+<li>Verificar spam del destinatario.</li>
+<li>Revisar logs de Vercel buscando el correo.</li>
+<li>Confirmar credenciales SMTP en variables de entorno.</li>
+<li>Reenviar manualmente desde <code>/api/invitar</code> si
+necesario.</li>
+</ol>
+<hr />
+<h2 id="políticas-de-seguridad-y-acceso-rls">11. Políticas de seguridad
+y acceso (RLS)</h2>
+<p>La base de datos utiliza <strong>Row Level Security (RLS)</strong> de
+Supabase:</p>
+<ul>
+<li>Los asesores solo ven sus propias caracterizaciones.</li>
+<li>Los agricultores solo ven sus propios registros (por
+<code>numero_documento</code>).</li>
+<li>Los administradores y analistas ven todo.</li>
+</ul>
+<p>Las políticas están definidas en
+<code>supabase/migrations/*.sql</code> (ver Manual Técnico).</p>
+<hr />
+<h2 id="procedimientos-operativos-recomendados">12. Procedimientos
+operativos recomendados</h2>
+<h3 id="onboarding-de-un-nuevo-asesor">12.1 Onboarding de un nuevo
+asesor</h3>
+<ol type="1">
+<li>Invitar por correo desde <code>/admin/usuarios</code>.</li>
+<li>Rol: <code>asesor</code>.</li>
+<li>Una vez registrado, verificar que puede crear caracterizaciones de
+prueba.</li>
+<li>Entregarle el Manual de Usuario.</li>
+</ol>
+<h3 id="cierre-de-una-jornada-de-campo">12.2 Cierre de una jornada de
+campo</h3>
+<ol type="1">
+<li>Verificar en <code>/admin/caracterizaciones</code> que todos los
+registros del día quedaron correctamente registrados.</li>
+<li>Confirmar que los radicados oficiales fueron asignados.</li>
+</ol>
+<h3 id="auditoría-mensual">12.3 Auditoría mensual</h3>
+<ol type="1">
+<li>Exportar CSV completo de caracterizaciones.</li>
+<li>Revisar usuarios inactivos y considerar desactivarlos.</li>
+<li>Verificar respaldos de Supabase funcionando.</li>
+</ol>
+<hr />
+<h2 id="contacto-técnico">13. Contacto técnico</h2>
+<p>Para escalamiento técnico utilizar el canal operativo acordado con el
+operador. Niveles de servicio y SLAs en el <strong>Documento de Soporte
+y Garantía</strong>.</p>
+</body>
+</html>
