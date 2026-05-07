@@ -92,7 +92,9 @@
       "Bash(dir \"C:\\\\Users\\\\jcorrea\\\\Desktop\\\\agro-360\\\\public\\\\sw.js\")",
       "Bash(dir \"C:\\\\Users\\\\jcorrea\\\\Desktop\\\\agro-360\\\\public\\\\workbox-*.js\")",
       "Bash(workbox\" 2>&1; ls \"C:\\\\Users\\\\jcorrea\\\\Desktop\\\\agro-360\\\\.next\\\\\")",
-      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\(p.scripts, null, 2\\)\\)\")"
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\(p.scripts, null, 2\\)\\)\")",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }
