@@ -439,6 +439,31 @@ export async function POST(request: Request) {
       uploadResults.map(r => r.status === 'fulfilled' ? r.value : null)
 
     // === 11. CARACTERIZACION (registro central) ===
+    // Segundo chequeo de duplicado justo antes del insert: captura casos donde un
+    // intento previo falló después del paso 1 (beneficiario) pero antes de este punto,
+    // dejando al beneficiario sin caracterización y permitiendo que un reintento pase
+    // el primer chequeo. Con este segundo chequeo se bloquea el reintento correctamente.
+    const { data: caracActivaFinal } = await adminClient
+      .from('caracterizaciones')
+      .select('id, estado, radicado_oficial')
+      .eq('id_beneficiario', beneficiarioId)
+      .in('estado', ESTADOS_BLOQUEANTES)
+      .limit(1)
+      .maybeSingle()
+
+    if (caracActivaFinal) {
+      if (offlineSync) {
+        return NextResponse.json(
+          { radicadoOficial: caracActivaFinal.radicado_oficial || 'YA_REGISTRADO', duplicate: true },
+          { status: 200 }
+        )
+      }
+      return NextResponse.json(
+        { error: 'Este agricultor ya tiene un proceso activo. Solo puede iniciar uno nuevo cuando el proceso actual esté cancelado o aprobado.' },
+        { status: 409 }
+      )
+    }
+
     const { error: caracErr } = await adminClient
       .from('caracterizaciones')
       .insert({
