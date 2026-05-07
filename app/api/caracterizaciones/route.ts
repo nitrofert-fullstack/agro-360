@@ -141,8 +141,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // === Captcha (solo si no hay asesor autenticado y no es sync offline) ===
-    if (!asesorId && !offlineSync) {
+    // === Captcha (solo para usuarios completamente anónimos, no sync offline) ===
+    if (!user && !offlineSync) {
       if (process.env.TURNSTILE_SECRET_KEY && process.env.TURNSTILE_SECRET_KEY !== 'your-secret-key-here') {
         if (!turnstileToken) {
           return NextResponse.json({ error: 'Verificación de seguridad requerida' }, { status: 400 })

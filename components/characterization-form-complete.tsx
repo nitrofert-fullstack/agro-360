@@ -481,8 +481,8 @@ export function CharacterizationFormComplete({
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const turnstileRef = useRef<TurnstileInstance>(null)
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""
-  // Si el siteKey no está configurado, se omite la verificación (token siempre válido)
-  const captchaValid = isAsesor || !turnstileSiteKey || !!turnstileToken
+  // Si el siteKey no está configurado, o el usuario está autenticado, se omite la verificación
+  const captchaValid = isAuthenticated || isAsesor || !turnstileSiteKey || !!turnstileToken
 
   // Estado de modales legales (null = ninguno abierto)
   const [legalModalOpen, setLegalModalOpen] = useState<keyof typeof LEGAL_DOCUMENTS | null>(null)
@@ -760,8 +760,8 @@ export function CharacterizationFormComplete({
       if (!validation.valid) { handleValidationError(validation); return }
 
     } else {
-      // Online, creación nueva: captcha para no asesores + todos los pasos.
-      if (!isAsesor && turnstileSiteKey && !turnstileToken) {
+      // Online, creación nueva: captcha solo para usuarios NO autenticados.
+      if (!isAuthenticated && !isAsesor && turnstileSiteKey && !turnstileToken) {
         toast.error('Verificación de seguridad', { description: 'Completa la verificación de seguridad antes de enviar.' })
         return
       }
@@ -986,7 +986,7 @@ export function CharacterizationFormComplete({
       const payload = {
         ...dataToSave,
         autorizaciones: formData.autorizaciones,
-        ...(!isAsesor && turnstileToken && { turnstileToken }),
+        ...(!isAuthenticated && !isAsesor && turnstileToken && { turnstileToken }),
       }
 
       let res: Response
@@ -2485,8 +2485,8 @@ export function CharacterizationFormComplete({
                 </div>
               </div>
 
-              {/* Verificación de seguridad Cloudflare Turnstile (solo para no asesores) */}
-              {!isAsesor && !!turnstileSiteKey && isOnline && (
+              {/* Verificación de seguridad Cloudflare Turnstile (solo para usuarios no autenticados) */}
+              {!isAuthenticated && !isAsesor && !!turnstileSiteKey && isOnline && (
                 <div className="rounded-lg border border-border/50 bg-muted/30 p-4 space-y-3">
                   <Label className="font-medium flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-primary" />
