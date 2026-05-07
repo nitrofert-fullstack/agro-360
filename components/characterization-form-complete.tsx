@@ -561,6 +561,39 @@ export function CharacterizationFormComplete({
     }
   }, [isAsesor, profile?.nombre_completo])
 
+  // Pre-llenar datos del beneficiario para agricultores autenticados (formulario nuevo)
+  useEffect(() => {
+    if (!isAuthenticated || isAsesor || isEdit || !profile) return
+
+    const palabras = (profile.nombre_completo || '').trim().split(/\s+/).filter(Boolean)
+    let nombres = '', apellidos = ''
+    if (palabras.length >= 4) {
+      const mitad = Math.ceil(palabras.length / 2)
+      nombres = palabras.slice(0, mitad).join(' ')
+      apellidos = palabras.slice(mitad).join(' ')
+    } else if (palabras.length === 3) {
+      nombres = palabras[0]
+      apellidos = palabras.slice(1).join(' ')
+    } else if (palabras.length === 2) {
+      nombres = palabras[0]
+      apellidos = palabras[1]
+    } else {
+      nombres = palabras[0] || ''
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      beneficiario: {
+        ...prev.beneficiario,
+        ...(nombres        && { nombres }),
+        ...(apellidos      && { apellidos }),
+        ...(profile.numero_documento && { numeroDocumento: profile.numero_documento }),
+        ...(user?.email    && { correo: user.email }),
+        ...(profile.telefono && { telefono: profile.telefono }),
+      },
+    }))
+  }, [isAuthenticated, isAsesor, isEdit, profile?.id])
+
   // Auto-calcular edad desde la fecha de nacimiento (solo si el usuario no la editó manualmente)
   useEffect(() => {
     if (edadManual) return
