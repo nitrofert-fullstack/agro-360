@@ -5,11 +5,12 @@ import { Pool } from 'pg'
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }
 
 function createPrismaClient() {
+  // Eliminar sslmode del URL para evitar conflicto con la opción ssl del Pool.
+  // pg-connection-string parsea sslmode=verify-full y puede sobrescribir rejectUnauthorized.
+  const rawUrl = new URL(process.env.DATABASE_URL!)
+  rawUrl.searchParams.delete('sslmode')
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL!,
-    // El pooler de Supabase usa cert self-signed en la cadena TLS.
-    // rejectUnauthorized:false solo afecta este pool — no contamina otras conexiones HTTPS
-    // (a diferencia de NODE_TLS_REJECT_UNAUTHORIZED=0 que es global al proceso).
+    connectionString: rawUrl.toString(),
     ssl: { rejectUnauthorized: false },
   })
   const adapter = new PrismaPg(pool)
