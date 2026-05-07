@@ -55,6 +55,7 @@ export async function GET(request: Request) {
       telefono:         beneficiario.telefono || '',
       correo:           beneficiario.correo || '',
       ocupacionPrincipal: beneficiario.ocupacion_principal || '',
+      asociacion: beneficiario.asociacion || '',
       contactoSecundario: {
         nombre:    beneficiario.nombre_contacto_secundario || '',
         telefono:  beneficiario.telefono_secundario || '',

@@ -1,17 +1,19 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ThemeToggle } from "@/components/theme-toggle"
 import Image from "next/image"
-import { Mail, Lock, User, Phone, Loader2, Eye, EyeOff, ChevronLeft, CheckCircle, Info, CreditCard, Sprout } from "lucide-react"
+import { Mail, Lock, User, Phone, Loader2, Eye, EyeOff, ChevronLeft, CheckCircle, Info, CreditCard } from "lucide-react"
+import { scaleIn, celebrationVariants } from "@/lib/animations"
+import { LegalDocumentModal, LEGAL_DOCUMENTS } from "@/components/legal-document-modal"
 
 export default function RegistroPage() {
   const router = useRouter()
@@ -29,6 +31,13 @@ export default function RegistroPage() {
     aceptaTerminos: false,
   })
   const [error, setError] = useState("")
+  const [legalModalOpen, setLegalModalOpen] = useState<keyof typeof LEGAL_DOCUMENTS | null>(null)
+
+  useEffect(() => {
+    if (!window.matchMedia('(pointer: coarse)').matches) {
+      document.getElementById('nombre')?.focus()
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -83,58 +92,40 @@ export default function RegistroPage() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <header className="flex items-center justify-between border-b border-border px-4 py-3 md:px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/icons/icon-192x192.png" alt="Agro360" width={36} height={36} className="rounded-lg" />
-            <span className="text-lg font-bold text-foreground">Agro360</span>
-          </Link>
-          <ThemeToggle />
-        </header>
-        <main className="flex flex-1 items-center justify-center p-4 md:p-8">
-          <Card className="w-full max-w-md border-0 shadow-xl md:border text-center">
-            <CardHeader className="pb-4">
-              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10">
-                <CheckCircle className="h-10 w-10 text-green-500" />
-              </div>
-              <CardTitle className="text-2xl">¡Cuenta creada!</CardTitle>
-              <CardDescription className="text-base">
-                Tu cuenta de agricultor fue registrada exitosamente.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Alert className="border-green-500/20 bg-green-500/5 text-left">
-                <Info className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-700 dark:text-green-400">
-                  Puedes iniciar sesión ahora con tu correo y contraseña para ver tus registros.
-                </AlertDescription>
-              </Alert>
-              <Button asChild className="w-full">
-                <Link href="/auth/login">Iniciar Sesión</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </main>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+          <motion.div variants={scaleIn} initial="hidden" animate="visible" className="w-full max-w-md">
+            <Card className="shadow-xl text-center">
+              <CardHeader className="pb-4">
+                <motion.div variants={celebrationVariants} className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10">
+                  <CheckCircle className="h-10 w-10 text-green-500" />
+                </motion.div>
+                <CardTitle className="text-2xl">¡Cuenta creada!</CardTitle>
+                <CardDescription className="text-base">
+                  Tu cuenta de agricultor fue registrada exitosamente.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Alert className="border-green-500/20 bg-green-500/5 text-left">
+                  <Info className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-700 dark:text-green-400">
+                    Puedes iniciar sesión ahora con tu correo y contraseña para ver tus registros.
+                  </AlertDescription>
+                </Alert>
+                <Button asChild className="w-full">
+                  <Link href="/auth/login">Iniciar Sesión</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      {/* Header */}
-      <header className="flex items-center justify-between border-b border-border px-4 py-3 md:px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-            <Sprout className="h-5 w-5 text-primary" />
-          </div>
-          <span className="text-lg font-bold text-foreground">Agro360</span>
-        </Link>
-        <ThemeToggle />
-      </header>
-
-      {/* Main Content */}
-      <main className="flex flex-1 items-center justify-center p-4 md:p-8">
-        <Card className="w-full max-w-lg border-0 shadow-xl md:border">
+    <>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+        <motion.div variants={scaleIn} initial="hidden" animate="visible" className="w-full max-w-lg">
+        <Card className="shadow-xl">
           <CardHeader className="space-y-1 pb-6">
             <Link
               href="/auth/login"
@@ -144,7 +135,7 @@ export default function RegistroPage() {
               Volver a iniciar sesión
             </Link>
             <div className="flex items-center gap-3">
-              <Image src="/icons/icon-192x192.png" alt="Agro360" width={48} height={48} className="rounded-2xl" />
+              <Image src="/icons/icon-384x384.png" alt="Santander Agro360" width={72} height={72} className="rounded-2xl" />
               <div>
                 <CardTitle className="text-xl font-bold">Crear Cuenta de Agricultor</CardTitle>
                 <CardDescription>
@@ -179,6 +170,7 @@ export default function RegistroPage() {
                     <Input
                       id="nombre"
                       type="text"
+                      autoComplete="name"
                       placeholder="Juan Perez"
                       value={formData.nombre}
                       onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
@@ -197,6 +189,8 @@ export default function RegistroPage() {
                     <Input
                       id="telefono"
                       type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
                       placeholder="300 123 4567"
                       value={formData.telefono}
                       onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
@@ -236,6 +230,7 @@ export default function RegistroPage() {
                   <Input
                     id="email"
                     type="email"
+                    autoComplete="email"
                     placeholder="correo@ejemplo.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -255,6 +250,7 @@ export default function RegistroPage() {
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
                       placeholder="Mín. 8 caracteres"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -264,7 +260,8 @@ export default function RegistroPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -280,6 +277,7 @@ export default function RegistroPage() {
                     <Input
                       id="confirmPassword"
                       type={showConfirmPassword ? "text" : "password"}
+                      autoComplete="new-password"
                       placeholder="Repite tu contraseña"
                       value={formData.confirmPassword}
                       onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
@@ -289,7 +287,8 @@ export default function RegistroPage() {
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showConfirmPassword ? "Ocultar confirmación" : "Mostrar confirmación"}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground"
                     >
                       {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -306,13 +305,21 @@ export default function RegistroPage() {
                 />
                 <Label htmlFor="terminos" className="text-sm font-normal leading-relaxed text-muted-foreground">
                   Acepto los{" "}
-                  <Link href="/terminos" className="text-primary hover:underline">
+                  <button
+                    type="button"
+                    onClick={() => setLegalModalOpen("autorizacionTratamientoDatos")}
+                    className="text-primary hover:underline font-normal"
+                  >
                     términos y condiciones
-                  </Link>{" "}
+                  </button>{" "}
                   y la{" "}
-                  <Link href="/privacidad" className="text-primary hover:underline">
+                  <button
+                    type="button"
+                    onClick={() => setLegalModalOpen("avisoPrivacidad")}
+                    className="text-primary hover:underline font-normal"
+                  >
                     política de privacidad
-                  </Link>
+                  </button>
                 </Label>
               </div>
 
@@ -340,12 +347,19 @@ export default function RegistroPage() {
             </div>
           </CardContent>
         </Card>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-border py-4 text-center text-sm text-muted-foreground">
-        <p>Agro360 - Sistema de Caracterización Predial</p>
-      </footer>
+        </motion.div>
     </div>
+
+    {legalModalOpen && (
+      <LegalDocumentModal
+        open={legalModalOpen !== null}
+        onOpenChange={(open) => !open && setLegalModalOpen(null)}
+        title={LEGAL_DOCUMENTS[legalModalOpen].title}
+        description={LEGAL_DOCUMENTS[legalModalOpen].description}
+        documentUrl={LEGAL_DOCUMENTS[legalModalOpen].url}
+        showAcceptButton={false}
+      />
+    )}
+    </>
   )
 }

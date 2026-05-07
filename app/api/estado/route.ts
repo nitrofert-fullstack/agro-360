@@ -86,7 +86,7 @@ export async function POST(request: Request) {
           APROBADO:           'fue aprobada',
           CANCELADO:          'fue cancelada',
         }
-        const asunto = `Tu caracterización ${estadoLabel[estado] ?? `cambió a ${estado}`} — Agro360`
+        const asunto = `Tu caracterización ${estadoLabel[estado] ?? `cambió a ${estado}`} — Santander Agro360`
 
         await sendEmail({
           to: correo,

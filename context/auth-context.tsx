@@ -4,6 +4,18 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo, R
 import { createClient } from '@/lib/supabase/client'
 import type { User, Session, AuthChangeEvent } from '@supabase/supabase-js'
 
+function translateAuthError(msg: string): string {
+  const m = msg.toLowerCase()
+  if (m.includes('invalid login credentials') || m.includes('invalid credentials')) return 'Correo o contraseña incorrectos'
+  if (m.includes('email not confirmed')) return 'Debes confirmar tu correo antes de iniciar sesión'
+  if (m.includes('user not found')) return 'No existe una cuenta con ese correo'
+  if (m.includes('too many requests') || m.includes('rate limit')) return 'Demasiados intentos. Espera unos minutos e intenta de nuevo'
+  if (m.includes('network') || m.includes('fetch')) return 'Error de conexión. Verifica tu internet'
+  if (m.includes('password')) return 'La contraseña no cumple los requisitos mínimos'
+  if (m.includes('email')) return 'El correo ingresado no es válido'
+  return 'Error al iniciar sesión. Intenta de nuevo'
+}
+
 interface Profile {
   id: string
   email: string
@@ -40,44 +52,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const supabase = useMemo(() => createClient(), [])
 
-  /**
-   * Carga el perfil del usuario.
-   * - Intenta obtenerlo de la tabla profiles (1 sola petición de red)
-   * - Si falla (sin conexión u otro error), usa user_metadata del token (sin red, instantáneo)
-   * - NO llama getUser() para evitar una segunda petición redundante al servidor de auth
-   */
   const fetchProfile = useCallback(async (user: User) => {
     if (!supabase) return
-
-    // Timeout de 4 s: si la query no responde, caer a user_metadata de inmediato
-    const TIMEOUT_MS = 8000
-
     try {
-      const result = await Promise.race([
-        supabase.from('profiles').select('*').eq('id', user.id).single(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('profile_timeout')), TIMEOUT_MS)
-        ),
-      ])
-
-      if (result.data) {
-        setProfile(result.data as Profile)
-        return
-      }
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+      if (data) setProfile(data as Profile)
     } catch {
-      // Timeout, error de red o sin conexión: usar fallback
+      // Si falla, el perfil queda null — el usuario verá la sesión activa pero sin datos de perfil
     }
-
-    // Fallback offline: datos del token JWT (disponible sin red)
-    setProfile({
-      id: user.id,
-      email: user.email || '',
-      nombre_completo: user.user_metadata?.nombre_completo || 'Usuario',
-      telefono: user.user_metadata?.telefono || null,
-      rol: user.user_metadata?.rol || 'asesor',
-      activo: true,
-      numero_documento: user.user_metadata?.numero_documento || null,
-    })
   }, [supabase])
 
   useEffect(() => {
@@ -192,7 +178,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error
       return { data, error: null }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Error al iniciar sesión'
+      const raw = err instanceof Error ? err.message : 'Error al iniciar sesión'
+      const msg = translateAuthError(raw)
       setState(prev => ({ ...prev, error: msg, loading: false }))
       return { data: null, error: msg }
     }
@@ -257,7 +244,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error
       return { error: null }
     } catch (err) {
-      return { error: err instanceof Error ? err.message : 'Error al enviar email' }
+      const raw = err instanceof Error ? err.message : 'Error al enviar email'
+      return { error: translateAuthError(raw) }
     }
   }, [supabase])
 

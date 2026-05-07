@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import Image from "next/image"
+import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -37,6 +38,7 @@ import {
   Download,
 } from "lucide-react"
 import { generateCaracterizacionPDF, pdfFromServerData } from "@/lib/generate-pdf"
+import { staggerContainer, staggerItem, fadeUp } from "@/lib/animations"
 
 const MapViewer = dynamic(
   () => import("@/components/map-viewer").then((mod) => mod.MapViewer),
@@ -453,23 +455,35 @@ function slugify(label: string) {
 
 // ==================== PHOTO MODAL ====================
 function PhotoModal({ url, label, onClose }: { url: string; label?: string; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={label ? `Imagen: ${label}` : 'Visualizar imagen'}
       onClick={onClose}
     >
       <div className="relative max-h-[90vh] max-w-[90vw]" onClick={e => e.stopPropagation()}>
-        <img src={url} alt="Vista ampliada" className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain" />
+        <img src={url} alt={label || 'Imagen ampliada'} className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain" />
         <div className="absolute -top-2 right-6 flex gap-2">
           <button
+            type="button"
             onClick={() => downloadImage(url, `${slugify(label || 'imagen')}.jpg`)}
-            title="Descargar imagen"
+            aria-label="Descargar imagen"
             className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary/80"
           >
             <Download className="h-4 w-4" />
           </button>
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Cerrar imagen (Escape)"
             className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black shadow-lg hover:bg-gray-200"
           >
             ✕
@@ -526,7 +540,7 @@ function ServerDetailView({
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-2 md:px-6 md:py-3">
           {/* Izquierda: volver + título */}
           <div className="flex min-w-0 items-center gap-1.5">
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => router.push("/dashboard")}>
+            <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0 md:h-8 md:w-8" aria-label="Volver al dashboard" onClick={() => router.push("/dashboard")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="min-w-0">
@@ -543,11 +557,11 @@ function ServerDetailView({
               <span className="hidden sm:inline">{est.label}</span>
             </Badge>
             {((profile?.rol === "agricultor" && !["CANCELADO", "RECHAZADO"].includes(caracterizacion?.estado)) || ["admin", "asesor"].includes(profile?.rol)) && (
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => router.push(`/formulario/editar/${visita?.id}`)} title="Editar">
+              <Button variant="outline" size="icon" className="h-10 w-10 md:h-8 md:w-8" aria-label="Editar caracterización" onClick={() => router.push(`/formulario/editar/${visita?.id}`)}>
                 <PenTool className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => generateCaracterizacionPDF(pdfFromServerData(data))} title="Descargar PDF">
+            <Button variant="outline" size="icon" className="h-10 w-10 md:h-8 md:w-8" aria-label="Descargar PDF" onClick={() => generateCaracterizacionPDF(pdfFromServerData(data))}>
               <Download className="h-4 w-4" />
             </Button>
             <ThemeToggle />
@@ -555,48 +569,72 @@ function ServerDetailView({
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 md:px-6">
+      <motion.main
+        variants={fadeUp}
+        initial="hidden"
+        animate="visible"
+        className="mx-auto max-w-7xl px-4 py-6 md:px-6"
+      >
         {/* Summary cards */}
-        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="border-primary/20 bg-primary/5">
-            <CardContent className="flex items-center gap-3 p-4">
-              <User className="h-8 w-8 shrink-0 text-primary" />
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Productor</p>
-                <p className="truncate text-sm font-semibold">{nombre}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <MapPin className="h-8 w-8 shrink-0 text-green-600" />
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Predio</p>
-                <p className="truncate text-sm font-semibold">{predio?.nombre_predio || "Sin nombre"}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <Calendar className="h-8 w-8 shrink-0 text-blue-600" />
-              <div>
-                <p className="text-xs text-muted-foreground">Fecha visita</p>
-                <p className="text-sm font-semibold">
-                  {visita?.fecha_visita ? new Date(visita.fecha_visita + "T12:00:00").toLocaleDateString("es-CO") : "N/A"}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <FileText className="h-8 w-8 shrink-0 text-orange-600" />
-              <div>
-                <p className="text-xs text-muted-foreground">Tecnico</p>
-                <p className="text-sm font-semibold">{visita?.nombre_tecnico || "N/A"}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          <motion.div variants={staggerItem}>
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="flex items-center gap-3 p-4">
+                <User className="h-8 w-8 shrink-0 text-primary" />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Productor</p>
+                  <p className="truncate text-sm font-semibold">{nombre}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+          <motion.div variants={staggerItem}>
+            <Card>
+              <CardContent className="flex items-center gap-3 p-4">
+                <MapPin className="h-8 w-8 shrink-0 text-green-600" />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Predio</p>
+                  <p className="truncate text-sm font-semibold">{predio?.nombre_predio || "Sin nombre"}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+          <motion.div variants={staggerItem}>
+            <Card>
+              <CardContent className="flex items-center gap-3 p-4">
+                <Calendar className="h-8 w-8 shrink-0 text-blue-600" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Fecha visita</p>
+                  <p className="text-sm font-semibold">
+                    {(() => {
+                      if (!visita?.fecha_visita) return 'N/A'
+                      const m = String(visita.fecha_visita).match(/(\d{4}-\d{2}-\d{2})/)
+                      if (!m) return 'N/A'
+                      const d = new Date(m[1] + 'T12:00:00')
+                      return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('es-CO')
+                    })()}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+          <motion.div variants={staggerItem}>
+            <Card>
+              <CardContent className="flex items-center gap-3 p-4">
+                <FileText className="h-8 w-8 shrink-0 text-orange-600" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Tecnico</p>
+                  <p className="text-sm font-semibold">{visita?.nombre_tecnico || "N/A"}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
 
         {/* Map - full width, bigger */}
         {hasCoords && (
@@ -846,12 +884,6 @@ function ServerDetailView({
               <Badge variant="outline" className={(caracterizacion as any)?.autorizacion_aviso_privacidad ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
                 {(caracterizacion as any)?.autorizacion_aviso_privacidad ? "Leyó" : "No leyó"} aviso de privacidad
               </Badge>
-              <Badge variant="outline" className={caracterizacion?.autorizacion_consulta_crediticia ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
-                {caracterizacion?.autorizacion_consulta_crediticia ? "Autoriza" : "No autoriza"} consulta crediticia
-              </Badge>
-              <Badge variant="outline" className={(caracterizacion as any)?.autorizacion_uso_imagen ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
-                {(caracterizacion as any)?.autorizacion_uso_imagen ? "Autoriza" : "No autoriza"} uso de imagen
-              </Badge>
               <Badge variant="outline" className={areaProductiva?.interesado_programa ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
                 {areaProductiva?.interesado_programa ? "Requiere financiación" : "No requiere financiación"}
               </Badge>
@@ -863,7 +895,7 @@ function ServerDetailView({
             )}
           </SectionCard>
         </div>
-      </main>
+      </motion.main>
 
       {photoModal && <PhotoModal url={photoModal} label="imagen" onClose={() => setPhotoModal(null)} />}
     </div>

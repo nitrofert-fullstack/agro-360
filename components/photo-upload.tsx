@@ -13,6 +13,7 @@ export interface PhotoUploadProps {
   label?: string
   required?: boolean
   className?: string
+  guideType?: "documento" | "persona"
 }
 
 function resizeImage(file: File, maxWidth: number, maxHeight: number, quality: number): Promise<string> {
@@ -74,7 +75,8 @@ export function PhotoUpload({
   currentPhoto = null,
   label = "Foto",
   required = false,
-  className
+  className,
+  guideType,
 }: PhotoUploadProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentPhoto)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -211,37 +213,35 @@ export function PhotoUpload({
         <Card className="p-6 border-dashed">
           <div className="flex flex-col items-center justify-center gap-4 text-center">
             <div className="rounded-full bg-muted p-4">
-              <ImageIcon className="h-8 w-8 text-muted-foreground" />
+              <ImageIcon className="h-10 w-10 text-muted-foreground md:h-12 md:w-12" />
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm md:text-base text-muted-foreground">
                 Toma una foto o sube una imagen
               </p>
               <p className="text-xs text-muted-foreground">
                 {'Ideal <2MB · Máx 5MB · JPG, PNG o WebP'}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-3 flex-wrap justify-center">
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
                 onClick={() => startCamera(facingMode)}
                 disabled={isProcessing}
-                className="gap-2"
+                className="gap-2 h-11 px-5 md:h-12 md:px-6 md:text-base"
               >
-                <Camera className="h-4 w-4" />
+                <Camera className="h-5 w-5" />
                 Tomar foto
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isProcessing}
-                className="gap-2"
+                className="gap-2 h-11 px-5 md:h-12 md:px-6 md:text-base"
               >
-                <Upload className="h-4 w-4" />
+                <Upload className="h-5 w-5" />
                 Subir archivo
               </Button>
             </div>
@@ -251,41 +251,67 @@ export function PhotoUpload({
 
       {cameraMode && (
         <Card className="p-4 space-y-4">
-          <video
-            ref={videoRef}
-            className="w-full h-64 object-cover rounded-md bg-black"
-            autoPlay
-            playsInline
-            muted
-          />
-          <div className="flex gap-2 justify-center flex-wrap">
+          <div className="relative">
+            <video
+              ref={videoRef}
+              className="w-full h-64 md:h-80 object-cover rounded-md bg-black"
+              autoPlay
+              playsInline
+              muted
+            />
+            {guideType === "documento" && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <div className="border-2 border-white border-dashed rounded-lg opacity-80"
+                  style={{ width: "75%", height: "62%", borderRadius: "8px" }}
+                />
+                <span className="mt-2 text-white text-sm font-medium drop-shadow bg-black/40 px-2 py-0.5 rounded">
+                  Centre el documento
+                </span>
+              </div>
+            )}
+            {guideType === "persona" && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <div className="border-2 border-white border-dashed opacity-80"
+                  style={{ width: "50%", height: "72%", borderRadius: "50%" }}
+                />
+                <span className="mt-2 text-white text-sm font-medium drop-shadow bg-black/40 px-2 py-0.5 rounded">
+                  Centre el rostro
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-3 justify-center flex-wrap">
             <Button
               type="button"
               variant="default"
-              size="sm"
               onClick={capturePhoto}
               disabled={isProcessing}
-              className="gap-2"
+              className="gap-2 h-11 px-5 md:h-12 md:px-6 md:text-base"
             >
               {isProcessing ? (
-                <><Loader2 className="h-4 w-4 animate-spin" /> Procesando...</>
+                <><Loader2 className="h-5 w-5 animate-spin" /> Procesando...</>
               ) : (
-                <><Camera className="h-4 w-4" /> Capturar</>
+                <><Camera className="h-5 w-5" /> Capturar</>
               )}
             </Button>
             <Button
               type="button"
               variant="outline"
-              size="sm"
               onClick={switchCamera}
               disabled={isProcessing}
-              className="gap-2"
+              className="gap-2 h-11 px-5 md:h-12 md:px-6 md:text-base"
               title={facingMode === 'environment' ? 'Cambiar a cámara frontal' : 'Cambiar a cámara trasera'}
             >
-              <SwitchCamera className="h-4 w-4" />
+              <SwitchCamera className="h-5 w-5" />
               {facingMode === 'environment' ? 'Frontal' : 'Trasera'}
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={stopCamera} disabled={isProcessing}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={stopCamera}
+              disabled={isProcessing}
+              className="h-11 px-5 md:h-12 md:px-6 md:text-base"
+            >
               Cancelar
             </Button>
           </div>
@@ -295,18 +321,18 @@ export function PhotoUpload({
       {previewUrl && !cameraMode && (
         <Card className="p-4">
           <div className="relative">
-            <img src={previewUrl} alt="Vista previa" className="w-full h-64 object-cover rounded-md" />
+            <img src={previewUrl} alt="Vista previa" className="w-full h-64 md:h-80 object-cover rounded-md" />
             <Button
               type="button"
               variant="destructive"
               size="icon"
-              className="absolute top-2 right-2"
+              className="absolute top-2 right-2 h-10 w-10"
               onClick={handleRemove}
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2 text-center">Foto cargada correctamente</p>
+          <p className="text-sm text-muted-foreground mt-2 text-center">Foto cargada correctamente</p>
         </Card>
       )}
 

@@ -20,7 +20,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
-    const [caracs, predios, beneficiarios, visitas] = await Promise.all([
+    const [caracs, predios, beneficiarios, visitas, asesoresProfiles] = await Promise.all([
       prisma.caracterizaciones.findMany({
         select: { estado: true, created_at: true },
         take: 2000,
@@ -36,6 +36,10 @@ export async function GET() {
       prisma.visitas.findMany({
         select: { asesor_id: true, created_at: true },
         take: 2000,
+      }),
+      prisma.profiles.findMany({
+        where: { rol: { in: ['asesor', 'admin'] }, activo: true },
+        select: { id: true, nombre_completo: true, rol: true },
       }),
     ])
 
@@ -101,12 +105,27 @@ export async function GET() {
     const conAsesor = visitas.filter(v => v.asesor_id).length
     const sinAsesor = visitas.filter(v => !v.asesor_id).length
 
+    // Por asesor — conteo de visitas por asesor_id, con nombre del perfil
+    const asesorCount: Record<string, number> = {}
+    for (const v of visitas) {
+      const key = v.asesor_id || '__sin_asesor__'
+      asesorCount[key] = (asesorCount[key] || 0) + 1
+    }
+    const profileMap = new Map(asesoresProfiles.map(p => [p.id, p.nombre_completo || 'Sin nombre']))
+    const porAsesor = Object.entries(asesorCount)
+      .map(([id, total]) => ({
+        nombre: id === '__sin_asesor__' ? 'Sin asesor' : (profileMap.get(id) || 'Asesor desconocido'),
+        total,
+      }))
+      .sort((a, b) => b.total - a.total)
+
     const response = NextResponse.json({
       porEstado,
       porMes,
       porMunicipio,
       porDepartamento,
       porGenero,
+      porAsesor,
       totalRegistros: caracs.length,
       promedios: {
         edad:          avg(edades),

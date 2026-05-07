@@ -3,13 +3,16 @@
 import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { motion } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Mail, Phone, Shield, Leaf } from "lucide-react"
+import { ArrowLeft, Mail, Phone, Shield } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { staggerContainer, staggerItem } from "@/lib/animations"
 
 export default function ProfilePage() {
   const { user, profile, isAuthenticated, loading } = useAuth()
@@ -47,11 +50,8 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <Leaf className="h-4 w-4 text-primary" />
-            </div>
-            <span className="text-sm font-bold text-foreground">Agro360</span>
+          <Link href="/dashboard" className="flex items-center">
+            <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={48} height={48} className="rounded-xl" />
           </Link>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild className="gap-1.5">
@@ -65,10 +65,16 @@ export default function ProfilePage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl px-4 py-6 md:px-6">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="mx-auto max-w-2xl px-4 py-6 md:px-6"
+      >
         <div className="space-y-6">
           {/* Perfil Card */}
-          <Card>
+          <motion.div variants={staggerItem}>
+          <Card className="h-full">
             <CardHeader>
               <CardTitle>Mi Perfil</CardTitle>
               <CardDescription>Información de tu cuenta</CardDescription>
@@ -135,29 +141,23 @@ export default function ProfilePage() {
               </div>
             </CardContent>
           </Card>
+          </motion.div>
 
           {/* Información de seguridad */}
+          <motion.div variants={staggerItem}>
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Seguridad</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Tu sesión está protegida con tokens JWT. Los tokens se renuevan automáticamente cuando se detecta conexión a internet.
+                Tu sesión está protegida con tokens JWT. Los tokens se renuevan automáticamente para mantener tu acceso activo.
               </p>
-              <div className="flex items-start gap-3 rounded-lg border border-border bg-blue-50 p-3 dark:bg-blue-950/20">
-                <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                <div className="text-sm text-blue-900 dark:text-blue-200">
-                  <p className="font-medium mb-1">Acceso offline seguro</p>
-                  <p>
-                    Puedes trabajar sin conexión. Los formularios se guardarán localmente y se sincronizarán cuando recuperes conexión.
-                  </p>
-                </div>
-              </div>
             </CardContent>
           </Card>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
     </div>
   )
 }

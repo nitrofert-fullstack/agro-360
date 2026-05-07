@@ -110,6 +110,7 @@ export async function POST(request: Request) {
         nombre_contacto_secundario:      datos.beneficiario.nombreContactoSecundario || null,
         telefono_secundario:             datos.beneficiario.telefonoSecundario || null,
         parentesco_contacto_secundario:  datos.beneficiario.parentescoContactoSecundario || null,
+        asociacion:                      datos.beneficiario.asociacion || null,
         updated_at:                      new Date(),
       },
     })
@@ -131,7 +132,7 @@ export async function POST(request: Request) {
         longitud:                  datos.predio.longitud ?? null,
         coordenada_x:              datos.predio.coordenadaX || null,
         coordenada_y:              datos.predio.coordenadaY || null,
-        poligono:                  datos.predio.poligono ?? undefined,
+        poligono:                  datos.predio.poligono !== undefined ? datos.predio.poligono : null,
         altitud_msnm:              datos.predio.altitudMsnm ?? null,
         direccion:                 datos.predio.direccion || null,
         codigo_catastral:          datos.predio.codigoCatastral || null,
@@ -197,6 +198,9 @@ export async function POST(request: Request) {
         interesado_programa:                 datos.areaProductiva.interesadoPrograma ?? false,
         donde_comercializa:                  datos.areaProductiva.dondeComercializa || null,
         ingreso_mensual_ventas:              datos.areaProductiva.ingresoMensualVentas ?? null,
+        sistema_productivo_interes:          datos.areaProductiva.sistemaProductivoInteres || null,
+        hectareas_siembra_nueva:             datos.areaProductiva.hectareasSiembraNueva ?? null,
+        hectareas_renovacion:               datos.areaProductiva.hectareasRenovacion ?? null,
         updated_at:                          new Date(),
       }),
     ])

@@ -105,7 +105,7 @@ export const LEGAL_DOCUMENTS = {
     id: "politicaTratamientoDatos",
     title: "Política de Tratamiento de Datos Personales",
     description: "Manual general del tratamiento de datos personales por parte de COA (Ley 1581/2012).",
-    url: "/legal/politica-tratamiento-datos.html",
+    url: "/legal/politica-tratamiento-datos-coa.pdf",
   },
   avisoPrivacidad: {
     id: "avisoPrivacidad",
@@ -117,7 +117,7 @@ export const LEGAL_DOCUMENTS = {
     id: "autorizacionTratamientoDatos",
     title: "Autorización de Tratamiento de Datos Personales",
     description: "Texto de autorización que el productor acepta al suministrar sus datos.",
-    url: "/legal/autorizacion-tratamiento-datos.html",
+    url: "/legal/formato-recoleccion-datos.pdf",
   },
   autorizacionUsoImagen: {
     id: "autorizacionUsoImagen",

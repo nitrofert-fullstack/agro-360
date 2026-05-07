@@ -1,49 +1,43 @@
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 
-function createTransporter() {
-  const host = process.env.SMTP_HOST
-  const port = parseInt(process.env.SMTP_PORT || '587', 10)
-  const user = process.env.SMTP_USER
-  const pass = process.env.SMTP_PASS
-  const from = process.env.SMTP_FROM || user
-
-  if (!host || !user || !pass) {
-    console.warn('[Mailer] Variables SMTP no configuradas. Los emails no se enviarán.')
-    return null
-  }
-
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass },
-    tls: { rejectUnauthorized: false },
-  })
-}
+const resend = new Resend(process.env.RESEND_API_KEY)
+const FROM = process.env.RESEND_FROM || 'Santander Agro360 <no-reply@santanderagro360.com>'
 
 interface SendEmailOptions {
   to: string
   subject: string
   html: string
+  idempotencyKey?: string
 }
 
-export async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<boolean> {
-  const transporter = createTransporter()
-  if (!transporter) return false
-
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER
-
-  try {
-    await transporter.sendMail({ from, to, subject, html })
-    console.log(`[Mailer] Email enviado a ${to}: ${subject}`)
-    return true
-  } catch (err) {
-    console.error('[Mailer] Error enviando email:', err)
+export async function sendEmail({ to, subject, html, idempotencyKey }: SendEmailOptions): Promise<boolean> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('[Mailer] RESEND_API_KEY no configurada. El email no se enviará.')
     return false
   }
+
+  const { data, error } = await resend.emails.send({
+    from: FROM,
+    to,
+    subject,
+    html,
+    ...(idempotencyKey ? { headers: { 'X-Idempotency-Key': idempotencyKey } } : {}),
+  })
+
+  if (error) {
+    console.error('[Mailer] Error enviando email:', error)
+    return false
+  }
+
+  console.log(`[Mailer] Email enviado a ${to}: ${subject} (id: ${data?.id})`)
+  return true
 }
 
-export function buildCredentialsEmail({
+const NO_REPLY_NOTICE = `<p style="color:#9ca3af;font-size:11px;margin:8px 0 0">
+  Este correo se ha enviado de manera automática, por favor no responder.
+</p>`
+
+export function buildCredencialesEmail({
   nombreCompleto,
   email,
   password,
@@ -64,13 +58,13 @@ export function buildCredentialsEmail({
 <body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px">
   <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
     <div style="background:#16a34a;padding:24px;text-align:center">
-      <h1 style="color:#fff;margin:0;font-size:22px">Agro360</h1>
+      <h1 style="color:#fff;margin:0;font-size:22px">Santander Agro360</h1>
       <p style="color:#d1fae5;margin:6px 0 0;font-size:14px">Sistema de Caracterización Agropecuaria</p>
     </div>
     <div style="padding:28px 32px">
       <h2 style="color:#1a1a1a;font-size:18px;margin:0 0 8px">Bienvenido(a), ${nombreCompleto || email}</h2>
       <p style="color:#555;font-size:14px;margin:0 0 20px">
-        Se ha creado tu cuenta como <strong>${rolLabel}</strong> en Agro360.
+        Se ha creado tu cuenta como <strong>${rolLabel}</strong> en Santander Agro360.
         A continuación encuentras tus credenciales de acceso:
       </p>
       <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:16px;margin-bottom:20px">
@@ -96,12 +90,15 @@ export function buildCredentialsEmail({
       <p style="color:#9ca3af;font-size:12px;margin:0">
         Si no esperabas este correo, por favor ignóralo o contacta al administrador.
       </p>
+      ${NO_REPLY_NOTICE}
     </div>
   </div>
 </body>
-</html>
-  `.trim()
+</html>`.trim()
 }
+
+// Alias para retrocompatibilidad con imports existentes
+export const buildCredentialsEmail = buildCredencialesEmail
 
 export function buildConfirmacionRegistroEmail({
   nombreCompleto,
@@ -123,7 +120,7 @@ export function buildConfirmacionRegistroEmail({
 <body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px">
   <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
     <div style="background:#16a34a;padding:24px;text-align:center">
-      <h1 style="color:#fff;margin:0;font-size:22px">Agro360</h1>
+      <h1 style="color:#fff;margin:0;font-size:22px">Santander Agro360</h1>
       <p style="color:#d1fae5;margin:6px 0 0;font-size:14px">Registro Recibido</p>
     </div>
     <div style="padding:28px 32px">
@@ -162,11 +159,11 @@ export function buildConfirmacionRegistroEmail({
       <p style="color:#9ca3af;font-size:12px;margin:0">
         Si no realizaste este registro, por favor ignora este correo o contacta a tu asesor agropecuario.
       </p>
+      ${NO_REPLY_NOTICE}
     </div>
   </div>
 </body>
-</html>
-  `.trim()
+</html>`.trim()
 }
 
 export function buildNuevoRegistroEmail({
@@ -193,41 +190,23 @@ export function buildNuevoRegistroEmail({
 <body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px">
   <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
     <div style="background:#1d4ed8;padding:24px;text-align:center">
-      <h1 style="color:#fff;margin:0;font-size:22px">Agro360</h1>
+      <h1 style="color:#fff;margin:0;font-size:22px">Santander Agro360</h1>
       <p style="color:#bfdbfe;margin:6px 0 0;font-size:14px">Nuevo Registro — Revisión Pendiente</p>
     </div>
     <div style="padding:28px 32px">
       <h2 style="color:#1a1a1a;font-size:18px;margin:0 0 8px">Nuevo registro recibido</h2>
       <p style="color:#555;font-size:14px;margin:0 0 16px">
-        Se ha registrado una nueva caracterización agropecuaria a través del formulario público. Ingresa al panel de administración para revisarla.
+        Se ha registrado una nueva caracterización agropecuaria. Ingresa al panel de administración para revisarla.
       </p>
       <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:16px;margin-bottom:20px">
         <p style="color:#1e40af;font-weight:600;margin:0 0 8px;font-size:14px">Datos del registro:</p>
         <table style="width:100%;border-collapse:collapse;font-size:13px">
-          <tr>
-            <td style="color:#6b7280;padding:4px 0;width:160px">Productor:</td>
-            <td style="color:#111827;font-weight:600">${nombreProductor}</td>
-          </tr>
-          <tr>
-            <td style="color:#6b7280;padding:4px 0">Documento:</td>
-            <td style="color:#111827">${numeroDocumento}</td>
-          </tr>
-          <tr>
-            <td style="color:#6b7280;padding:4px 0">Predio:</td>
-            <td style="color:#111827">${nombrePredio}</td>
-          </tr>
-          <tr>
-            <td style="color:#6b7280;padding:4px 0">Municipio:</td>
-            <td style="color:#111827">${municipio}</td>
-          </tr>
-          <tr>
-            <td style="color:#6b7280;padding:4px 0">Radicado:</td>
-            <td style="color:#111827;font-family:monospace;font-weight:600">${radicadoOficial}</td>
-          </tr>
-          <tr>
-            <td style="color:#6b7280;padding:4px 0">Fecha:</td>
-            <td style="color:#111827">${fechaRegistro}</td>
-          </tr>
+          <tr><td style="color:#6b7280;padding:4px 0;width:160px">Productor:</td><td style="color:#111827;font-weight:600">${nombreProductor}</td></tr>
+          <tr><td style="color:#6b7280;padding:4px 0">Documento:</td><td style="color:#111827">${numeroDocumento}</td></tr>
+          <tr><td style="color:#6b7280;padding:4px 0">Predio:</td><td style="color:#111827">${nombrePredio}</td></tr>
+          <tr><td style="color:#6b7280;padding:4px 0">Municipio:</td><td style="color:#111827">${municipio}</td></tr>
+          <tr><td style="color:#6b7280;padding:4px 0">Radicado:</td><td style="color:#111827;font-family:monospace;font-weight:600">${radicadoOficial}</td></tr>
+          <tr><td style="color:#6b7280;padding:4px 0">Fecha:</td><td style="color:#111827">${fechaRegistro}</td></tr>
         </table>
       </div>
       <a href="${appUrl}/admin" style="display:inline-block;background:#1d4ed8;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-size:15px;font-weight:600">
@@ -235,14 +214,12 @@ export function buildNuevoRegistroEmail({
       </a>
     </div>
     <div style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb">
-      <p style="color:#9ca3af;font-size:12px;margin:0">
-        Este mensaje fue generado automáticamente por el sistema Agro360.
-      </p>
+      <p style="color:#9ca3af;font-size:12px;margin:0">Este mensaje fue generado automáticamente por el sistema Santander Agro360.</p>
+      ${NO_REPLY_NOTICE}
     </div>
   </div>
 </body>
-</html>
-  `.trim()
+</html>`.trim()
 }
 
 export function buildSyncNotificationEmail({
@@ -267,40 +244,23 @@ export function buildSyncNotificationEmail({
 <body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px">
   <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
     <div style="background:#16a34a;padding:24px;text-align:center">
-      <h1 style="color:#fff;margin:0;font-size:22px">Agro360</h1>
+      <h1 style="color:#fff;margin:0;font-size:22px">Santander Agro360</h1>
       <p style="color:#d1fae5;margin:6px 0 0;font-size:14px">Caracterización Agropecuaria Registrada</p>
     </div>
     <div style="padding:28px 32px">
       <h2 style="color:#1a1a1a;font-size:18px;margin:0 0 8px">Hola, ${nombreCompleto || email}</h2>
-      <p style="color:#555;font-size:14px;margin:0 0 16px">
-        Tu caracterización agropecuaria ha sido registrada exitosamente en el sistema.
-      </p>
+      <p style="color:#555;font-size:14px;margin:0 0 16px">Tu caracterización agropecuaria ha sido registrada exitosamente en el sistema.</p>
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:16px;margin-bottom:20px">
         <p style="color:#15803d;font-weight:600;margin:0 0 8px;font-size:14px">Datos del registro:</p>
         <table style="width:100%;border-collapse:collapse;font-size:13px">
-          <tr>
-            <td style="color:#6b7280;padding:4px 0;width:130px">Radicado:</td>
-            <td style="color:#111827;font-weight:600;font-family:monospace">${radicadoOficial}</td>
-          </tr>
-          <tr>
-            <td style="color:#6b7280;padding:4px 0">Predio:</td>
-            <td style="color:#111827">${nombrePredio}</td>
-          </tr>
+          <tr><td style="color:#6b7280;padding:4px 0;width:130px">Radicado:</td><td style="color:#111827;font-weight:600;font-family:monospace">${radicadoOficial}</td></tr>
+          <tr><td style="color:#6b7280;padding:4px 0">Predio:</td><td style="color:#111827">${nombrePredio}</td></tr>
         </table>
       </div>
-      <p style="color:#555;font-size:14px;margin:0 0 8px">
-        Puedes acceder al portal para ver los detalles de tu registro y terrenos:
-      </p>
       <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:16px;margin-bottom:20px">
         <table style="width:100%;border-collapse:collapse;font-size:14px">
-          <tr>
-            <td style="color:#6b7280;padding:6px 0;width:110px">Correo:</td>
-            <td style="color:#111827;font-weight:600">${email}</td>
-          </tr>
-          <tr>
-            <td style="color:#6b7280;padding:6px 0">Contraseña:</td>
-            <td style="color:#111827;font-weight:600;font-family:monospace">${password}</td>
-          </tr>
+          <tr><td style="color:#6b7280;padding:6px 0;width:110px">Correo:</td><td style="color:#111827;font-weight:600">${email}</td></tr>
+          <tr><td style="color:#6b7280;padding:6px 0">Contraseña:</td><td style="color:#111827;font-weight:600;font-family:monospace">${password}</td></tr>
         </table>
       </div>
       <a href="${appUrl}/auth/login" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-size:15px;font-weight:600">
@@ -308,14 +268,12 @@ export function buildSyncNotificationEmail({
       </a>
     </div>
     <div style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb">
-      <p style="color:#9ca3af;font-size:12px;margin:0">
-        Si no reconoces este registro, por favor contacta a tu asesor agropecuario.
-      </p>
+      <p style="color:#9ca3af;font-size:12px;margin:0">Si no reconoces este registro, por favor contacta a tu asesor agropecuario.</p>
+      ${NO_REPLY_NOTICE}
     </div>
   </div>
 </body>
-</html>
-  `.trim()
+</html>`.trim()
 }
 
 export function buildEstadoNotificationEmail({
@@ -332,17 +290,15 @@ export function buildEstadoNotificationEmail({
   appUrl: string
 }): string {
   const estadoConfig: Record<string, { label: string; color: string; bg: string; border: string; icon: string }> = {
-    // Estados actuales de BD
     iniciado:           { label: 'Iniciado',              color: '#475569', bg: '#f8fafc', border: '#e2e8f0', icon: '○' },
     revisado:           { label: 'Revisado',              color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe', icon: '👁' },
     en_estudio_credito: { label: 'En Estudio de Crédito', color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe', icon: '📋' },
     aprobado:           { label: 'Viable',                color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', icon: '✓' },
     cancelado:          { label: 'No Viable',             color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: '✗' },
-    // Estados legado
-    rechazado:    { label: 'No Viable',    color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: '✗' },
-    en_revision:  { label: 'En Revisión',  color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe', icon: '👁' },
-    sincronizado: { label: 'Sincronizado', color: '#0369a1', bg: '#f0f9ff', border: '#bae6fd', icon: '↑' },
-    pendiente:    { label: 'Pendiente',    color: '#b45309', bg: '#fffbeb', border: '#fde68a', icon: '○' },
+    rechazado:          { label: 'No Viable',             color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: '✗' },
+    en_revision:        { label: 'En Revisión',           color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe', icon: '👁' },
+    sincronizado:       { label: 'Sincronizado',          color: '#0369a1', bg: '#f0f9ff', border: '#bae6fd', icon: '↑' },
+    pendiente:          { label: 'Pendiente',             color: '#b45309', bg: '#fffbeb', border: '#fde68a', icon: '○' },
   }
   const cfg = estadoConfig[nuevoEstado.toLowerCase()] ?? { label: nuevoEstado, color: '#555', bg: '#f9fafb', border: '#e5e7eb', icon: '•' }
 
@@ -353,14 +309,12 @@ export function buildEstadoNotificationEmail({
 <body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px">
   <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
     <div style="background:#16a34a;padding:24px;text-align:center">
-      <h1 style="color:#fff;margin:0;font-size:22px">Agro360</h1>
+      <h1 style="color:#fff;margin:0;font-size:22px">Santander Agro360</h1>
       <p style="color:#d1fae5;margin:6px 0 0;font-size:14px">Actualización de tu caracterización</p>
     </div>
     <div style="padding:28px 32px">
       <h2 style="color:#1a1a1a;font-size:18px;margin:0 0 8px">Hola, ${nombreCompleto}</h2>
-      <p style="color:#555;font-size:14px;margin:0 0 20px">
-        El estado de tu caracterización agropecuaria ha sido actualizado.
-      </p>
+      <p style="color:#555;font-size:14px;margin:0 0 20px">El estado de tu caracterización agropecuaria ha sido actualizado.</p>
       <div style="background:${cfg.bg};border:1px solid ${cfg.border};border-radius:8px;padding:18px;margin-bottom:20px;text-align:center">
         <p style="color:${cfg.color};font-size:22px;font-weight:700;margin:0">${cfg.icon} ${cfg.label}</p>
         <p style="color:#6b7280;font-size:12px;margin:6px 0 0;font-family:monospace">Radicado: ${radicadoOficial}</p>
@@ -375,12 +329,10 @@ export function buildEstadoNotificationEmail({
       </a>
     </div>
     <div style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb">
-      <p style="color:#9ca3af;font-size:12px;margin:0">
-        Puedes consultar el detalle en el portal usando tu número de documento.
-      </p>
+      <p style="color:#9ca3af;font-size:12px;margin:0">Puedes consultar el detalle en el portal usando tu número de documento.</p>
+      ${NO_REPLY_NOTICE}
     </div>
   </div>
 </body>
-</html>
-  `.trim()
+</html>`.trim()
 }

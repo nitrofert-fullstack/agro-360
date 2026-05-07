@@ -3,11 +3,14 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { LocationPicker } from "./location-picker"
@@ -33,9 +36,13 @@ import {
   Lock,
   Info,
   CheckCircle,
+  Check,
   Cloud,
   Download,
   Plus,
+  ChevronsUpDown,
+  WifiOff,
+  CloudUpload,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ThemeToggle } from "./theme-toggle"
@@ -43,27 +50,62 @@ import { UserProfile } from "./user-profile"
 import { useAuth } from "@/hooks/use-auth"
 import { toast } from "sonner"
 import Link from "next/link"
-import { Turnstile } from "@marsidev/react-turnstile"
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile"
 import { LegalDocumentModal, LEGAL_DOCUMENTS } from "./legal-document-modal"
+import { savePendingForm } from "@/lib/offline-db"
+import { useOfflineSync } from "@/hooks/use-offline-sync"
+import { OfflineSyncBanner } from "./offline-sync-banner"
 
-// Municipios de Santander (sin duplicados)
-const municipiosSantander = [...new Set([
-  "Bucaramanga", "Floridablanca", "Giron", "Piedecuesta", "Barrancabermeja",
-  "San Gil", "Socorro", "Barbosa", "Velez", "Malaga", "Lebrija", "Rionegro",
-  "Cimitarra", "Puerto Wilches", "Sabana de Torres", "San Vicente de Chucuri",
-  "El Playon", "Zapatoca", "Charala", "Oiba", "Puente Nacional", "Simacota",
-  "Barichara", "Villanueva", "Curiti", "Aratoca", "Mogotes", "Onzaga",
-  "San Joaquin", "Coromoro", "Encino", "Ocamonte", "Valle de San Jose",
-  "Paramo", "Cerrito", "Pinchote", "Cabrera", "Guadalupe", "Guaca",
-  "San Andres", "Macaravita", "Capitanejo", "Carcasi", "San Miguel",
-  "Molagavita", "Enciso", "Concepcion", "Los Santos", "Gambita",
-  "Suaita", "Guepsa", "Chipatá", "Jesus Maria", "Albania", "Sucre",
-  "Bolivar", "El Carmen de Chucuri", "Landazuri", "El Penon",
-  "Contratacion", "Galan", "Hato", "Palmas del Socorro", "Confines",
-  "Guavata", "Chipata", "Aguada", "La Paz", "Santa Helena del Opon",
-  "Puerto Parra", "Betulia", "Tona", "Matanza", "Surata", "California",
-  "Vetas", "Charta", "El Carmen"
-])].sort()
+// Los 87 municipios oficiales de Santander (DANE), ordenados alfabéticamente
+const municipiosSantander = [
+  "Aguada", "Albania", "Aratoca", "Barbosa", "Barichara", "Barrancabermeja",
+  "Betulia", "Bolívar", "Bucaramanga", "Cabrera", "California", "Capitanejo",
+  "Carcasí", "Cepitá", "Cerrito", "Charalá", "Charta", "Chima", "Chipatá",
+  "Cimitarra", "Concepción", "Confines", "Contratación", "Coromoro", "Curití",
+  "El Carmen de Chucurí", "El Guacamayo", "El Peñón", "El Playón", "Encino",
+  "Enciso", "Florián", "Floridablanca", "Galán", "Gámbita", "Girón", "Guaca", "Guadalupe",
+  "Guapotá", "Guavatá", "Güepsa", "Hato", "Jesús María", "Jordán",
+  "La Belleza", "La Paz", "Landázuri", "Lebrija", "Los Santos", "Macaravita",
+  "Málaga", "Matanza", "Mogotes", "Molagavita", "Ocamonte", "Oiba", "Onzaga",
+  "Palmar", "Palmas del Socorro", "Páramo", "Piedecuesta", "Pinchote",
+  "Puente Nacional", "Puerto Parra", "Puerto Wilches", "Rionegro",
+  "Sabana de Torres", "San Andrés", "San Benito", "San Gil", "San Joaquín",
+  "San José de Miranda", "San Miguel", "San Vicente de Chucurí",
+  "Santa Bárbara", "Santa Helena del Opón", "Simacota", "Socorro", "Suaita",
+  "Sucre", "Suratá", "Tona", "Valle de San José", "Vélez", "Vetas",
+  "Villanueva", "Zapatoca",
+]
+
+// Cultivos para "sistema productivo actual"
+const cultivosSantander = [
+  "Aguacate", "Ahuyama", "Ajo", "Arracacha", "Arroz", "Arveja",
+  "Banano", "Cacao", "Café", "Caña panelera", "Cebada", "Cebolla",
+  "Cítricos", "Fique", "Fríjol", "Frutales", "Granadilla", "Guanabana",
+  "Guayaba", "Hortalizas", "Lechuga", "Limón", "Maíz", "Mandarina",
+  "Mango", "Maracuyá", "Mora", "Naranja", "Palma de aceite", "Papa",
+  "Patilla", "Pepino", "Piña", "Plátano", "Sorgo", "Tabaco", "Tomate",
+  "Trigo", "Yacón", "Yuca", "Zanahoria", "Otro",
+]
+
+// Cultivos de interés en el programa (orden alfabético)
+const cultivosPrograma = [
+  "Cacao", "Café", "Caña panelera", "Fique",
+  "Limón tahití", "Mora", "Palma africana", "Plátano",
+]
+
+// Tipos de tenencia (orden alfabético) — sin constraint en BD
+const tiposTenencia = [
+  "Aparcería",
+  "Arrendamiento",
+  "Asignación por cabildo indígena",
+  "Asignación por comunidad afrodescendiente",
+  "Comodato",
+  "Derechos de uso",
+  "Posesión o falsa tradición",
+  "Predio del cónyuge",
+  "Propiedad",
+  "Usufructo",
+]
 
 // Pasos del formulario
 const steps = [
@@ -101,6 +143,7 @@ interface FormData {
     telefono: string
     correo: string
     ocupacionPrincipal: string
+    asociacion: string
   }
   // 2b. Contacto secundario / acudiente
   contactoSecundario: {
@@ -175,6 +218,9 @@ interface FormData {
     interesadoPrograma: boolean
     dondeComercializa: string
     ingresoMensualVentas: number | null
+    sistemaProductivoInteres: string
+    hectareasSiembraNueva: number | null
+    hectareasRenovacion: number | null
   }
   // 8. Información financiera
   infoFinanciera: {
@@ -225,6 +271,7 @@ const initialFormData: FormData = {
     telefono: "",
     correo: "",
     ocupacionPrincipal: "",
+    asociacion: "",
   },
   contactoSecundario: {
     nombre: "",
@@ -291,6 +338,9 @@ const initialFormData: FormData = {
     interesadoPrograma: false,
     dondeComercializa: "",
     ingresoMensualVentas: null,
+    sistemaProductivoInteres: "",
+    hectareasSiembraNueva: null,
+    hectareasRenovacion: null,
   },
   infoFinanciera: {
     ingresosMensualesAgropecuaria: null,
@@ -370,11 +420,29 @@ export function CharacterizationFormComplete({
   const router = useRouter()
   const { user, profile, isAuthenticated } = useAuth()
   const isAsesor = isAuthenticated && (profile?.rol === 'asesor' || profile?.rol === 'admin')
+  // El sync global lo maneja AutoSync (layout). Aquí solo necesitamos isOnline y el conteo
+  // para el banner del formulario, sin crear una segunda instancia que cause envíos dobles.
+  const { isOnline, pendingCount, isSyncing, syncPending, refreshCount } = useOfflineSync(false)
   const [currentStep, setCurrentStep] = useState(1)
+  const [stepDirection, setStepDirection] = useState(1)
   const [formData, setFormData] = useState<FormData>(() => {
     if (initialData) {
-      // Merge con deep fusion base para asegurar la estructura
-      return { ...initialFormData, ...initialData } as FormData
+      // Deep merge: secciones del initialData reemplazan las del default,
+      // pero cualquier campo faltante dentro de cada sección usa el default
+      return {
+        visita:             { ...initialFormData.visita,             ...(initialData.visita             ?? {}) },
+        beneficiario:       { ...initialFormData.beneficiario,       ...(initialData.beneficiario       ?? {}) },
+        contactoSecundario: { ...initialFormData.contactoSecundario, ...(initialData.contactoSecundario ?? {}) },
+        predio:             { ...initialFormData.predio,             ...(initialData.predio             ?? {}) },
+        caracterizacion:    { ...initialFormData.caracterizacion,    ...(initialData.caracterizacion    ?? {}) },
+        abastecimientoAgua: { ...initialFormData.abastecimientoAgua, ...(initialData.abastecimientoAgua ?? {}) },
+        riesgos:            { ...initialFormData.riesgos,            ...(initialData.riesgos            ?? {}) },
+        areaProductiva:     { ...initialFormData.areaProductiva,     ...(initialData.areaProductiva     ?? {}) },
+        infoFinanciera:     { ...initialFormData.infoFinanciera,     ...(initialData.infoFinanciera     ?? {}) },
+        archivos:           { ...initialFormData.archivos,           ...(initialData.archivos           ?? {}) },
+        autorizaciones:     { ...initialFormData.autorizaciones,     ...(initialData.autorizaciones     ?? {}) },
+        observaciones:      initialData.observaciones ?? initialFormData.observaciones,
+      } as FormData
     }
     return initialFormData
   })
@@ -385,12 +453,48 @@ export function CharacterizationFormComplete({
   const [submittedData, setSubmittedData] = useState<{ radicado: string; sincronizado: boolean } | null>(null)
   const [edadManual, setEdadManual] = useState(false)
 
+  const errorBannerRef = useRef<HTMLDivElement>(null)
+
+  // Scroll al inicio + foco en primer input editable al cambiar de paso
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    const timer = setTimeout(() => {
+      const first = document.querySelector<HTMLElement>(
+        'main input:not([disabled]):not([readonly]):not([type="hidden"]):not([type="date"]):not([type="number"]), main textarea:not([disabled])'
+      )
+      first?.focus({ preventScroll: true })
+    }, 360)
+    return () => clearTimeout(timer)
+  }, [currentStep])
+
+  // Scroll al banner de errores cuando aparecen
+  useEffect(() => {
+    if (showErrors && Object.keys(errors).length > 0) {
+      const timer = setTimeout(() => {
+        errorBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }, 80)
+      return () => clearTimeout(timer)
+    }
+  }, [showErrors, errors])
+
   // Turnstile token (solo requerido para usuarios no autenticados como asesor)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
-  const captchaValid = isAsesor || !!turnstileToken
+  const turnstileRef = useRef<TurnstileInstance>(null)
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""
+  // Si el siteKey no está configurado, se omite la verificación (token siempre válido)
+  const captchaValid = isAsesor || !turnstileSiteKey || !!turnstileToken
 
   // Estado de modales legales (null = ninguno abierto)
   const [legalModalOpen, setLegalModalOpen] = useState<keyof typeof LEGAL_DOCUMENTS | null>(null)
+
+  // Desactivar temporalmente la autorización de consulta crediticia
+  const SHOW_CONSULTA_CREDITICIA = false
+
+  // Estados para comboboxes con búsqueda
+  const [municipioOpen, setMunicipioOpen] = useState(false)
+  const [tenenciaOpen, setTenenciaOpen] = useState(false)
+  const [sistemaProductivoOpen, setSistemaProductivoOpen] = useState(false)
+  const [sistemaIntereOpen, setSistemaIntereOpen] = useState(false)
 
   // Autocompletar desde documento previo (solo cuando está logueado)
   const [buscandoDocumento, setBuscandoDocumento] = useState(false)
@@ -417,6 +521,7 @@ export function CharacterizationFormComplete({
           telefono: b.telefono || prev.beneficiario.telefono,
           correo: b.correo || prev.beneficiario.correo,
           ocupacionPrincipal: b.ocupacionPrincipal || prev.beneficiario.ocupacionPrincipal,
+          asociacion: b.asociacion || prev.beneficiario.asociacion,
         },
         contactoSecundario: {
           nombre: b.contactoSecundario?.nombre || prev.contactoSecundario.nombre,
@@ -513,7 +618,6 @@ export function CharacterizationFormComplete({
         if (!formData.predio.vereda.trim()) stepErrors['predio.vereda'] = 'La vereda es requerida'
         if (!formData.predio.tipoTenencia) stepErrors['predio.tipoTenencia'] = 'El tipo de tenencia es requerido'
         if (formData.predio.areaTotalHectareas !== null && formData.predio.areaTotalHectareas < 0) stepErrors['predio.areaTotalHectareas'] = 'El area no puede ser negativa'
-        if (!formData.predio.tipoUbicacion) stepErrors['predio.ubicacion'] = 'Debes marcar la ubicación del predio en el mapa'
         break
 
       case 4: // Caracterizacion
@@ -550,7 +654,7 @@ export function CharacterizationFormComplete({
 
       case 9: // Autorizacion
         if (!formData.autorizaciones.autorizacionDatosPersonales) stepErrors['autorizaciones.autorizacionDatosPersonales'] = 'Debe autorizar el tratamiento de datos personales'
-        if (!formData.autorizaciones.autorizacionAvisoPrivacidad) stepErrors['autorizaciones.autorizacionAvisoPrivacidad'] = 'Debe confirmar que ha leído el Aviso de Privacidad y la Política de Tratamiento de Datos'
+        if (!formData.autorizaciones.autorizacionAvisoPrivacidad) stepErrors['autorizaciones.autorizacionAvisoPrivacidad'] = 'Debe confirmar que ha leído la Política de Tratamiento de Datos'
         break
     }
 
@@ -567,23 +671,25 @@ export function CharacterizationFormComplete({
     }
     setShowErrors(false)
     setErrors({})
-    if (currentStep < steps.length) setCurrentStep(currentStep + 1)
+    if (currentStep < steps.length) { setStepDirection(1); setCurrentStep(currentStep + 1) }
   }
 
   const prevStep = () => {
     setShowErrors(false)
-    if (currentStep > 1) setCurrentStep(currentStep - 1)
+    if (currentStep > 1) { setStepDirection(-1); setCurrentStep(currentStep - 1) }
   }
 
   // Navegar a un paso específico (desde la barra de progreso)
   const goToStep = (targetStep: number) => {
     // Siempre permite ir hacia atrás
     if (targetStep <= currentStep) {
+      setStepDirection(-1)
       setShowErrors(false)
       setErrors({})
       setCurrentStep(targetStep)
       return
     }
+    setStepDirection(1)
     // Para ir adelante, validar todos los pasos intermedios
     for (let s = currentStep; s < targetStep; s++) {
       const stepErrors = validateStep(s)
@@ -602,11 +708,11 @@ export function CharacterizationFormComplete({
     setCurrentStep(targetStep)
   }
 
-  // Validar TODOS los pasos del formulario
-  const validateAllSteps = (): { valid: boolean; firstErrorStep: number; errors: ValidationErrors } => {
+  // Validar pasos del formulario hasta maxStep (inclusive)
+  const validateAllSteps = (maxStep = steps.length): { valid: boolean; firstErrorStep: number; errors: ValidationErrors } => {
     const allErrors: ValidationErrors = {}
     let firstErrorStep = 0
-    for (let s = 1; s <= steps.length; s++) {
+    for (let s = 1; s <= maxStep; s++) {
       const stepErrors = validateStep(s)
       if (Object.keys(stepErrors).length > 0 && firstErrorStep === 0) {
         firstErrorStep = s
@@ -616,32 +722,55 @@ export function CharacterizationFormComplete({
     return { valid: Object.keys(allErrors).length === 0, firstErrorStep, errors: allErrors }
   }
 
-  // Enviar formulario — cualquiera puede guardar (público → sync-public, asesor → sync)
+  // Helper: mostrar errores de validación y navegar al paso con el primer error
+  const handleValidationError = (validation: { firstErrorStep: number; errors: ValidationErrors }) => {
+    setErrors(validation.errors)
+    setShowErrors(true)
+    if (validation.firstErrorStep > 0) {
+      setCurrentStep(validation.firstErrorStep)
+      toast.error(
+        `Hay campos sin completar en el paso ${validation.firstErrorStep}: ${steps[validation.firstErrorStep - 1].title}`,
+        { description: 'Completa todos los campos requeridos antes de enviar', duration: 5000 }
+      )
+    }
+  }
+
+  // Enviar formulario
   const handleSubmit = async () => {
     if (submitLock.current) return
-    submitLock.current = true
-    // Validar captcha (solo para usuarios no autenticados como asesor)
-    if (!captchaValid) {
-      submitLock.current = false
-      toast.error('Verificación incorrecta', { description: 'Por favor responde correctamente la pregunta de seguridad.' })
-      return
-    }
 
-    // Validar TODOS los pasos antes de guardar
-    const validation = validateAllSteps()
-    if (!validation.valid) {
-      setErrors(validation.errors)
-      setShowErrors(true)
-      if (validation.firstErrorStep > 0) {
-        setCurrentStep(validation.firstErrorStep)
-        toast.error(`Hay campos sin completar en el paso ${validation.firstErrorStep}: ${steps[validation.firstErrorStep - 1].title}`, {
-          description: 'Completa todos los campos requeridos antes de enviar',
-          duration: 5000,
-        })
+    // ── Fase 1: Validaciones por modo (síncronas, sin bloquear el botón) ──────
+    // Las validaciones no adquieren el lock. Si fallan, el usuario puede corregir
+    // y reintentar sin que el botón quede bloqueado.
+
+    if (isEdit && visitaId) {
+      // Edición: solo validar pasos 1-8 (datos del formulario).
+      // El paso 9 (autorizaciones) ya está guardado en la BD y no se re-valida.
+      const validation = validateAllSteps(8)
+      if (!validation.valid) { handleValidationError(validation); return }
+
+    } else if (!isOnline) {
+      // Sin conexión: solo asesores pueden guardar localmente.
+      if (!isAsesor) {
+        toast.error('Sin conexión', { description: 'Se requiere conexión a internet para enviar el formulario.' })
+        return
       }
-      return
+      // Validar pasos 1-9 (sin captcha — no aplica offline).
+      const validation = validateAllSteps()
+      if (!validation.valid) { handleValidationError(validation); return }
+
+    } else {
+      // Online, creación nueva: captcha para no asesores + todos los pasos.
+      if (!isAsesor && turnstileSiteKey && !turnstileToken) {
+        toast.error('Verificación de seguridad', { description: 'Completa la verificación de seguridad antes de enviar.' })
+        return
+      }
+      const validation = validateAllSteps()
+      if (!validation.valid) { handleValidationError(validation); return }
     }
 
+    // ── Fase 2: Envío (adquirir lock y marcar como enviando) ─────────────────
+    submitLock.current = true
     setIsSubmitting(true)
     try {
       // Estructura que coincide con las tablas de la BD
@@ -683,6 +812,7 @@ export function CharacterizationFormComplete({
           ocupacionPrincipal: formData.beneficiario.ocupacionPrincipal || undefined,
           genero: formData.beneficiario.genero || undefined,
           personasACargo: formData.beneficiario.personasACargo ?? undefined,
+          asociacion: formData.beneficiario.asociacion || undefined,
           // Contacto secundario
           nombreContactoSecundario: formData.contactoSecundario.nombre || undefined,
           telefonoSecundario: formData.contactoSecundario.telefono || undefined,
@@ -776,6 +906,9 @@ export function CharacterizationFormComplete({
           interesadoPrograma: formData.areaProductiva.interesadoPrograma,
           dondeComercializa: formData.areaProductiva.dondeComercializa,
           ingresoMensualVentas: formData.areaProductiva.ingresoMensualVentas ?? undefined,
+          sistemaProductivoInteres: formData.areaProductiva.sistemaProductivoInteres,
+          hectareasSiembraNueva: formData.areaProductiva.hectareasSiembraNueva ?? undefined,
+          hectareasRenovacion: formData.areaProductiva.hectareasRenovacion ?? undefined,
         },
 
         // 7. Informacion financiera (tabla informacion_financiera)
@@ -832,18 +965,52 @@ export function CharacterizationFormComplete({
         return
       }
 
-      // Creación: enviar directo al servidor
+      // Creación: modo offline (asesor guardando localmente)
+      if (!isOnline) {
+        const payload = {
+          ...dataToSave,
+          autorizaciones: formData.autorizaciones,
+          offlineSync: true,
+        }
+        const localId = await savePendingForm(payload as Record<string, unknown>)
+        await refreshCount()
+        toast.success('Formulario guardado localmente', {
+          description: 'Se sincronizará automáticamente cuando recuperes la conexión.',
+          duration: 6000,
+        })
+        setSubmittedData({ radicado: localId, sincronizado: false })
+        return
+      }
+
+      // Creación: enviar al servidor (online)
       const payload = {
         ...dataToSave,
         autorizaciones: formData.autorizaciones,
-        ...(!isAsesor && { turnstileToken }),
+        ...(!isAsesor && turnstileToken && { turnstileToken }),
       }
 
-      const res = await fetch('/api/caracterizaciones', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
+      let res: Response
+      try {
+        res = await fetch('/api/caracterizaciones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+      } catch {
+        // Error de red: si es asesor, guardar localmente como fallback
+        if (!isAsesor) {
+          throw new Error('No hay conexión a internet. Verifica tu red e inténtalo de nuevo.')
+        }
+        const offlinePayload = { ...payload, offlineSync: true }
+        const localId = await savePendingForm(offlinePayload as Record<string, unknown>)
+        await refreshCount()
+        toast.success('Formulario guardado localmente', {
+          description: 'Se sincronizará automáticamente cuando recuperes la conexión.',
+          duration: 6000,
+        })
+        setSubmittedData({ radicado: localId, sincronizado: false })
+        return
+      }
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -867,6 +1034,10 @@ export function CharacterizationFormComplete({
         description: error instanceof Error ? error.message : 'Verifica tu conexión e inténtalo de nuevo.',
         duration: 6000,
       })
+      // Resetear Turnstile: cada token es de un solo uso. Si el envío falló,
+      // el token ya fue consumido por el servidor y no puede reutilizarse.
+      turnstileRef.current?.reset()
+      setTurnstileToken(null)
     } finally {
       setIsSubmitting(false)
       submitLock.current = false
@@ -891,7 +1062,7 @@ export function CharacterizationFormComplete({
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="fechaVisita">Fecha de Visita <span className="text-red-500">*</span></Label>
                   <Input
@@ -901,7 +1072,7 @@ export function CharacterizationFormComplete({
                     onChange={(e) => updateField("visita", "fechaVisita", e.target.value)}
                     className={`h-11 ${errors['visita.fechaVisita'] ? 'border-red-500' : ''}`}
                   />
-                  {errors['visita.fechaVisita'] && <p className="text-sm text-red-500">{errors['visita.fechaVisita']}</p>}
+                  {errors['visita.fechaVisita'] && <p role="alert" className="text-sm text-red-500">{errors['visita.fechaVisita']}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="nombreTecnico" className="flex items-center gap-2">
@@ -934,7 +1105,7 @@ export function CharacterizationFormComplete({
                       Si llenas este formulario sin la ayuda de un asesor, puedes dejar este campo en blanco.
                     </p>
                   )}
-                  {errors['visita.nombreTecnico'] && <p className="text-sm text-red-500">{errors['visita.nombreTecnico']}</p>}
+                  {errors['visita.nombreTecnico'] && <p role="alert" className="text-sm text-red-500">{errors['visita.nombreTecnico']}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="codigoFormulario" className="flex items-center gap-2">
@@ -992,15 +1163,6 @@ export function CharacterizationFormComplete({
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              {/* Alerta de errores */}
-              {showErrors && Object.keys(errors).length > 0 && (
-                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                  <p className="text-red-700 dark:text-red-400 text-sm font-medium">Por favor corrija los siguientes errores:</p>
-                  <ul className="text-red-600 dark:text-red-400 text-sm mt-2 list-disc list-inside">
-                    {Object.values(errors).map((err, i) => <li key={i}>{err}</li>)}
-                  </ul>
-                </div>
-              )}
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="numeroDocumento" className="flex items-center gap-2">
@@ -1023,7 +1185,7 @@ export function CharacterizationFormComplete({
                       Si el agricultor tiene registros previos, los campos se autocompletarán al salir de este campo.
                     </p>
                   )}
-                  {errors['beneficiario.numeroDocumento'] && <p className="text-sm text-red-500">{errors['beneficiario.numeroDocumento']}</p>}
+                  {errors['beneficiario.numeroDocumento'] && <p role="alert" className="text-sm text-red-500">{errors['beneficiario.numeroDocumento']}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="tipoDocumento">Tipo Documento <span className="text-red-500">*</span></Label>
@@ -1042,7 +1204,7 @@ export function CharacterizationFormComplete({
                       <SelectItem value="NIT">NIT</SelectItem>
                     </SelectContent>
                   </Select>
-                  {errors['beneficiario.tipoDocumento'] && <p className="text-sm text-red-500">{errors['beneficiario.tipoDocumento']}</p>}
+                  {errors['beneficiario.tipoDocumento'] && <p role="alert" className="text-sm text-red-500">{errors['beneficiario.tipoDocumento']}</p>}
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
@@ -1055,7 +1217,7 @@ export function CharacterizationFormComplete({
                     placeholder="Nombres del beneficiario"
                     className={`h-11 ${errors['beneficiario.nombres'] ? 'border-red-500' : ''}`}
                   />
-                  {errors['beneficiario.nombres'] && <p className="text-sm text-red-500">{errors['beneficiario.nombres']}</p>}
+                  {errors['beneficiario.nombres'] && <p role="alert" className="text-sm text-red-500">{errors['beneficiario.nombres']}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="apellidos">Apellidos <span className="text-red-500">*</span></Label>
@@ -1066,10 +1228,10 @@ export function CharacterizationFormComplete({
                     placeholder="Apellidos del beneficiario"
                     className={`h-11 ${errors['beneficiario.apellidos'] ? 'border-red-500' : ''}`}
                   />
-                  {errors['beneficiario.apellidos'] && <p className="text-sm text-red-500">{errors['beneficiario.apellidos']}</p>}
+                  {errors['beneficiario.apellidos'] && <p role="alert" className="text-sm text-red-500">{errors['beneficiario.apellidos']}</p>}
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="fechaNacimiento">Fecha de Nacimiento</Label>
                   <Input
@@ -1113,7 +1275,7 @@ export function CharacterizationFormComplete({
                     placeholder="7-10 digitos"
                     className={`h-11 ${errors['beneficiario.telefono'] ? 'border-red-500' : ''}`}
                   />
-                  {errors['beneficiario.telefono'] && <p className="text-sm text-red-500">{errors['beneficiario.telefono']}</p>}
+                  {errors['beneficiario.telefono'] && <p role="alert" className="text-sm text-red-500">{errors['beneficiario.telefono']}</p>}
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
@@ -1127,10 +1289,8 @@ export function CharacterizationFormComplete({
                       <SelectValue placeholder="Seleccione" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Masculino">Masculino</SelectItem>
-                      <SelectItem value="Femenino">Femenino</SelectItem>
-                      <SelectItem value="Otro">Otro</SelectItem>
-                      <SelectItem value="Prefiero no decir">Prefiero no decir</SelectItem>
+                      <SelectItem value="Hombre">Hombre</SelectItem>
+                      <SelectItem value="Mujer">Mujer</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1162,7 +1322,7 @@ export function CharacterizationFormComplete({
                     placeholder="correo@ejemplo.com"
                     className={`h-11 ${errors['beneficiario.correo'] ? 'border-red-500' : ''}`}
                   />
-                  {errors['beneficiario.correo'] && <p className="text-sm text-red-500">{errors['beneficiario.correo']}</p>}
+                  {errors['beneficiario.correo'] && <p role="alert" className="text-sm text-red-500">{errors['beneficiario.correo']}</p>}
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Info className="h-3 w-3" />
                     Al proporcionar el correo recibirás credenciales de acceso al sistema.
@@ -1180,13 +1340,24 @@ export function CharacterizationFormComplete({
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="asociacion">¿Pertenece a una asociación, cooperativa o federación? ¿Cuál?</Label>
+                <Input
+                  id="asociacion"
+                  value={formData.beneficiario.asociacion}
+                  onChange={(e) => updateField("beneficiario", "asociacion", e.target.value)}
+                  placeholder="Nombre de la asociación, cooperativa o federación (opcional)"
+                  className="h-11"
+                />
+              </div>
+
               {/* Contacto secundario / Acudiente */}
               <div className="rounded-lg border border-border/50 bg-muted/20 p-4 space-y-4">
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <h4 className="text-sm font-medium">Contacto Secundario / Acudiente <span className="text-xs font-normal text-muted-foreground">(Opcional)</span></h4>
                 </div>
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="contactoNombre">Nombre completo</Label>
                     <Input
@@ -1242,16 +1413,7 @@ export function CharacterizationFormComplete({
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              {/* Alerta de errores */}
-              {showErrors && Object.keys(errors).length > 0 && (
-                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                  <p className="text-red-700 dark:text-red-400 text-sm font-medium">Por favor corrija los siguientes errores:</p>
-                  <ul className="text-red-600 dark:text-red-400 text-sm mt-2 list-disc list-inside">
-                    {Object.values(errors).map((err, i) => <li key={i}>{err}</li>)}
-                  </ul>
-                </div>
-              )}
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="nombrePredio">Nombre del Predio <span className="text-red-500">*</span></Label>
                   <Input
@@ -1261,7 +1423,7 @@ export function CharacterizationFormComplete({
                     placeholder="Nombre del predio"
                     className={`h-11 ${errors['predio.nombrePredio'] ? 'border-red-500' : ''}`}
                   />
-                  {errors['predio.nombrePredio'] && <p className="text-sm text-red-500">{errors['predio.nombrePredio']}</p>}
+                  {errors['predio.nombrePredio'] && <p role="alert" className="text-sm text-red-500">{errors['predio.nombrePredio']}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="departamento">Departamento</Label>
@@ -1273,24 +1435,47 @@ export function CharacterizationFormComplete({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="municipio">Municipio <span className="text-red-500">*</span></Label>
-                  <Select
-                    value={formData.predio.municipio}
-                    onValueChange={(value) => updateField("predio", "municipio", value)}
-                  >
-                    <SelectTrigger className={`h-11 ${errors['predio.municipio'] ? 'border-red-500' : ''}`}>
-                      <SelectValue placeholder="Seleccione municipio" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {municipiosSantander.map((m) => (
-                        <SelectItem key={m} value={m}>{m}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors['predio.municipio'] && <p className="text-sm text-red-500">{errors['predio.municipio']}</p>}
+                  <Label>Municipio <span className="text-red-500">*</span></Label>
+                  <Popover open={municipioOpen} onOpenChange={setMunicipioOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={municipioOpen}
+                        className={`w-full h-11 justify-between font-normal ${errors['predio.municipio'] ? 'border-red-500' : ''}`}
+                      >
+                        {formData.predio.municipio || "Seleccione municipio"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar municipio..." />
+                        <CommandList>
+                          <CommandEmpty>No se encontró el municipio.</CommandEmpty>
+                          <CommandGroup>
+                            {municipiosSantander.map((m) => (
+                              <CommandItem
+                                key={m}
+                                value={m}
+                                onSelect={(val) => {
+                                  updateField("predio", "municipio", val)
+                                  setMunicipioOpen(false)
+                                }}
+                              >
+                                <Check className={`mr-2 h-4 w-4 ${formData.predio.municipio === m ? 'opacity-100' : 'opacity-0'}`} />
+                                {m}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {errors['predio.municipio'] && <p role="alert" className="text-sm text-red-500">{errors['predio.municipio']}</p>}
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="vereda">Vereda <span className="text-red-500">*</span></Label>
                   <Input
@@ -1300,20 +1485,20 @@ export function CharacterizationFormComplete({
                     placeholder="Nombre de la vereda"
                     className={`h-11 ${errors['predio.vereda'] ? 'border-red-500' : ''}`}
                   />
-                  {errors['predio.vereda'] && <p className="text-sm text-red-500">{errors['predio.vereda']}</p>}
+                  {errors['predio.vereda'] && <p role="alert" className="text-sm text-red-500">{errors['predio.vereda']}</p>}
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="direccion">Dirección</Label>
+                  <Label htmlFor="direccion">Dirección o corregimiento</Label>
                   <Input
                     id="direccion"
                     value={formData.predio.direccion}
                     onChange={(e) => updateField("predio", "direccion", e.target.value)}
-                    placeholder="Dirección del predio"
+                    placeholder="Dirección o corregimiento del predio"
                     className="h-11"
                   />
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="codigoCatastral">Código Catastral / Matrícula</Label>
                   <Input
@@ -1325,35 +1510,45 @@ export function CharacterizationFormComplete({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="tipoTenencia">Tipo de Tenencia <span className="text-red-500">*</span></Label>
-                  <Select
-                    value={formData.predio.tipoTenencia}
-                    onValueChange={(value) => updateField("predio", "tipoTenencia", value)}
-                  >
-                    <SelectTrigger className={`h-11 ${errors['predio.tipoTenencia'] ? 'border-red-500' : ''}`}>
-                      <SelectValue placeholder="Seleccione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Propia">Propia</SelectItem>
-                      <SelectItem value="Posesion">Posesión</SelectItem>
-                      <SelectItem value="Arriendo">Arriendo</SelectItem>
-                      <SelectItem value="Otro">Otro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors['predio.tipoTenencia'] && <p className="text-sm text-red-500">{errors['predio.tipoTenencia']}</p>}
+                  <Label>Tipo de Tenencia <span className="text-red-500">*</span></Label>
+                  <Popover open={tenenciaOpen} onOpenChange={setTenenciaOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={tenenciaOpen}
+                        className={`w-full h-11 justify-between font-normal ${errors['predio.tipoTenencia'] ? 'border-red-500' : ''}`}
+                      >
+                        {formData.predio.tipoTenencia || "Seleccione tipo de tenencia"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar tipo de tenencia..." />
+                        <CommandList>
+                          <CommandEmpty>No se encontró.</CommandEmpty>
+                          <CommandGroup>
+                            {tiposTenencia.map((t) => (
+                              <CommandItem
+                                key={t}
+                                value={t}
+                                onSelect={(val) => {
+                                  updateField("predio", "tipoTenencia", val)
+                                  setTenenciaOpen(false)
+                                }}
+                              >
+                                <Check className={`mr-2 h-4 w-4 ${formData.predio.tipoTenencia === t ? 'opacity-100' : 'opacity-0'}`} />
+                                {t}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {errors['predio.tipoTenencia'] && <p role="alert" className="text-sm text-red-500">{errors['predio.tipoTenencia']}</p>}
                 </div>
-                {formData.predio.tipoTenencia === "Otro" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="tipoTenenciaOtro">Especifique</Label>
-                    <Input
-                      id="tipoTenenciaOtro"
-                      value={formData.predio.tipoTenenciaOtro}
-                      onChange={(e) => updateField("predio", "tipoTenenciaOtro", e.target.value)}
-                      placeholder="Otro tipo de tenencia"
-                      className="h-11"
-                    />
-                  </div>
-                )}
                 <div className="space-y-2">
                   <Label htmlFor="documentoTenencia">Documento de Tenencia</Label>
                   <Input
@@ -1365,7 +1560,7 @@ export function CharacterizationFormComplete({
                   />
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="areaTotalHectareas">Área Total (ha)</Label>
                   <Input
@@ -1419,9 +1614,9 @@ export function CharacterizationFormComplete({
                       <SelectValue placeholder="Seleccione" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Si">Sí</SelectItem>
-                      <SelectItem value="No">No</SelectItem>
                       <SelectItem value="Cerca">Cerca</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                      <SelectItem value="Si">Sí</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1448,7 +1643,7 @@ export function CharacterizationFormComplete({
               {/* Mapa de ubicación */}
               <div className="space-y-2">
                 <Label>
-                  Ubicación del Predio <span className="text-destructive">*</span>
+                  Ubicación del Predio <span className="text-xs text-muted-foreground font-normal">(opcional)</span>
                 </Label>
                 <LocationPicker
                   onLocationChange={(loc) => {
@@ -1463,12 +1658,13 @@ export function CharacterizationFormComplete({
                       }
                     }))
                   }}
-                  initialLocation={{
+                  initialLocation={formData.predio.tipoUbicacion ? {
                     latitud: formData.predio.latitud,
                     longitud: formData.predio.longitud,
                     poligono: formData.predio.poligono,
-                    tipoUbicacion: formData.predio.tipoUbicacion || "punto",
-                  }}
+                    tipoUbicacion: formData.predio.tipoUbicacion,
+                  } : undefined}
+                  municipio={formData.predio.municipio}
                 />
                 {errors['predio.ubicacion'] && (
                   <p className="text-sm text-destructive">{errors['predio.ubicacion']}</p>
@@ -1493,15 +1689,6 @@ export function CharacterizationFormComplete({
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              {/* Alerta de errores */}
-              {showErrors && Object.keys(errors).length > 0 && (
-                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                  <p className="text-red-700 dark:text-red-400 text-sm font-medium">Por favor corrija los siguientes errores:</p>
-                  <ul className="text-red-600 dark:text-red-400 text-sm mt-2 list-disc list-inside">
-                    {Object.values(errors).map((err, i) => <li key={i}>{err}</li>)}
-                  </ul>
-                </div>
-              )}
               <div className="space-y-2">
                 <Label htmlFor="rutaAcceso">Ruta de Acceso desde el Casco Urbano</Label>
                 <Textarea
@@ -1512,7 +1699,7 @@ export function CharacterizationFormComplete({
                   rows={3}
                 />
               </div>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="distanciaKm">Distancia (km)</Label>
                   <Input
@@ -1573,19 +1760,19 @@ export function CharacterizationFormComplete({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="0-25% Plana">0-25% Plana</SelectItem>
-                      <SelectItem value="26-50% Inclinada">26-50% Inclinada</SelectItem>
+                      <SelectItem value="26-50% Ondulada">26-50% Ondulada</SelectItem>
                       <SelectItem value="51%> Pendiente">{">"} 51% Pendiente pronunciada</SelectItem>
                     </SelectContent>
                   </Select>
-                  {errors['caracterizacion.topografia'] && <p className="text-sm text-red-500">{errors['caracterizacion.topografia']}</p>}
+                  {errors['caracterizacion.topografia'] && <p role="alert" className="text-sm text-red-500">{errors['caracterizacion.topografia']}</p>}
                 </div>
               </div>
 
               {/* Cobertura vegetal */}
               <div className="space-y-3">
                 <Label>Cobertura Vegetal</Label>
-                <div className="grid gap-4 md:grid-cols-4">
-                  <div className="flex items-center gap-3">
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="coberturaBosque"
                       checked={formData.caracterizacion.coberturaBosque}
@@ -1593,7 +1780,7 @@ export function CharacterizationFormComplete({
                     />
                     <Label htmlFor="coberturaBosque">Bosque</Label>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="coberturaCultivos"
                       checked={formData.caracterizacion.coberturaCultivos}
@@ -1601,7 +1788,7 @@ export function CharacterizationFormComplete({
                     />
                     <Label htmlFor="coberturaCultivos">Cultivos</Label>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="coberturaPastos"
                       checked={formData.caracterizacion.coberturaPastos}
@@ -1609,7 +1796,7 @@ export function CharacterizationFormComplete({
                     />
                     <Label htmlFor="coberturaPastos">Pastos</Label>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="coberturaRastrojo"
                       checked={formData.caracterizacion.coberturaRastrojo}
@@ -1638,21 +1825,12 @@ export function CharacterizationFormComplete({
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              {/* Alerta de errores */}
-              {showErrors && Object.keys(errors).length > 0 && (
-                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                  <p className="text-red-700 dark:text-red-400 text-sm font-medium">Por favor corrija los siguientes errores:</p>
-                  <ul className="text-red-600 dark:text-red-400 text-sm mt-2 list-disc list-inside">
-                    {Object.values(errors).map((err, i) => <li key={i}>{err}</li>)}
-                  </ul>
-                </div>
-              )}
               {/* Abastecimiento de agua */}
               <div className="space-y-3">
                 <Label className="text-base font-medium">Fuentes de Abastecimiento de Agua <span className="text-red-500">*</span></Label>
-                {errors['abastecimientoAgua'] && <p className="text-sm text-red-500">{errors['abastecimientoAgua']}</p>}
-                <div className="grid gap-4 md:grid-cols-4">
-                  <div className="flex items-center gap-3">
+                {errors['abastecimientoAgua'] && <p role="alert" className="text-sm text-red-500">{errors['abastecimientoAgua']}</p>}
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="nacimientoManantial"
                       checked={formData.abastecimientoAgua.nacimientoManantial}
@@ -1660,7 +1838,7 @@ export function CharacterizationFormComplete({
                     />
                     <Label htmlFor="nacimientoManantial">Nacimiento/Manantial</Label>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="rioQuebrada"
                       checked={formData.abastecimientoAgua.rioQuebrada}
@@ -1668,7 +1846,7 @@ export function CharacterizationFormComplete({
                     />
                     <Label htmlFor="rioQuebrada">Río/Quebrada</Label>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="pozo"
                       checked={formData.abastecimientoAgua.pozo}
@@ -1676,7 +1854,7 @@ export function CharacterizationFormComplete({
                     />
                     <Label htmlFor="pozo">Pozo</Label>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="acueductoRural"
                       checked={formData.abastecimientoAgua.acueductoRural}
@@ -1684,7 +1862,7 @@ export function CharacterizationFormComplete({
                     />
                     <Label htmlFor="acueductoRural">Acueducto Rural</Label>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="canalDistritoRiego"
                       checked={formData.abastecimientoAgua.canalDistritoRiego}
@@ -1692,7 +1870,7 @@ export function CharacterizationFormComplete({
                     />
                     <Label htmlFor="canalDistritoRiego">Canal/Distrito Riego</Label>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="jagueyReservorio"
                       checked={formData.abastecimientoAgua.jagueyReservorio}
@@ -1700,7 +1878,7 @@ export function CharacterizationFormComplete({
                     />
                     <Label htmlFor="jagueyReservorio">Jagüey/Reservorio</Label>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="aguaLluvia"
                       checked={formData.abastecimientoAgua.aguaLluvia}
@@ -1727,8 +1905,8 @@ export function CharacterizationFormComplete({
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
                   Riesgos Identificados
                 </Label>
-                <div className="grid gap-4 md:grid-cols-4">
-                  <div className="flex items-center gap-3">
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="inundacion"
                       checked={formData.riesgos.inundacion}
@@ -1736,7 +1914,7 @@ export function CharacterizationFormComplete({
                     />
                     <Label htmlFor="inundacion">Inundación</Label>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="sequia"
                       checked={formData.riesgos.sequia}
@@ -1744,7 +1922,7 @@ export function CharacterizationFormComplete({
                     />
                     <Label htmlFor="sequia">Sequía</Label>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="viento"
                       checked={formData.riesgos.viento}
@@ -1752,7 +1930,7 @@ export function CharacterizationFormComplete({
                     />
                     <Label htmlFor="viento">Vientos Fuertes</Label>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="helada"
                       checked={formData.riesgos.helada}
@@ -1791,29 +1969,50 @@ export function CharacterizationFormComplete({
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              {/* Alerta de errores */}
-              {showErrors && Object.keys(errors).length > 0 && (
-                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                  <p className="text-red-700 dark:text-red-400 text-sm font-medium">Por favor corrija los siguientes errores:</p>
-                  <ul className="text-red-600 dark:text-red-400 text-sm mt-2 list-disc list-inside">
-                    {Object.values(errors).map((err, i) => <li key={i}>{err}</li>)}
-                  </ul>
-                </div>
-              )}
+              {/* Sistema productivo actual — combobox con búsqueda */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="sistemaProductivo">Sistema Productivo <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="sistemaProductivo"
-                    value={formData.areaProductiva.sistemaProductivo}
-                    onChange={(e) => updateField("areaProductiva", "sistemaProductivo", e.target.value)}
-                    placeholder="Ej: Cafe, Cacao, Ganaderia"
-                    className={`h-11 ${errors['areaProductiva.sistemaProductivo'] ? 'border-red-500' : ''}`}
-                  />
-                  {errors['areaProductiva.sistemaProductivo'] && <p className="text-sm text-red-500">{errors['areaProductiva.sistemaProductivo']}</p>}
+                  <Label>Sistema Productivo Actual <span className="text-red-500">*</span></Label>
+                  <Popover open={sistemaProductivoOpen} onOpenChange={setSistemaProductivoOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={sistemaProductivoOpen}
+                        className={`w-full h-11 justify-between font-normal ${errors['areaProductiva.sistemaProductivo'] ? 'border-red-500' : ''}`}
+                      >
+                        {formData.areaProductiva.sistemaProductivo || "Seleccione cultivo / actividad"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar cultivo..." />
+                        <CommandList>
+                          <CommandEmpty>No se encontró.</CommandEmpty>
+                          <CommandGroup>
+                            {cultivosSantander.map((c) => (
+                              <CommandItem
+                                key={c}
+                                value={c}
+                                onSelect={(val) => {
+                                  updateField("areaProductiva", "sistemaProductivo", val)
+                                  setSistemaProductivoOpen(false)
+                                }}
+                              >
+                                <Check className={`mr-2 h-4 w-4 ${formData.areaProductiva.sistemaProductivo === c ? 'opacity-100' : 'opacity-0'}`} />
+                                {c}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {errors['areaProductiva.sistemaProductivo'] && <p role="alert" className="text-sm text-red-500">{errors['areaProductiva.sistemaProductivo']}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="estadoCultivo">Estado del Cultivo</Label>
+                  <Label htmlFor="estadoCultivo">Estado del cultivo actual</Label>
                   <Select
                     value={formData.areaProductiva.estadoCultivo}
                     onValueChange={(value) => updateField("areaProductiva", "estadoCultivo", value)}
@@ -1822,9 +2021,9 @@ export function CharacterizationFormComplete({
                       <SelectValue placeholder="Seleccione" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Tecnificado">Tecnificado</SelectItem>
-                      <SelectItem value="En mal estado">En mal estado</SelectItem>
-                      <SelectItem value="NS/NR">NS/NR</SelectItem>
+                      <SelectItem value="Bueno">Bueno</SelectItem>
+                      <SelectItem value="Regular">Regular</SelectItem>
+                      <SelectItem value="Malo">Malo</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1894,6 +2093,83 @@ export function CharacterizationFormComplete({
                   rows={2}
                 />
               </div>
+
+              {/* Sistema productivo de interés en el programa */}
+              <div className="border-t pt-4 space-y-4">
+                <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Interés en el Programa</h4>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Sistema Productivo de Interés en el Programa</Label>
+                    <Popover open={sistemaIntereOpen} onOpenChange={setSistemaIntereOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={sistemaIntereOpen}
+                          className="w-full h-11 justify-between font-normal"
+                        >
+                          {formData.areaProductiva.sistemaProductivoInteres || "Seleccione cultivo"}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Buscar cultivo..." />
+                          <CommandList>
+                            <CommandEmpty>No se encontró.</CommandEmpty>
+                            <CommandGroup>
+                              {cultivosPrograma.map((c) => (
+                                <CommandItem
+                                  key={c}
+                                  value={c}
+                                  onSelect={(val) => {
+                                    updateField("areaProductiva", "sistemaProductivoInteres", val)
+                                    setSistemaIntereOpen(false)
+                                  }}
+                                >
+                                  <Check className={`mr-2 h-4 w-4 ${formData.areaProductiva.sistemaProductivoInteres === c ? 'opacity-100' : 'opacity-0'}`} />
+                                  {c}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="space-y-2" />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="hectareasSiembraNueva">Hectáreas Siembra Nueva</Label>
+                    <Input
+                      id="hectareasSiembraNueva"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={formData.areaProductiva.hectareasSiembraNueva ?? ""}
+                      onChange={(e) => updateField("areaProductiva", "hectareasSiembraNueva", e.target.value ? parseFloat(e.target.value) : null)}
+                      placeholder="Hectáreas"
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hectareasRenovacion">Hectáreas Renovación</Label>
+                    <Input
+                      id="hectareasRenovacion"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={formData.areaProductiva.hectareasRenovacion ?? ""}
+                      onChange={(e) => updateField("areaProductiva", "hectareasRenovacion", e.target.value ? parseFloat(e.target.value) : null)}
+                      placeholder="Hectáreas"
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )
@@ -1913,7 +2189,7 @@ export function CharacterizationFormComplete({
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="ingresosMensualesAgropecuaria">Ingresos Agropecuarios/mes ($)</Label>
                   <Input
@@ -1954,7 +2230,7 @@ export function CharacterizationFormComplete({
                   />
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="activosTotales">Activos Totales ($)</Label>
                   <Input
@@ -2014,15 +2290,6 @@ export function CharacterizationFormComplete({
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              {/* Alerta de errores */}
-              {showErrors && Object.keys(errors).length > 0 && (
-                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                  <p className="text-red-700 dark:text-red-400 text-sm font-medium">Por favor corrija los siguientes errores:</p>
-                  <ul className="text-red-600 dark:text-red-400 text-sm mt-2 list-disc list-inside">
-                    {Object.values(errors).map((err, i) => <li key={i}>{err}</li>)}
-                  </ul>
-                </div>
-              )}
               {/* Foto del beneficiario */}
               <div className="space-y-3">
                 <Label className="text-base font-medium">Foto del Beneficiario</Label>
@@ -2030,6 +2297,7 @@ export function CharacterizationFormComplete({
                   onPhotoCapture={(dataUrl) => updateField("archivos", "fotoBeneficiario", dataUrl)}
                   currentPhoto={formData.archivos.fotoBeneficiario}
                   label="Foto del Productor"
+                  guideType="persona"
                 />
               </div>
 
@@ -2063,6 +2331,7 @@ export function CharacterizationFormComplete({
                       onPhotoCapture={(dataUrl) => updateField("archivos", "fotoDocFrontalUrl", dataUrl)}
                       currentPhoto={formData.archivos.fotoDocFrontalUrl}
                       label="Foto frontal del documento"
+                      guideType="documento"
                     />
                   </div>
                   <div className="space-y-3">
@@ -2071,6 +2340,7 @@ export function CharacterizationFormComplete({
                       onPhotoCapture={(dataUrl) => updateField("archivos", "fotoDocTraseraUrl", dataUrl)}
                       currentPhoto={formData.archivos.fotoDocTraseraUrl}
                       label="Foto reverso del documento"
+                      guideType="documento"
                     />
                   </div>
                 </div>
@@ -2086,7 +2356,7 @@ export function CharacterizationFormComplete({
                   onSignatureChange={(dataUrl) => updateField("archivos", "firmaProductorUrl", dataUrl)}
                   currentSignature={formData.archivos.firmaProductorUrl}
                 />
-                {errors['archivos.firmaProductorUrl'] && <p className="text-sm text-red-500">{errors['archivos.firmaProductorUrl']}</p>}
+                {errors['archivos.firmaProductorUrl'] && <p role="alert" className="text-sm text-red-500">{errors['archivos.firmaProductorUrl']}</p>}
               </div>
             </CardContent>
           </Card>
@@ -2107,15 +2377,6 @@ export function CharacterizationFormComplete({
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              {/* Alerta de errores */}
-              {showErrors && Object.keys(errors).length > 0 && (
-                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                  <p className="text-red-700 dark:text-red-400 text-sm font-medium">Por favor corrija los siguientes errores:</p>
-                  <ul className="text-red-600 dark:text-red-400 text-sm mt-2 list-disc list-inside">
-                    {Object.values(errors).map((err, i) => <li key={i}>{err}</li>)}
-                  </ul>
-                </div>
-              )}
               {/* Observaciones */}
               <div className="space-y-2">
                 <Label htmlFor="observaciones">Observaciones Generales</Label>
@@ -2143,8 +2404,7 @@ export function CharacterizationFormComplete({
                         Autorización de Tratamiento de Datos Personales <span className="text-red-500">*</span>
                       </Label>
                       <p className="text-sm text-muted-foreground">
-                        Autorizo a COA el tratamiento de mis datos personales conforme a la Ley 1581 de 2012,
-                        incluyendo su transferencia a la entidad pública contratante.
+                        Conozco y autorizo que he suministrado datos personales a CONSULTORES Y OPERADORES AGROINDUSTRIALES S.A.S. (en adelante &ldquo;COA&rdquo; o la &ldquo;Compañía&rdquo;), para que, por sí mismo o en asocio con terceros, almacene, registre, transmita, transfiera, use, circule y suprima mis datos personales en sus bases de datos bajo estrictas medidas de confidencialidad y seguridad con el fin de que sean objeto de tratamiento, incluyendo cualquier operación o conjunto de operaciones sobre datos personales, bajo los efectos que indica la Ley 1266 de 2008 y la Ley 1581 de 2012; y manifiesto que conozco y autorizo a que mis datos personales serán tratados conforme se dispone en la política de tratamiento de datos de COA.
                       </p>
                       <button
                         type="button"
@@ -2168,19 +2428,12 @@ export function CharacterizationFormComplete({
                     />
                     <div className="flex-1 space-y-1">
                       <Label htmlFor="autorizacionAvisoPrivacidad" className="font-medium">
-                        He leído el Aviso de Privacidad y la Política de Tratamiento de Datos <span className="text-red-500">*</span>
+                        He leído la Política de Tratamiento de Datos <span className="text-red-500">*</span>
                       </Label>
                       <p className="text-sm text-muted-foreground">
-                        Declaro conocer la Política de Tratamiento de Datos de COA y mis derechos como titular.
+                        Declaro conocer la Política de Tratamiento de Datos de COA (SIG-62) y mis derechos como titular.
                       </p>
                       <div className="flex flex-wrap gap-3 mt-1">
-                        <button
-                          type="button"
-                          onClick={() => setLegalModalOpen("avisoPrivacidad")}
-                          className="text-sm text-primary underline hover:text-primary/80"
-                        >
-                          Ver Aviso de Privacidad
-                        </button>
                         <button
                           type="button"
                           onClick={() => setLegalModalOpen("politicaTratamientoDatos")}
@@ -2194,55 +2447,30 @@ export function CharacterizationFormComplete({
                   </div>
                 </div>
 
-                {/* 3. Consulta crediticia (opcional) */}
-                <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      id="autorizacionConsultaCrediticia"
-                      checked={formData.autorizaciones.autorizacionConsultaCrediticia}
-                      onCheckedChange={(checked) => {
-                        updateField("autorizaciones", "autorizacionConsultaCrediticia", checked)
-                        updateField("areaProductiva", "interesadoPrograma", checked)
-                      }}
-                    />
-                    <div className="flex-1 space-y-1">
-                      <Label htmlFor="autorizacionConsultaCrediticia" className="font-medium">
-                        Autorización de Consulta Crediticia <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Autorizo la consulta de mi historial crediticio en centrales de riesgo para la evaluación
-                        de opciones de financiación. También expreso mi interés en acompañamiento crediticio.
-                      </p>
+                {/* 3. Consulta crediticia (temporal: desactivada) */}
+                {SHOW_CONSULTA_CREDITICIA && (
+                  <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        id="autorizacionConsultaCrediticia"
+                        checked={formData.autorizaciones.autorizacionConsultaCrediticia}
+                        onCheckedChange={(checked) => {
+                          updateField("autorizaciones", "autorizacionConsultaCrediticia", checked)
+                          updateField("areaProductiva", "interesadoPrograma", checked)
+                        }}
+                      />
+                      <div className="flex-1 space-y-1">
+                        <Label htmlFor="autorizacionConsultaCrediticia" className="font-medium">
+                          Autorización de Consulta Crediticia <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Autorizo la consulta de mi historial crediticio en centrales de riesgo para la evaluación
+                          de opciones de financiación. También expreso mi interés en acompañamiento crediticio.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                {/* 4. Uso de imagen (opcional) */}
-                <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      id="autorizacionUsoImagen"
-                      checked={formData.autorizaciones.autorizacionUsoImagen}
-                      onCheckedChange={(checked) => updateField("autorizaciones", "autorizacionUsoImagen", checked)}
-                    />
-                    <div className="flex-1 space-y-1">
-                      <Label htmlFor="autorizacionUsoImagen" className="font-medium">
-                        Autorización de Uso de Imagen <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Autorizo a COA el uso público de mi imagen en las fotografías que se capturen durante esta visita,
-                        para materiales publicitarios, redes sociales y comunicaciones de COA.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setLegalModalOpen("autorizacionUsoImagen")}
-                        className="text-sm text-primary underline hover:text-primary/80 mt-1"
-                      >
-                        Ver documento completo
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Resumen */}
@@ -2258,14 +2486,15 @@ export function CharacterizationFormComplete({
               </div>
 
               {/* Verificación de seguridad Cloudflare Turnstile (solo para no asesores) */}
-              {!isAsesor && (
+              {!isAsesor && !!turnstileSiteKey && isOnline && (
                 <div className="rounded-lg border border-border/50 bg-muted/30 p-4 space-y-3">
                   <Label className="font-medium flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-primary" />
                     Verificación de seguridad <span className="text-red-500">*</span>
                   </Label>
                   <Turnstile
-                    siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""}
+                    ref={turnstileRef}
+                    siteKey={turnstileSiteKey}
                     onSuccess={(token) => setTurnstileToken(token)}
                     onExpire={() => setTurnstileToken(null)}
                     onError={() => setTurnstileToken(null)}
@@ -2280,7 +2509,7 @@ export function CharacterizationFormComplete({
               {/* Botón de envío */}
               <Button
                 onClick={handleSubmit}
-                disabled={isSubmitting || !formData.autorizaciones.autorizacionDatosPersonales || !formData.autorizaciones.autorizacionAvisoPrivacidad || !captchaValid}
+                disabled={isSubmitting || !formData.autorizaciones.autorizacionDatosPersonales || !formData.autorizaciones.autorizacionAvisoPrivacidad || (isOnline && !captchaValid)}
                 className="w-full h-12 text-base"
               >
                 {isSubmitting ? (
@@ -2315,46 +2544,70 @@ export function CharacterizationFormComplete({
       generateCaracterizacionPDF(pdfData)
     }
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5"
+      >
         <header className="border-b border-border bg-card/80 backdrop-blur-md">
           <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4">
             <Link href="/" className="flex items-center gap-2">
-              <Image src="/icons/icon-192x192.png" alt="Agro360" width={36} height={36} className="rounded-lg" />
-              <span className="text-lg font-semibold">Agro360</span>
+              <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={60} height={60} className="rounded-xl" />
             </Link>
             </div>
         </header>
         <main className="mx-auto max-w-2xl px-4 py-12">
           <Card className="text-center">
             <CardHeader className="pb-4">
-              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10">
+              <motion.div
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.2 }}
+                className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10"
+              >
                 <CheckCircle className="h-10 w-10 text-green-500" />
-              </div>
+              </motion.div>
               <CardTitle className="text-2xl">
-                ¡Registrado!
+                {submittedData.sincronizado ? '¡Registrado!' : 'Guardado localmente'}
               </CardTitle>
               <CardDescription>
-                El formulario se envió correctamente al servidor.
+                {submittedData.sincronizado
+                  ? 'El formulario se envió correctamente al servidor.'
+                  : 'El formulario se guardó en este dispositivo y se sincronizará cuando haya conexión.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
-                <p className="mb-1 text-xs text-muted-foreground">Radicado oficial</p>
-                <code className="font-mono text-xs text-muted-foreground">{submittedData.radicado}</code>
-              </div>
+              {submittedData.sincronizado && (
+                <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
+                  <p className="mb-1 text-xs text-muted-foreground">Radicado oficial</p>
+                  <code className="font-mono text-xs text-muted-foreground">{submittedData.radicado}</code>
+                </div>
+              )}
 
               <div className="space-y-3">
-                <Alert className="border-green-500/20 bg-green-500/5">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-foreground">
-                    Tu registro fue recibido por el servidor y está disponible en el sistema.
-                  </AlertDescription>
-                </Alert>
+                {submittedData.sincronizado ? (
+                  <Alert className="border-green-500/20 bg-green-500/5">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-foreground">
+                      Tu registro fue recibido por el servidor y está disponible en el sistema.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <Alert className="border-amber-500/30 bg-amber-500/10">
+                    <WifiOff className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-foreground space-y-1">
+                      <p>El formulario está guardado en este dispositivo.</p>
+                      <p className="text-xs text-muted-foreground">Al recuperar la conexión e iniciar sesión, se sincronizará automáticamente.</p>
+                    </AlertDescription>
+                  </Alert>
+                )}
                 {!isAuthenticated && formData.beneficiario.correo && (
                   <Alert className="border-primary/20 bg-primary/5">
                     <Info className="h-4 w-4 text-primary" />
-                    <AlertDescription className="text-foreground">
-                      Se enviará un correo a <strong>{formData.beneficiario.correo}</strong> con tus credenciales de acceso para consultar tus registros.
+                    <AlertDescription className="text-foreground space-y-1">
+                      <p>Se enviará un correo a <strong>{formData.beneficiario.correo}</strong> con tus credenciales de acceso para consultar tus registros.</p>
+                      <p className="text-xs text-muted-foreground">Si no lo encuentras en tu bandeja principal, revisa la carpeta de <strong>correo no deseado o spam</strong>.</p>
                     </AlertDescription>
                   </Alert>
                 )}
@@ -2398,21 +2651,22 @@ export function CharacterizationFormComplete({
             </CardContent>
           </Card>
         </main>
-      </div>
+      </motion.div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="min-h-screen bg-gradient-to-b from-background to-muted/20"
+    >
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border/40 bg-background/95 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
           <div className="flex items-center gap-3">
-            <Image src="/icons/icon-192x192.png" alt="Agro360" width={36} height={36} className="rounded-lg" />
-            <div>
-              <h1 className="text-lg font-semibold">Agro360</h1>
-              <p className="text-xs text-muted-foreground">Caracterización Predial</p>
-            </div>
+            <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={60} height={60} className="rounded-xl" />
           </div>
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <span className="hidden sm:inline">Paso {currentStep} de {steps.length}</span>
@@ -2441,8 +2695,26 @@ export function CharacterizationFormComplete({
 
       {/* Progress bar */}
       <div className="sticky top-16 z-40 border-b border-border/40 bg-background/95 backdrop-blur-md">
-        <div className="mx-auto max-w-5xl px-4 py-3">
-          <div className="flex items-center justify-between gap-1 overflow-x-auto pb-1">
+        <div className="mx-auto max-w-5xl px-4 py-2">
+
+          {/* Móvil: barra compacta (< 768px) */}
+          <div className="flex md:hidden items-center gap-3 py-1.5">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              {currentStep}/{steps.length}
+            </span>
+            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-300"
+                style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
+              />
+            </div>
+            <span className="text-xs font-medium text-foreground whitespace-nowrap">
+              {steps[currentStep - 1]?.title}
+            </span>
+          </div>
+
+          {/* Tablet: íconos + título solo del paso activo (768px–1023px) */}
+          <div className="hidden md:flex lg:hidden items-center justify-between gap-0.5 py-1">
             {steps.map((step) => {
               const Icon = step.icon
               const isActive = step.id === currentStep
@@ -2450,21 +2722,56 @@ export function CharacterizationFormComplete({
               return (
                 <button
                   key={step.id}
+                  type="button"
                   onClick={() => goToStep(step.id)}
-                  className={`flex flex-col items-center gap-1 min-w-[60px] p-2 rounded-lg transition-colors ${isActive ? "bg-primary/10" : isCompleted ? "bg-muted" : ""
-                    }`}
+                  aria-current={isActive ? "step" : undefined}
+                  aria-label={`Paso ${step.id}: ${step.title}`}
+                  className={`flex flex-col items-center gap-1 flex-1 min-h-[44px] py-1 rounded-lg transition-colors ${isActive ? "bg-primary/10" : ""}`}
+                >
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+                    isActive ? "bg-primary text-primary-foreground"
+                    : isCompleted ? "bg-primary/80 text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                  }`}>
+                    {isCompleted ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                  </div>
+                  {isActive && (
+                    <span className="text-[10px] font-semibold text-primary text-center leading-tight px-0.5">
+                      {step.title}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Escritorio: pastillas completas (≥ 1024px) */}
+          <div className="hidden lg:flex items-center justify-between gap-1">
+            {steps.map((step) => {
+              const Icon = step.icon
+              const isActive = step.id === currentStep
+              const isCompleted = step.id < currentStep
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => goToStep(step.id)}
+                  aria-current={isActive ? "step" : undefined}
+                  aria-label={`Paso ${step.id}: ${step.title}${isCompleted ? ' (completado)' : isActive ? ' (actual)' : ''}`}
+                  className={`flex flex-col items-center gap-1 min-w-[60px] p-2 rounded-lg transition-colors ${isActive ? "bg-primary/10" : isCompleted ? "bg-muted/60" : ""}`}
                 >
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${isActive
-                      ? "bg-primary text-primary-foreground"
-                      : isCompleted
-                        ? "bg-primary/20 text-primary"
-                        : "bg-muted text-muted-foreground"
-                      }`}
+                    className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : isCompleted
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
+                    }`}
                   >
-                    <Icon className="h-4 w-4" />
+                    {isCompleted ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                   </div>
-                  <span className={`text-[10px] text-center leading-tight ${isActive ? "font-medium" : ""}`}>
+                  <span className={`text-[10px] text-center leading-tight ${isActive ? "font-medium text-primary" : isCompleted ? "text-muted-foreground" : ""}`}>
                     {step.title}
                   </span>
                 </button>
@@ -2484,24 +2791,61 @@ export function CharacterizationFormComplete({
             </span>
           </div>
         )}
-        {renderStep()}
+        <div className="mb-4">
+          <OfflineSyncBanner
+            isOnline={isOnline}
+            pendingCount={pendingCount}
+            isSyncing={isSyncing}
+            onSyncNow={syncPending}
+            isAsesor={isAsesor}
+          />
+        </div>
+        {/* Banner de errores — único, siempre visible al tope del contenido */}
+        {showErrors && Object.keys(errors).length > 0 && (
+          <div
+            ref={errorBannerRef}
+            role="alert"
+            aria-live="assertive"
+            className="mb-4 flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <div>
+              <p className="text-sm font-semibold text-destructive">Corrige los siguientes errores antes de continuar:</p>
+              <ul className="mt-1 list-inside list-disc space-y-0.5 text-sm text-destructive/90">
+                {Object.values(errors).map((err, i) => <li key={i}>{err}</li>)}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={currentStep}
+            initial={{ opacity: 0, x: stepDirection * 32 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: stepDirection * -24 }}
+            transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            {renderStep()}
+          </motion.div>
+        </AnimatePresence>
 
         {/* Navigation */}
-        <div className="mt-6 flex items-center justify-between">
+        <div className="mt-6 flex items-center justify-between gap-4">
           <Button
             variant="outline"
             onClick={prevStep}
             disabled={currentStep === 1}
-            className="gap-2"
+            className="gap-2 h-11 px-5 md:h-12 md:px-8 md:text-base"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" />
             Anterior
           </Button>
 
           {currentStep < steps.length && (
-            <Button onClick={nextStep} className="gap-2">
+            <Button onClick={nextStep} className="gap-2 h-11 px-5 md:h-12 md:px-8 md:text-base">
               Siguiente
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />
             </Button>
           )}
         </div>
@@ -2524,6 +2868,6 @@ export function CharacterizationFormComplete({
           beneficiarioFirma={formData.archivos.firmaProductorUrl || undefined}
         />
       )}
-    </div>
+    </motion.div>
   )
 }

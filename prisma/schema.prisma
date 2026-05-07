@@ -31,7 +31,7 @@ model beneficiarios {
   nombres                        String    @db.VarChar
   apellidos                      String    @db.VarChar
   tipo_documento                 String    @db.VarChar
-  numero_documento               String    @db.VarChar
+  numero_documento               String    @unique @db.VarChar
   edad                           Int?
   telefono                       String?   @db.VarChar
   correo                         String?   @db.VarChar
@@ -44,6 +44,7 @@ model beneficiarios {
   genero                         String?
   personas_a_cargo               Int?
   fecha_nacimiento               DateTime? @db.Date
+  asociacion                     String?
 
   visitas                visitas?               @relation(fields: [id_visita], references: [id], onDelete: Cascade)
   predios                predios[]
@@ -150,6 +151,9 @@ model area_productiva {
   interesado_programa                 Boolean?
   donde_comercializa                  String?
   ingreso_mensual_ventas              Decimal?
+  sistema_productivo_interes          String?   @db.VarChar
+  hectareas_siembra_nueva             Decimal?
+  hectareas_renovacion                Decimal?
   created_at                          DateTime? @default(now()) @db.Timestamptz(6)
   updated_at                          DateTime? @default(now()) @db.Timestamptz(6)
 

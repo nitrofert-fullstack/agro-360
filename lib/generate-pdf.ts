@@ -82,6 +82,15 @@ const estadoLabels: Record<string, string> = {
   RECHAZADO: 'No Viable',
 }
 
+function fmtFecha(raw: unknown, fallback = 'No registrada'): string {
+  if (!raw) return fallback
+  const s = String(raw)
+  const match = s.match(/(\d{4}-\d{2}-\d{2})/)
+  if (!match) return fallback
+  const d = new Date(match[1] + 'T12:00:00')
+  return isNaN(d.getTime()) ? fallback : d.toLocaleDateString('es-CO')
+}
+
 export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
   const fechaGen = new Date().toLocaleDateString('es-CO', {
     year: 'numeric',
@@ -170,7 +179,7 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
 
   <div class="header">
     <div>
-      <div class="logo">Agro360</div>
+      <div class="logo">Santander Agro360</div>
       <div class="logo-sub">Sistema de Caracterización Agropecuaria — Santander, Colombia</div>
     </div>
     <div class="header-right">
@@ -269,7 +278,7 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
   <div class="section-box">
     <div class="grid3">
       ${field('Asesor', data.nombreTecnico)}
-      ${field('Fecha visita', data.fechaVisita ? new Date(data.fechaVisita).toLocaleDateString('es-CO') : null)}
+      ${field('Fecha visita', fmtFecha(data.fechaVisita))}
       ${field('Radicado', data.radicado)}
     </div>
   </div>
@@ -282,22 +291,14 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
       </span>
       ${data.autorizaAvisoPrivacidad != null ? `
       <span class="auth-item ${data.autorizaAvisoPrivacidad ? 'auth-ok' : 'auth-no'}">
-        ${data.autorizaAvisoPrivacidad ? '&#10003;' : '&#10007;'} Aviso de privacidad
-      </span>` : ''}
-      ${data.autorizaConsultaCrediticia != null ? `
-      <span class="auth-item ${data.autorizaConsultaCrediticia ? 'auth-ok' : 'auth-no'}">
-        ${data.autorizaConsultaCrediticia ? '&#10003;' : '&#10007;'} Consulta crediticia
-      </span>` : ''}
-      ${data.autorizaUsoImagen != null ? `
-      <span class="auth-item ${data.autorizaUsoImagen ? 'auth-ok' : 'auth-no'}">
-        ${data.autorizaUsoImagen ? '&#10003;' : '&#10007;'} Uso de imagen
+        ${data.autorizaAvisoPrivacidad ? '&#10003;' : '&#10007;'} Política de datos
       </span>` : ''}
     </div>
     ${data.observaciones ? `<div style="margin-top:8px">${field('Observaciones', data.observaciones)}</div>` : ''}
   </div>
 
   <div class="footer">
-    <span>Agro360 — Sistema de Caracterización Agropecuaria</span>
+    <span>Santander Agro360 — Sistema de Caracterización Agropecuaria</span>
     <span>Documento generado el ${fechaGen}</span>
   </div>
 </div>

@@ -1,24 +1,127 @@
--- =============================================================
--- MIGRACIÓN: Políticas RLS completas y corregidas — Agro360
--- Fecha: 2026-04-27
+-- =====================================================================
+-- MIGRACIÓN CONSOLIDADA — Agro360 / AgroSantander360
+-- Fecha: 2026-05-07
 --
--- Problemas que resuelve:
---  1. Recursión infinita en profiles (GET devuelve vacío)
---  2. Rol analista sin acceso SELECT en ninguna tabla
---  3. Rol agricultor sin acceso SELECT a sus propios registros
---  4. Registros con asesor_id NULL (envíos públicos) invisibles para admin/analista
---  5. Políticas UPDATE faltantes en sub-tablas de predio
---  6. Políticas DELETE faltantes
+-- Consolida todas las migraciones anteriores en un solo script idempotente.
+-- Seguro de ejecutar aunque ya se hayan aplicado cambios parciales.
 --
--- Es idempotente: usa DROP POLICY IF EXISTS antes de cada CREATE.
--- Segura de reejecutar.
--- =============================================================
+-- Secciones:
+--   1. Cambios estructurales (columnas, constraints, datos)
+--   2. Funciones SECURITY DEFINER (RLS helpers)
+--   3. Políticas RLS (estado final — todas las tablas)
+--   4. Permisos de ejecución
+-- =====================================================================
 
--- =============================================================
--- PASO 1: Función helper SECURITY DEFINER para leer el propio rol
--- Sin esta función, las políticas de visitas/caracterizaciones que
--- verifican profiles.rol causan recursión cuando profiles tiene RLS.
--- =============================================================
+
+-- =====================================================================
+-- SECCIÓN 1 — CAMBIOS ESTRUCTURALES
+-- =====================================================================
+
+-- -------------------------
+-- 1.1 caracterizaciones
+-- -------------------------
+ALTER TABLE public.caracterizaciones
+  ADD COLUMN IF NOT EXISTS estado character varying DEFAULT 'INICIADO'::character varying,
+  ADD COLUMN IF NOT EXISTS foto_beneficiario_url VARCHAR(500),
+  ADD COLUMN IF NOT EXISTS foto_doc_frontal_url  VARCHAR(500),
+  ADD COLUMN IF NOT EXISTS foto_doc_trasera_url  VARCHAR(500),
+  ADD COLUMN IF NOT EXISTS autorizacion_aviso_privacidad BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS autorizacion_uso_imagen       BOOLEAN DEFAULT FALSE;
+
+-- Rellenar estado NULL con INICIADO en registros existentes
+UPDATE public.caracterizaciones
+SET estado = 'INICIADO'
+WHERE estado IS NULL;
+
+-- -------------------------
+-- 1.2 visitas
+-- -------------------------
+-- Columna 'estado' migrada a caracterizaciones; eliminarla de visitas
+ALTER TABLE public.visitas DROP COLUMN IF EXISTS estado;
+
+-- -------------------------
+-- 1.3 beneficiarios
+-- -------------------------
+ALTER TABLE public.beneficiarios
+  DROP COLUMN  IF EXISTS foto_url,
+  ADD COLUMN   IF NOT EXISTS fecha_nacimiento              DATE,
+  ADD COLUMN   IF NOT EXISTS nombre_contacto_secundario   VARCHAR(200),
+  ADD COLUMN   IF NOT EXISTS telefono_secundario          VARCHAR(20),
+  ADD COLUMN   IF NOT EXISTS parentesco_contacto_secundario VARCHAR(50),
+  ADD COLUMN   IF NOT EXISTS asociacion                   TEXT;
+
+COMMENT ON COLUMN beneficiarios.fecha_nacimiento IS 'Fecha de nacimiento del beneficiario (YYYY-MM-DD)';
+
+-- Eliminar CHECK constraints cuyos valores no coinciden con los del formulario
+-- (la validación la realizan los Select/Input del formulario con opciones fijas)
+ALTER TABLE public.beneficiarios
+  DROP CONSTRAINT IF EXISTS beneficiarios_genero_check,
+  DROP CONSTRAINT IF EXISTS beneficiarios_tipo_documento_check,
+  DROP CONSTRAINT IF EXISTS beneficiarios_personas_cargo_check;
+
+-- Índice único para evitar duplicados en sincronizaciones concurrentes
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.beneficiarios'::regclass
+      AND contype = 'u'
+      AND conname LIKE '%numero_documento%'
+  ) THEN
+    ALTER TABLE public.beneficiarios
+      ADD CONSTRAINT beneficiarios_numero_documento_unique UNIQUE (numero_documento);
+  END IF;
+END $$;
+
+-- -------------------------
+-- 1.4 predios
+-- -------------------------
+-- Constraint de tipo_tenencia no coincide con valores del formulario
+ALTER TABLE public.predios
+  DROP CONSTRAINT IF EXISTS predios_tipo_tenencia_check;
+
+-- -------------------------
+-- 1.5 caracterizacion_predio
+-- -------------------------
+ALTER TABLE public.caracterizacion_predio
+  DROP CONSTRAINT IF EXISTS caracterizacion_predio_topografia_check;
+
+-- -------------------------
+-- 1.6 area_productiva
+-- -------------------------
+ALTER TABLE public.area_productiva
+  DROP CONSTRAINT IF EXISTS area_productiva_estado_cultivo_check,
+  ADD COLUMN IF NOT EXISTS sistema_productivo_interes TEXT,
+  ADD COLUMN IF NOT EXISTS hectareas_siembra_nueva    NUMERIC(10, 2),
+  ADD COLUMN IF NOT EXISTS hectareas_renovacion       NUMERIC(10, 2);
+
+-- -------------------------
+-- 1.7 profiles
+-- -------------------------
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS numero_documento VARCHAR(20);
+
+-- Actualizar rol 'campesino' → 'agricultor' y CHECK constraint
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_rol_check;
+
+UPDATE public.profiles
+SET rol = 'agricultor'
+WHERE rol = 'campesino';
+
+UPDATE auth.users
+SET raw_user_meta_data = jsonb_set(raw_user_meta_data, '{rol}', '"agricultor"')
+WHERE raw_user_meta_data ->> 'rol' = 'campesino';
+
+ALTER TABLE public.profiles
+  ADD CONSTRAINT profiles_rol_check
+  CHECK (rol IN ('admin','asesor','agricultor','analista'));
+
+
+-- =====================================================================
+-- SECCIÓN 2 — FUNCIONES SECURITY DEFINER (RLS helpers)
+-- =====================================================================
+
+-- mi_rol(): devuelve el rol del usuario autenticado sin activar RLS en profiles
 CREATE OR REPLACE FUNCTION public.mi_rol()
 RETURNS TEXT
 LANGUAGE SQL
@@ -29,80 +132,139 @@ AS $$
   SELECT rol FROM public.profiles WHERE id = auth.uid()
 $$;
 
--- =============================================================
--- PASO 2: profiles
--- SELECT: propio usuario O admin (usando jwt claim para evitar recursión)
--- =============================================================
-DROP POLICY IF EXISTS "profiles_select_own" ON profiles;
-DROP POLICY IF EXISTS "profiles_insert_own" ON profiles;
-DROP POLICY IF EXISTS "profiles_update_own" ON profiles;
-DROP POLICY IF EXISTS "profiles_delete_admin" ON profiles;
--- Nombres creados por 20260428_fix_rls_profiles.sql (por si ya fue ejecutado)
-DROP POLICY IF EXISTS "profiles_select" ON profiles;
-DROP POLICY IF EXISTS "profiles_insert" ON profiles;
-DROP POLICY IF EXISTS "profiles_insert_service" ON profiles;
-DROP POLICY IF EXISTS "profiles_update" ON profiles;
-DROP POLICY IF EXISTS "profiles_update_service" ON profiles;
-DROP POLICY IF EXISTS "profiles_delete" ON profiles;
-DROP POLICY IF EXISTS "profiles_delete_service" ON profiles;
+-- get_user_role(): versión con parámetro uid (usada por políticas de profiles)
+CREATE OR REPLACE FUNCTION public.get_user_role(uid UUID)
+RETURNS TEXT
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT rol FROM public.profiles WHERE id = uid;
+$$;
 
-CREATE POLICY "profiles_select" ON profiles
-  FOR SELECT USING (
-    auth.uid() = id
-    OR (auth.jwt() ->> 'rol') = 'admin'
-    OR (auth.jwt() ->> 'user_metadata')::jsonb ->> 'rol' = 'admin'
+-- agricultor_tiene_visita(): comprueba acceso de agricultor a una visita
+-- sin crear recursión mutua entre visitas ↔ beneficiarios
+CREATE OR REPLACE FUNCTION public.agricultor_tiene_visita(vid UUID)
+RETURNS BOOLEAN
+LANGUAGE SQL SECURITY DEFINER STABLE
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM beneficiarios b
+    JOIN profiles p ON p.numero_documento = b.numero_documento
+    WHERE b.id_visita = vid
+      AND p.id = auth.uid()
+      AND p.numero_documento IS NOT NULL
+  )
+$$;
+
+
+-- =====================================================================
+-- SECCIÓN 3 — POLÍTICAS RLS (estado final)
+-- =====================================================================
+
+-- -------------------------
+-- 3.1 profiles
+-- Estado final: 20260428_fix_rls_profiles.sql
+-- -------------------------
+
+-- Eliminar todas las políticas existentes en profiles
+DO $$
+DECLARE pol RECORD;
+BEGIN
+  FOR pol IN
+    SELECT policyname
+    FROM pg_policies
+    WHERE tablename = 'profiles' AND schemaname = 'public'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.profiles', pol.policyname);
+  END LOOP;
+END $$;
+
+-- SELECT: propio usuario; admin y analista ven todos
+CREATE POLICY "profiles_select" ON public.profiles
+  FOR SELECT TO authenticated
+  USING (
+    id = auth.uid()
+    OR public.get_user_role(auth.uid()) IN ('admin', 'analista')
   );
 
-CREATE POLICY "profiles_insert" ON profiles
-  FOR INSERT WITH CHECK (auth.uid() = id);
+-- INSERT: service_role (registro via API) o el propio usuario
+CREATE POLICY "profiles_insert_service" ON public.profiles
+  FOR INSERT TO service_role
+  WITH CHECK (true);
 
-CREATE POLICY "profiles_update" ON profiles
-  FOR UPDATE USING (
-    auth.uid() = id
-    OR mi_rol() = 'admin'
+CREATE POLICY "profiles_insert_own" ON public.profiles
+  FOR INSERT TO authenticated
+  WITH CHECK (id = auth.uid());
+
+-- UPDATE: propio usuario o admin
+CREATE POLICY "profiles_update" ON public.profiles
+  FOR UPDATE TO authenticated
+  USING (
+    id = auth.uid()
+    OR public.get_user_role(auth.uid()) = 'admin'
+  )
+  WITH CHECK (
+    id = auth.uid()
+    OR public.get_user_role(auth.uid()) = 'admin'
   );
 
-CREATE POLICY "profiles_delete" ON profiles
-  FOR DELETE USING (mi_rol() = 'admin');
+CREATE POLICY "profiles_update_service" ON public.profiles
+  FOR UPDATE TO service_role
+  USING (true)
+  WITH CHECK (true);
 
--- =============================================================
--- PASO 3: visitas
--- admin y analista ven TODAS (incluyendo asesor_id NULL)
--- asesor ve las suyas (asesor_id = auth.uid())
--- agricultor NO ve visitas directamente
--- =============================================================
+-- DELETE
+CREATE POLICY "profiles_delete" ON public.profiles
+  FOR DELETE TO authenticated
+  USING (public.get_user_role(auth.uid()) = 'admin');
+
+CREATE POLICY "profiles_delete_service" ON public.profiles
+  FOR DELETE TO service_role
+  USING (true);
+
+-- -------------------------
+-- 3.2 visitas
+-- Estado final: 20260428_fix_visitas_agricultor.sql (reemplaza visitas_select de 20260427)
+-- -------------------------
 DROP POLICY IF EXISTS "visitas_select_own" ON visitas;
 DROP POLICY IF EXISTS "visitas_insert_own" ON visitas;
 DROP POLICY IF EXISTS "visitas_update_own" ON visitas;
 DROP POLICY IF EXISTS "visitas_delete_admin" ON visitas;
+DROP POLICY IF EXISTS "visitas_select"  ON visitas;
+DROP POLICY IF EXISTS "visitas_insert"  ON visitas;
+DROP POLICY IF EXISTS "visitas_update"  ON visitas;
+DROP POLICY IF EXISTS "visitas_delete"  ON visitas;
 
+-- SELECT: admin/analista ven todo; asesor ve las suyas;
+--         agricultor via SECURITY DEFINER (sin recursión)
 CREATE POLICY "visitas_select" ON visitas
-  FOR SELECT USING (
-    mi_rol() IN ('admin', 'analista')
+  FOR SELECT TO authenticated
+  USING (
+    public.mi_rol() IN ('admin', 'analista')
     OR auth.uid() = asesor_id
+    OR public.agricultor_tiene_visita(visitas.id)
   );
 
 CREATE POLICY "visitas_insert" ON visitas
   FOR INSERT WITH CHECK (
     auth.uid() = asesor_id
-    OR mi_rol() IN ('admin', 'asesor')
+    OR public.mi_rol() IN ('admin', 'asesor')
   );
 
 CREATE POLICY "visitas_update" ON visitas
   FOR UPDATE USING (
     auth.uid() = asesor_id
-    OR mi_rol() = 'admin'
+    OR public.mi_rol() = 'admin'
   );
 
 CREATE POLICY "visitas_delete" ON visitas
-  FOR DELETE USING (mi_rol() = 'admin');
+  FOR DELETE USING (public.mi_rol() = 'admin');
 
--- =============================================================
--- PASO 4: beneficiarios
--- admin/analista: todos
--- asesor: los de sus visitas
--- agricultor: el suyo (numero_documento coincide con profiles)
--- =============================================================
+-- -------------------------
+-- 3.3 beneficiarios
+-- -------------------------
 DROP POLICY IF EXISTS "beneficiarios_select" ON beneficiarios;
 DROP POLICY IF EXISTS "beneficiarios_insert" ON beneficiarios;
 DROP POLICY IF EXISTS "beneficiarios_update" ON beneficiarios;
@@ -110,7 +272,7 @@ DROP POLICY IF EXISTS "beneficiarios_delete" ON beneficiarios;
 
 CREATE POLICY "beneficiarios_select" ON beneficiarios
   FOR SELECT USING (
-    mi_rol() IN ('admin', 'analista')
+    public.mi_rol() IN ('admin', 'analista')
     OR EXISTS (
       SELECT 1 FROM visitas v
       WHERE v.id = beneficiarios.id_visita
@@ -126,7 +288,7 @@ CREATE POLICY "beneficiarios_select" ON beneficiarios
 
 CREATE POLICY "beneficiarios_insert" ON beneficiarios
   FOR INSERT WITH CHECK (
-    mi_rol() IN ('admin', 'asesor')
+    public.mi_rol() IN ('admin', 'asesor')
     OR EXISTS (
       SELECT 1 FROM visitas v
       WHERE v.id = id_visita AND v.asesor_id = auth.uid()
@@ -135,7 +297,7 @@ CREATE POLICY "beneficiarios_insert" ON beneficiarios
 
 CREATE POLICY "beneficiarios_update" ON beneficiarios
   FOR UPDATE USING (
-    mi_rol() IN ('admin', 'analista')
+    public.mi_rol() IN ('admin', 'analista')
     OR EXISTS (
       SELECT 1 FROM visitas v
       WHERE v.id = beneficiarios.id_visita AND v.asesor_id = auth.uid()
@@ -143,11 +305,11 @@ CREATE POLICY "beneficiarios_update" ON beneficiarios
   );
 
 CREATE POLICY "beneficiarios_delete" ON beneficiarios
-  FOR DELETE USING (mi_rol() = 'admin');
+  FOR DELETE USING (public.mi_rol() = 'admin');
 
--- =============================================================
--- PASO 5: predios
--- =============================================================
+-- -------------------------
+-- 3.4 predios
+-- -------------------------
 DROP POLICY IF EXISTS "predios_select" ON predios;
 DROP POLICY IF EXISTS "predios_insert" ON predios;
 DROP POLICY IF EXISTS "predios_update" ON predios;
@@ -155,7 +317,7 @@ DROP POLICY IF EXISTS "predios_delete" ON predios;
 
 CREATE POLICY "predios_select" ON predios
   FOR SELECT USING (
-    mi_rol() IN ('admin', 'analista')
+    public.mi_rol() IN ('admin', 'analista')
     OR EXISTS (
       SELECT 1 FROM beneficiarios b
       JOIN visitas v ON v.id = b.id_visita
@@ -173,7 +335,7 @@ CREATE POLICY "predios_select" ON predios
 
 CREATE POLICY "predios_insert" ON predios
   FOR INSERT WITH CHECK (
-    mi_rol() IN ('admin', 'asesor')
+    public.mi_rol() IN ('admin', 'asesor')
     OR EXISTS (
       SELECT 1 FROM beneficiarios b
       JOIN visitas v ON v.id = b.id_visita
@@ -183,7 +345,7 @@ CREATE POLICY "predios_insert" ON predios
 
 CREATE POLICY "predios_update" ON predios
   FOR UPDATE USING (
-    mi_rol() = 'admin'
+    public.mi_rol() = 'admin'
     OR EXISTS (
       SELECT 1 FROM beneficiarios b
       JOIN visitas v ON v.id = b.id_visita
@@ -192,11 +354,11 @@ CREATE POLICY "predios_update" ON predios
   );
 
 CREATE POLICY "predios_delete" ON predios
-  FOR DELETE USING (mi_rol() = 'admin');
+  FOR DELETE USING (public.mi_rol() = 'admin');
 
--- =============================================================
--- PASO 6: caracterizacion_predio
--- =============================================================
+-- -------------------------
+-- 3.5 caracterizacion_predio
+-- -------------------------
 DROP POLICY IF EXISTS "caracterizacion_predio_select" ON caracterizacion_predio;
 DROP POLICY IF EXISTS "caracterizacion_predio_insert" ON caracterizacion_predio;
 DROP POLICY IF EXISTS "caracterizacion_predio_update" ON caracterizacion_predio;
@@ -204,7 +366,7 @@ DROP POLICY IF EXISTS "caracterizacion_predio_delete" ON caracterizacion_predio;
 
 CREATE POLICY "caracterizacion_predio_select" ON caracterizacion_predio
   FOR SELECT USING (
-    mi_rol() IN ('admin', 'analista')
+    public.mi_rol() IN ('admin', 'analista')
     OR EXISTS (
       SELECT 1 FROM predios pr
       JOIN beneficiarios b ON b.id = pr.id_beneficiario
@@ -216,7 +378,7 @@ CREATE POLICY "caracterizacion_predio_select" ON caracterizacion_predio
 
 CREATE POLICY "caracterizacion_predio_insert" ON caracterizacion_predio
   FOR INSERT WITH CHECK (
-    mi_rol() IN ('admin', 'asesor')
+    public.mi_rol() IN ('admin', 'asesor')
     OR EXISTS (
       SELECT 1 FROM predios pr
       JOIN beneficiarios b ON b.id = pr.id_beneficiario
@@ -227,7 +389,7 @@ CREATE POLICY "caracterizacion_predio_insert" ON caracterizacion_predio
 
 CREATE POLICY "caracterizacion_predio_update" ON caracterizacion_predio
   FOR UPDATE USING (
-    mi_rol() = 'admin'
+    public.mi_rol() = 'admin'
     OR EXISTS (
       SELECT 1 FROM predios pr
       JOIN beneficiarios b ON b.id = pr.id_beneficiario
@@ -237,11 +399,11 @@ CREATE POLICY "caracterizacion_predio_update" ON caracterizacion_predio
   );
 
 CREATE POLICY "caracterizacion_predio_delete" ON caracterizacion_predio
-  FOR DELETE USING (mi_rol() = 'admin');
+  FOR DELETE USING (public.mi_rol() = 'admin');
 
--- =============================================================
--- PASO 7: abastecimiento_agua
--- =============================================================
+-- -------------------------
+-- 3.6 abastecimiento_agua
+-- -------------------------
 DROP POLICY IF EXISTS "abastecimiento_agua_select" ON abastecimiento_agua;
 DROP POLICY IF EXISTS "abastecimiento_agua_insert" ON abastecimiento_agua;
 DROP POLICY IF EXISTS "abastecimiento_agua_update" ON abastecimiento_agua;
@@ -249,7 +411,7 @@ DROP POLICY IF EXISTS "abastecimiento_agua_delete" ON abastecimiento_agua;
 
 CREATE POLICY "abastecimiento_agua_select" ON abastecimiento_agua
   FOR SELECT USING (
-    mi_rol() IN ('admin', 'analista')
+    public.mi_rol() IN ('admin', 'analista')
     OR EXISTS (
       SELECT 1 FROM predios pr
       JOIN beneficiarios b ON b.id = pr.id_beneficiario
@@ -261,7 +423,7 @@ CREATE POLICY "abastecimiento_agua_select" ON abastecimiento_agua
 
 CREATE POLICY "abastecimiento_agua_insert" ON abastecimiento_agua
   FOR INSERT WITH CHECK (
-    mi_rol() IN ('admin', 'asesor')
+    public.mi_rol() IN ('admin', 'asesor')
     OR EXISTS (
       SELECT 1 FROM predios pr
       JOIN beneficiarios b ON b.id = pr.id_beneficiario
@@ -272,7 +434,7 @@ CREATE POLICY "abastecimiento_agua_insert" ON abastecimiento_agua
 
 CREATE POLICY "abastecimiento_agua_update" ON abastecimiento_agua
   FOR UPDATE USING (
-    mi_rol() = 'admin'
+    public.mi_rol() = 'admin'
     OR EXISTS (
       SELECT 1 FROM predios pr
       JOIN beneficiarios b ON b.id = pr.id_beneficiario
@@ -282,11 +444,11 @@ CREATE POLICY "abastecimiento_agua_update" ON abastecimiento_agua
   );
 
 CREATE POLICY "abastecimiento_agua_delete" ON abastecimiento_agua
-  FOR DELETE USING (mi_rol() = 'admin');
+  FOR DELETE USING (public.mi_rol() = 'admin');
 
--- =============================================================
--- PASO 8: riesgos_predio
--- =============================================================
+-- -------------------------
+-- 3.7 riesgos_predio
+-- -------------------------
 DROP POLICY IF EXISTS "riesgos_predio_select" ON riesgos_predio;
 DROP POLICY IF EXISTS "riesgos_predio_insert" ON riesgos_predio;
 DROP POLICY IF EXISTS "riesgos_predio_update" ON riesgos_predio;
@@ -294,7 +456,7 @@ DROP POLICY IF EXISTS "riesgos_predio_delete" ON riesgos_predio;
 
 CREATE POLICY "riesgos_predio_select" ON riesgos_predio
   FOR SELECT USING (
-    mi_rol() IN ('admin', 'analista')
+    public.mi_rol() IN ('admin', 'analista')
     OR EXISTS (
       SELECT 1 FROM predios pr
       JOIN beneficiarios b ON b.id = pr.id_beneficiario
@@ -306,7 +468,7 @@ CREATE POLICY "riesgos_predio_select" ON riesgos_predio
 
 CREATE POLICY "riesgos_predio_insert" ON riesgos_predio
   FOR INSERT WITH CHECK (
-    mi_rol() IN ('admin', 'asesor')
+    public.mi_rol() IN ('admin', 'asesor')
     OR EXISTS (
       SELECT 1 FROM predios pr
       JOIN beneficiarios b ON b.id = pr.id_beneficiario
@@ -317,7 +479,7 @@ CREATE POLICY "riesgos_predio_insert" ON riesgos_predio
 
 CREATE POLICY "riesgos_predio_update" ON riesgos_predio
   FOR UPDATE USING (
-    mi_rol() = 'admin'
+    public.mi_rol() = 'admin'
     OR EXISTS (
       SELECT 1 FROM predios pr
       JOIN beneficiarios b ON b.id = pr.id_beneficiario
@@ -327,11 +489,11 @@ CREATE POLICY "riesgos_predio_update" ON riesgos_predio
   );
 
 CREATE POLICY "riesgos_predio_delete" ON riesgos_predio
-  FOR DELETE USING (mi_rol() = 'admin');
+  FOR DELETE USING (public.mi_rol() = 'admin');
 
--- =============================================================
--- PASO 9: area_productiva
--- =============================================================
+-- -------------------------
+-- 3.8 area_productiva
+-- -------------------------
 DROP POLICY IF EXISTS "area_productiva_select" ON area_productiva;
 DROP POLICY IF EXISTS "area_productiva_insert" ON area_productiva;
 DROP POLICY IF EXISTS "area_productiva_update" ON area_productiva;
@@ -339,7 +501,7 @@ DROP POLICY IF EXISTS "area_productiva_delete" ON area_productiva;
 
 CREATE POLICY "area_productiva_select" ON area_productiva
   FOR SELECT USING (
-    mi_rol() IN ('admin', 'analista')
+    public.mi_rol() IN ('admin', 'analista')
     OR EXISTS (
       SELECT 1 FROM predios pr
       JOIN beneficiarios b ON b.id = pr.id_beneficiario
@@ -351,7 +513,7 @@ CREATE POLICY "area_productiva_select" ON area_productiva
 
 CREATE POLICY "area_productiva_insert" ON area_productiva
   FOR INSERT WITH CHECK (
-    mi_rol() IN ('admin', 'asesor')
+    public.mi_rol() IN ('admin', 'asesor')
     OR EXISTS (
       SELECT 1 FROM predios pr
       JOIN beneficiarios b ON b.id = pr.id_beneficiario
@@ -362,7 +524,7 @@ CREATE POLICY "area_productiva_insert" ON area_productiva
 
 CREATE POLICY "area_productiva_update" ON area_productiva
   FOR UPDATE USING (
-    mi_rol() = 'admin'
+    public.mi_rol() = 'admin'
     OR EXISTS (
       SELECT 1 FROM predios pr
       JOIN beneficiarios b ON b.id = pr.id_beneficiario
@@ -372,11 +534,11 @@ CREATE POLICY "area_productiva_update" ON area_productiva
   );
 
 CREATE POLICY "area_productiva_delete" ON area_productiva
-  FOR DELETE USING (mi_rol() = 'admin');
+  FOR DELETE USING (public.mi_rol() = 'admin');
 
--- =============================================================
--- PASO 10: informacion_financiera
--- =============================================================
+-- -------------------------
+-- 3.9 informacion_financiera
+-- -------------------------
 DROP POLICY IF EXISTS "informacion_financiera_select" ON informacion_financiera;
 DROP POLICY IF EXISTS "informacion_financiera_insert" ON informacion_financiera;
 DROP POLICY IF EXISTS "informacion_financiera_update" ON informacion_financiera;
@@ -384,7 +546,7 @@ DROP POLICY IF EXISTS "informacion_financiera_delete" ON informacion_financiera;
 
 CREATE POLICY "informacion_financiera_select" ON informacion_financiera
   FOR SELECT USING (
-    mi_rol() IN ('admin', 'analista')
+    public.mi_rol() IN ('admin', 'analista')
     OR EXISTS (
       SELECT 1 FROM beneficiarios b
       JOIN visitas v ON v.id = b.id_visita
@@ -402,7 +564,7 @@ CREATE POLICY "informacion_financiera_select" ON informacion_financiera
 
 CREATE POLICY "informacion_financiera_insert" ON informacion_financiera
   FOR INSERT WITH CHECK (
-    mi_rol() IN ('admin', 'asesor')
+    public.mi_rol() IN ('admin', 'asesor')
     OR EXISTS (
       SELECT 1 FROM beneficiarios b
       JOIN visitas v ON v.id = b.id_visita
@@ -412,7 +574,7 @@ CREATE POLICY "informacion_financiera_insert" ON informacion_financiera
 
 CREATE POLICY "informacion_financiera_update" ON informacion_financiera
   FOR UPDATE USING (
-    mi_rol() IN ('admin', 'analista')
+    public.mi_rol() IN ('admin', 'analista')
     OR EXISTS (
       SELECT 1 FROM beneficiarios b
       JOIN visitas v ON v.id = b.id_visita
@@ -421,12 +583,12 @@ CREATE POLICY "informacion_financiera_update" ON informacion_financiera
   );
 
 CREATE POLICY "informacion_financiera_delete" ON informacion_financiera
-  FOR DELETE USING (mi_rol() = 'admin');
+  FOR DELETE USING (public.mi_rol() = 'admin');
 
--- =============================================================
--- PASO 11: caracterizaciones
--- Tabla central — agricultor ve la suya via numero_documento
--- =============================================================
+-- -------------------------
+-- 3.10 caracterizaciones
+-- -------------------------
+DROP POLICY IF EXISTS "update_estado_caracterizaciones" ON caracterizaciones;
 DROP POLICY IF EXISTS "caracterizaciones_select" ON caracterizaciones;
 DROP POLICY IF EXISTS "caracterizaciones_insert" ON caracterizaciones;
 DROP POLICY IF EXISTS "caracterizaciones_update" ON caracterizaciones;
@@ -434,7 +596,7 @@ DROP POLICY IF EXISTS "caracterizaciones_delete" ON caracterizaciones;
 
 CREATE POLICY "caracterizaciones_select" ON caracterizaciones
   FOR SELECT USING (
-    mi_rol() IN ('admin', 'analista')
+    public.mi_rol() IN ('admin', 'analista')
     OR EXISTS (
       SELECT 1 FROM visitas v
       WHERE v.id = caracterizaciones.id_visita
@@ -451,18 +613,18 @@ CREATE POLICY "caracterizaciones_select" ON caracterizaciones
 
 CREATE POLICY "caracterizaciones_insert" ON caracterizaciones
   FOR INSERT WITH CHECK (
-    mi_rol() IN ('admin', 'asesor')
+    public.mi_rol() IN ('admin', 'asesor')
     OR EXISTS (
       SELECT 1 FROM visitas v
       WHERE v.id = id_visita AND v.asesor_id = auth.uid()
     )
   );
 
--- UPDATE: asesor puede editar sus propias; analista puede cambiar estado; admin todo
+-- asesor edita las suyas; analista puede cambiar estado; admin todo
 CREATE POLICY "caracterizaciones_update" ON caracterizaciones
   FOR UPDATE USING (
-    mi_rol() = 'admin'
-    OR mi_rol() = 'analista'
+    public.mi_rol() = 'admin'
+    OR public.mi_rol() = 'analista'
     OR EXISTS (
       SELECT 1 FROM visitas v
       WHERE v.id = caracterizaciones.id_visita AND v.asesor_id = auth.uid()
@@ -470,11 +632,11 @@ CREATE POLICY "caracterizaciones_update" ON caracterizaciones
   );
 
 CREATE POLICY "caracterizaciones_delete" ON caracterizaciones
-  FOR DELETE USING (mi_rol() = 'admin');
+  FOR DELETE USING (public.mi_rol() = 'admin');
 
--- =============================================================
--- PASO 12: invitations
--- =============================================================
+-- -------------------------
+-- 3.11 invitations
+-- -------------------------
 DROP POLICY IF EXISTS "invitations_select" ON invitations;
 DROP POLICY IF EXISTS "invitations_insert" ON invitations;
 DROP POLICY IF EXISTS "invitations_update" ON invitations;
@@ -482,22 +644,25 @@ DROP POLICY IF EXISTS "invitations_delete" ON invitations;
 
 CREATE POLICY "invitations_select" ON invitations
   FOR SELECT USING (
-    mi_rol() = 'admin'
+    public.mi_rol() = 'admin'
     OR invitado_por = auth.uid()
   );
 
 CREATE POLICY "invitations_insert" ON invitations
   FOR INSERT WITH CHECK (
-    mi_rol() IN ('admin', 'asesor')
+    public.mi_rol() IN ('admin', 'asesor')
   );
 
 CREATE POLICY "invitations_update" ON invitations
-  FOR UPDATE USING (mi_rol() = 'admin');
+  FOR UPDATE USING (public.mi_rol() = 'admin');
 
 CREATE POLICY "invitations_delete" ON invitations
-  FOR DELETE USING (mi_rol() = 'admin');
+  FOR DELETE USING (public.mi_rol() = 'admin');
 
--- =============================================================
--- PASO 13: Otorgar permisos de ejecución en mi_rol() al rol anon y authenticated
--- =============================================================
-GRANT EXECUTE ON FUNCTION public.mi_rol() TO anon, authenticated;
+
+-- =====================================================================
+-- SECCIÓN 4 — PERMISOS DE EJECUCIÓN
+-- =====================================================================
+GRANT EXECUTE ON FUNCTION public.mi_rol()                      TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_user_role(UUID)           TO authenticated;
+GRANT EXECUTE ON FUNCTION public.agricultor_tiene_visita(UUID) TO authenticated;

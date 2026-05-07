@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { motion } from "framer-motion"
 import { Leaf, Mail, Lock, Eye, EyeOff, AlertCircle, User, Phone, Ticket } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/hooks/use-auth"
 import { createClient } from "@/lib/supabase/client"
+import { scaleIn } from "@/lib/animations"
 
 export default function InvitationPage() {
   const router = useRouter()
@@ -120,7 +122,8 @@ export default function InvitationPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
-      <Card className="w-full max-w-md">
+      <motion.div variants={scaleIn} initial="hidden" animate="visible" className="w-full max-w-md">
+      <Card>
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
             <Leaf className="h-7 w-7 text-primary" />
@@ -211,6 +214,8 @@ export default function InvitationPage() {
                   <Input
                     id="telefono"
                     type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     placeholder="300 123 4567"
                     value={formData.telefono}
                     onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
@@ -226,6 +231,7 @@ export default function InvitationPage() {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
                     placeholder="Minimo 6 caracteres"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -235,7 +241,8 @@ export default function InvitationPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -280,6 +287,7 @@ export default function InvitationPage() {
           </p>
         </CardFooter>
       </Card>
+      </motion.div>
     </div>
   )
 }

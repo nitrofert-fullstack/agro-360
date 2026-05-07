@@ -61,10 +61,12 @@ import {
   TrendingUp,
   Activity,
 } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 import { ThemeToggle } from "./theme-toggle"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
+import { staggerContainer, staggerItem, fadeUp } from "@/lib/animations"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import {
   BarChart, Bar, PieChart, Pie, Cell,
@@ -86,6 +88,8 @@ const MapViewer = dynamic(
     )
   }
 )
+
+import type { MapMarker } from "./map-viewer"
 
 // Type from Supabase join query
 interface CaracterizacionDB {
@@ -245,19 +249,31 @@ async function downloadImage(url: string, filename: string) {
   }
 }
 
+function fmtFecha(raw: unknown, fallback = 'No registrada'): string {
+  if (!raw) return fallback
+  const s = String(raw)
+  const match = s.match(/(\d{4}-\d{2}-\d{2})/)
+  if (!match) return fallback
+  const d = new Date(match[1] + 'T12:00:00')
+  return isNaN(d.getTime()) ? fallback : d.toLocaleDateString('es-CO')
+}
+
 export function AdminDashboard() {
   const { isAdmin, isAuthenticated, loading: authLoading, user: currentUser, profile: currentProfile, signOut } = useAuth()
   const isAnalista = currentProfile?.rol === 'analista'
   const router = useRouter()
   const pathname = usePathname()
   const [isSigningOut, setIsSigningOut] = useState(false)
-  const activeSection: 'caracterizaciones' | 'usuarios' | 'estadisticas' = pathname.includes('/usuarios')
+  const activeSection: 'caracterizaciones' | 'usuarios' | 'estadisticas' | 'mapa' = pathname.includes('/usuarios')
     ? 'usuarios'
     : pathname.includes('/estadisticas')
       ? 'estadisticas'
-      : 'caracterizaciones'
+      : pathname.includes('/mapa')
+        ? 'mapa'
+        : 'caracterizaciones'
   const [caracterizaciones, setCaracterizaciones] = useState<CaracterizacionDB[]>([])
   const [estadisticas, setEstadisticas] = useState({ total: 0, pendientes: 0, sincronizados: 0, aprobados: 0, rechazados: 0 })
+  const [adminMapMarkers, setAdminMapMarkers] = useState<MapMarker[]>([])
   const [selectedCaracterizacion, setSelectedCaracterizacion] = useState<CaracterizacionDB | null>(null)
   const [showDetail, setShowDetail] = useState(false)
   const [showMap, setShowMap] = useState(false)
@@ -272,6 +288,9 @@ export function AdminDashboard() {
   const [observaciones, setObservaciones] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [credencialesEmail, setCredencialesEmail] = useState("")
+  const [isSendingCredenciales, setIsSendingCredenciales] = useState(false)
+  const [credencialesResult, setCredencialesResult] = useState<{ credenciales: { email: string; password: string }; emailEnviado: boolean } | null>(null)
   // activeSection derivado del pathname — ver arriba
   const [usuarios, setUsuarios] = useState<UserProfile[]>([])
   const [invitations, setInvitations] = useState<Invitation[]>([])
@@ -391,6 +410,7 @@ export function AdminDashboard() {
     porMunicipio: { municipio: string; total: number }[]
     porDepartamento: { departamento: string; total: number }[]
     porGenero: { genero: string; total: number }[]
+    porAsesor: { nombre: string; total: number }[]
     totalRegistros: number
     promedios: { edad: number | null; personasACargo: number | null; hectareas: number | null }
     asignacion: { conAsesor: number; sinAsesor: number }
@@ -602,14 +622,55 @@ export function AdminDashboard() {
   }, [])
 
   useEffect(() => {
+    // Siempre cargar datos de caracterizaciones para los contadores del sidebar
+    loadData({ page: 1, search: '', estado: 'todos', append: false })
     if (activeSection === 'usuarios') {
       loadUsers({ page: 1, search: '' })
-    } else {
-      loadData({ page: 1, search: '', estado: 'todos', append: false })
     }
     loadStats()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Cargar markers del mapa global cuando el tab de mapa está activo
+  useEffect(() => {
+    if (activeSection !== 'mapa' || adminMapMarkers.length > 0) return
+    const load = async () => {
+      try {
+        const res = await fetch('/api/admin/caracterizaciones')
+        if (!res.ok) return
+        const { data } = await res.json()
+        if (!data) return
+        const markers: MapMarker[] = []
+        const seen = new Set<string>()
+        for (const c of data as any[]) {
+          const predio = c.predio
+          if (!predio?.latitud || !predio?.longitud) continue
+          if (seen.has(predio.id)) continue
+          seen.add(predio.id)
+          const benefNombre = c.beneficiario
+            ? `${c.beneficiario.nombres || ''} ${c.beneficiario.apellidos || ''}`.trim()
+            : 'Sin nombre'
+          const temp = c.caracterizacion_predio?.temperatura_celsius
+          const popup = `<div style="min-width:180px;font-family:system-ui,sans-serif;">
+            <strong style="font-size:14px;">${predio.nombre_predio || 'Sin nombre'}</strong>
+            <hr style="margin:4px 0;border-color:#e5e7eb;"/>
+            <p style="margin:2px 0;font-size:12px;"><b>Productor:</b> ${benefNombre}</p>
+            <p style="margin:2px 0;font-size:12px;"><b>Municipio:</b> ${predio.municipio || 'N/A'}</p>
+            ${predio.vereda ? `<p style="margin:2px 0;font-size:12px;"><b>Vereda:</b> ${predio.vereda}</p>` : ''}
+            ${predio.area_total_hectareas ? `<p style="margin:2px 0;font-size:12px;"><b>Área total:</b> ${predio.area_total_hectareas} ha</p>` : ''}
+            ${predio.area_productiva_hectareas ? `<p style="margin:2px 0;font-size:12px;"><b>Área productiva:</b> ${predio.area_productiva_hectareas} ha</p>` : ''}
+            ${temp ? `<p style="margin:2px 0;font-size:12px;"><b>Temperatura:</b> ${temp}°C</p>` : ''}
+          </div>`
+          const polygonCoords = predio.poligono
+            ? (typeof predio.poligono === 'string' ? JSON.parse(predio.poligono) : predio.poligono) as [number, number][]
+            : undefined
+          markers.push({ id: predio.id, name: predio.nombre_predio || 'Sin nombre', position: [predio.latitud, predio.longitud], popupContent: popup, polygonCoords })
+        }
+        setAdminMapMarkers(markers)
+      } catch { /* silencioso */ }
+    }
+    load()
+  }, [activeSection, adminMapMarkers.length])
 
   // Debounce: reload from server when search or estado filter changes
   useEffect(() => {
@@ -650,8 +711,12 @@ export function AdminDashboard() {
 
       toast.success(`Estado actualizado a "${estadoConfig[nuevoEstado as EstadoKey]?.label || nuevoEstado}"`)
       setObservaciones("")
-      // Recargar datos — el estado actualizado vendrá del servidor (visitas.estado)
-      await loadData({ page: 1, search: searchQuery, estado: filterEstado, append: false })
+      // Actualizar el modal inmediatamente sin esperar recarga
+      setSelectedCaracterizacion(prev =>
+        prev ? { ...prev, estado: nuevoEstado, observaciones: observaciones || prev.observaciones } : prev
+      )
+      // Recargar la lista en segundo plano
+      loadData({ page: 1, search: searchQuery, estado: filterEstado, append: false })
     } catch (err) {
       console.error('Error updating estado:', err)
       toast.error('Error al actualizar el estado')
@@ -665,6 +730,8 @@ export function AdminDashboard() {
     setShowDetail(true)
     setObservaciones(c.observaciones || "")
     setSelectedNewAsesorId("")
+    setCredencialesEmail(c.beneficiario?.correo || "")
+    setCredencialesResult(null)
     if (isAdmin && asesoresDisponibles.length === 0) loadAsesores()
   }
 
@@ -705,7 +772,7 @@ export function AdminDashboard() {
       'Ingresos Agropecuarios/mes', 'Otros Ingresos/mes', 'Egresos/mes',
       'Activos Totales', 'Activos Agropecuarios', 'Pasivos Totales',
       // Autorizaciones
-      'Autoriza Datos Personales', 'Autoriza Aviso Privacidad', 'Autoriza Consulta Crediticia', 'Autoriza Uso Imagen',
+      'Autoriza Datos Personales', 'Autoriza Aviso Privacidad',
       // Tecnico
       'Tecnico / Asesor', 'Asesor Email',
     ]
@@ -773,8 +840,6 @@ export function AdminDashboard() {
       money(c.informacion_financiera?.pasivos_totales),
       bool(c.autorizacion_datos_personales),
       bool(c.autorizacion_aviso_privacidad),
-      bool(c.autorizacion_consulta_crediticia),
-      bool(c.autorizacion_uso_imagen),
       c.visita?.nombre_tecnico || c.asesor?.nombre_completo || '',
       c.asesor?.email || '',
     ].map(escape))
@@ -850,7 +915,7 @@ export function AdminDashboard() {
   <!-- Header -->
   <div class="header">
     <div>
-      <div class="logo">Agro360</div>
+      <div class="logo">Santander Agro360</div>
       <div class="logo-sub">Sistema de Caracterizacion Agropecuaria — Santander, Colombia</div>
     </div>
     <div class="header-right">
@@ -890,7 +955,7 @@ export function AdminDashboard() {
       ${field('Area total', c.predio?.area_total_hectareas ? `${c.predio.area_total_hectareas} ha` : null)}
       ${field('Area productiva', c.predio?.area_productiva_hectareas ? `${c.predio.area_productiva_hectareas} ha` : null)}
       ${field('Altitud', c.predio?.altitud_msnm ? `${c.predio.altitud_msnm} msnm` : null)}
-      ${field('Coordenadas', c.predio?.latitud && c.predio?.longitud ? `${c.predio.latitud.toFixed(5)}, ${c.predio.longitud.toFixed(5)}` : null)}
+      ${field('Coordenadas', c.predio?.latitud && c.predio?.longitud ? `${parseFloat(String(c.predio.latitud)).toFixed(5)}, ${parseFloat(String(c.predio.longitud)).toFixed(5)}` : null)}
       ${field('Vive en predio', c.predio?.vive_en_predio ? 'Si' : (c.predio?.vive_en_predio === false ? 'No' : null))}
       ${field('Acceso vial', c.predio?.acceso_vial)}
       ${field('Cultivos existentes', c.predio?.cultivos_existentes)}
@@ -954,7 +1019,7 @@ export function AdminDashboard() {
     <div class="grid3">
       ${field('Tecnico / Asesor', c.visita?.nombre_tecnico || c.asesor?.nombre_completo)}
       ${field('Correo asesor', c.asesor?.email)}
-      ${field('Fecha visita', c.visita?.fecha_visita ? new Date(c.visita.fecha_visita + 'T12:00:00').toLocaleDateString('es-CO') : null)}
+      ${field('Fecha visita', fmtFecha(c.visita?.fecha_visita, 'No registrada'))}
       ${field('Fecha registro', c.created_at ? new Date(c.created_at).toLocaleDateString('es-CO') : null)}
       ${field('Radicado local', c.radicado_local)}
       ${field('Radicado oficial', c.radicado_oficial)}
@@ -971,18 +1036,12 @@ export function AdminDashboard() {
       <span class="auth-item ${c.autorizacion_aviso_privacidad ? 'auth-ok' : 'auth-no'}">
         ${c.autorizacion_aviso_privacidad ? '✓' : '✗'} Aviso de privacidad
       </span>
-      <span class="auth-item ${c.autorizacion_consulta_crediticia ? 'auth-ok' : 'auth-no'}">
-        ${c.autorizacion_consulta_crediticia ? '✓' : '✗'} Consulta crediticia
-      </span>
-      <span class="auth-item ${c.autorizacion_uso_imagen ? 'auth-ok' : 'auth-no'}">
-        ${c.autorizacion_uso_imagen ? '✓' : '✗'} Uso de imagen
-      </span>
     </div>
     ${c.observaciones ? `<div style="margin-top:8px">${field('Observaciones', c.observaciones)}</div>` : ''}
   </div>
 
   <div class="footer">
-    <span>Agro360 — Sistema de Caracterizacion Agropecuaria</span>
+    <span>Santander Agro360 — Sistema de Caracterizacion Agropecuaria</span>
     <span>Documento generado el ${fechaGen}</span>
   </div>
 </div>
@@ -1012,13 +1071,7 @@ export function AdminDashboard() {
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
         <div className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
-            <Image src="/icons/icon-192x192.png" alt="Agro360" width={40} height={40} className="rounded-lg" />
-            <div>
-              <h1 className="text-lg font-bold text-foreground md:text-xl">Agro360</h1>
-              <p className="hidden text-sm text-muted-foreground sm:block">
-                {isAnalista ? 'Panel del Analista' : 'Panel de Administración'}
-              </p>
-            </div>
+            <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={64} height={64} className="rounded-xl" />
           </div>
           <div className="flex items-center gap-1.5 md:gap-2">
             <Button variant="outline" size="sm" onClick={() => { if (activeSection === 'usuarios') loadUsers({ page: userPage, search: userSearch }); else loadData({ page: 1, search: searchQuery, estado: filterEstado }); loadStats(); toast.info('Actualizando datos...') }} className="h-9 gap-2 bg-transparent px-2 md:px-3">
@@ -1055,7 +1108,8 @@ export function AdminDashboard() {
               Resumen
             </div>
 
-            <div className="space-y-2">
+            <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-2">
+              <motion.div variants={staggerItem}>
               <Card className="border-border bg-card">
                 <CardContent className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-3">
@@ -1069,6 +1123,7 @@ export function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
+              </motion.div>
 
               <Card className="border-yellow-500/20 bg-yellow-500/5">
                 <CardContent className="flex items-center justify-between p-4">
@@ -1084,6 +1139,7 @@ export function AdminDashboard() {
                 </CardContent>
               </Card>
 
+              <motion.div variants={staggerItem}>
               <Card className="border-blue-500/20 bg-blue-500/5">
                 <CardContent className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-3">
@@ -1097,7 +1153,9 @@ export function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
+              </motion.div>
 
+              <motion.div variants={staggerItem}>
               <Card className="border-green-500/20 bg-green-500/5">
                 <CardContent className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-3">
@@ -1111,7 +1169,9 @@ export function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
+              </motion.div>
 
+              <motion.div variants={staggerItem}>
               <Card className="border-red-500/20 bg-red-500/5">
                 <CardContent className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-3">
@@ -1125,7 +1185,8 @@ export function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </div>
+              </motion.div>
+            </motion.div>
 
             {/* Section navigation */}
             <div className="mt-6 space-y-2">
@@ -1162,6 +1223,17 @@ export function AdminDashboard() {
                 <BarChart2 className="h-4 w-4" />
                 Estadísticas
               </Button>
+              {!isAnalista && (
+                <Button
+                  variant={activeSection === 'mapa' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="w-full justify-start gap-2"
+                  onClick={() => router.push('/admin/mapa')}
+                >
+                  <Map className="h-4 w-4" />
+                  Mapa de Predios
+                </Button>
+              )}
             </div>
           </div>
         </aside>
@@ -1199,10 +1271,21 @@ export function AdminDashboard() {
               <BarChart2 className="h-4 w-4" />
               Estadísticas
             </Button>
+            {!isAnalista && (
+              <Button
+                variant={activeSection === 'mapa' ? 'default' : 'outline'}
+                size="sm"
+                className="gap-2"
+                onClick={() => router.push('/admin/mapa')}
+              >
+                <Map className="h-4 w-4" />
+                Mapa
+              </Button>
+            )}
           </div>
 
           {activeSection === 'caracterizaciones' && (
-            <>
+            <motion.div key="caracterizaciones" variants={fadeUp} initial="hidden" animate="visible"><>
               {/* Filters */}
               <div className="mb-6 flex flex-col gap-3">
                 <div className="flex gap-2">
@@ -1391,11 +1474,12 @@ export function AdminDashboard() {
                   })()}
                 </>
               )}
-            </>
+            </></motion.div>
           )}
 
           {/* Seccion Usuarios */}
           {activeSection === 'usuarios' && (
+            <motion.div key="usuarios" variants={fadeUp} initial="hidden" animate="visible">
             <div className="space-y-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -1729,10 +1813,11 @@ export function AdminDashboard() {
                 </div>
               )}
             </div>
+            </motion.div>
           )}
 
           {/* Sección Estadísticas */}
-          {activeSection === 'estadisticas' && (() => {
+          {activeSection === 'estadisticas' && (<motion.div key="estadisticas" variants={fadeUp} initial="hidden" animate="visible">{(() => {
             const estadoColors: Record<string, string> = {
               INICIADO: '#94a3b8',
               REVISADO: '#3b82f6',
@@ -2028,11 +2113,64 @@ export function AdminDashboard() {
                         </Card>
                       )}
                     </div>
+
+                    {/* Caracterizaciones por Asesor */}
+                    {(dashStats.porAsesor?.length ?? 0) > 0 && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <UserCheck className="h-4 w-4 text-primary" />
+                            Visitas por Asesor
+                          </CardTitle>
+                          <CardDescription>Total de visitas registradas por cada asesor</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={Math.max(200, (dashStats.porAsesor?.length ?? 0) * 40)}>
+                            <BarChart
+                              data={dashStats.porAsesor}
+                              layout="vertical"
+                              margin={{ left: 8, right: 24, top: 4, bottom: 4 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />
+                              <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                              <YAxis type="category" dataKey="nombre" tick={{ fontSize: 11 }} width={140} />
+                              <Tooltip formatter={(value) => [`${value} visitas`, 'Total']} />
+                              <Bar dataKey="total" fill="#f59e0b" radius={[0, 4, 4, 0]}>
+                                {(dashStats.porAsesor ?? []).map((_, i) => (
+                                  <Cell key={i} fill={i % 2 === 0 ? '#f59e0b' : '#d97706'} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    )}
                   </>
                 )}
               </div>
             )
-          })()}
+          })()}</motion.div>)}
+
+          {/* Sección Mapa de Predios */}
+          {activeSection === 'mapa' && (
+            <motion.div key="mapa" variants={fadeUp} initial="hidden" animate="visible">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold">Mapa de Predios</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {adminMapMarkers.length > 0
+                      ? `${adminMapMarkers.length} predio${adminMapMarkers.length !== 1 ? 's' : ''} registrado${adminMapMarkers.length !== 1 ? 's' : ''}`
+                      : 'Cargando predios...'}
+                  </p>
+                </div>
+              </div>
+              <div className="relative h-[calc(100vh-220px)] min-h-[400px] overflow-hidden rounded-xl border border-border">
+                <MapViewer markers={adminMapMarkers} />
+              </div>
+            </div>
+            </motion.div>
+          )}
         </main>
       </div>
 
@@ -2137,11 +2275,11 @@ export function AdminDashboard() {
                       </div>
                       <div className="flex justify-between gap-x-3">
                         <span className="text-muted-foreground shrink-0">Fecha visita:</span>
-                        <span>{selectedCaracterizacion.visita?.fecha_visita ? new Date(selectedCaracterizacion.visita.fecha_visita + 'T12:00:00').toLocaleDateString('es-CO') : 'No registrada'}</span>
+                        <span>{fmtFecha(selectedCaracterizacion.visita?.fecha_visita)}</span>
                       </div>
                       <div className="flex justify-between gap-x-3">
                         <span className="text-muted-foreground shrink-0">Registrado:</span>
-                        <span>{(selectedCaracterizacion.visita as any)?.created_at ? new Date((selectedCaracterizacion.visita as any).created_at).toLocaleDateString('es-CO') : 'No registrada'}</span>
+                        <span>{fmtFecha((selectedCaracterizacion.visita as any)?.created_at)}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground shrink-0">Estado:</span>
@@ -2444,6 +2582,103 @@ export function AdminDashboard() {
                     </Card>
                   )}
                 </div>
+
+                {/* Credenciales de acceso del beneficiario */}
+                {(isAdmin || currentProfile?.rol === 'asesor') && (() => {
+                  const tieneCorreo = !!selectedCaracterizacion.beneficiario?.correo
+                  const handleEnviarCredenciales = async () => {
+                    if (!credencialesEmail.trim()) return
+                    setIsSendingCredenciales(true)
+                    setCredencialesResult(null)
+                    try {
+                      const res = await fetch('/api/admin/enviar-credenciales', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          correo: credencialesEmail.trim(),
+                          nombreCompleto: getNombreCompleto(selectedCaracterizacion),
+                          beneficiarioId: selectedCaracterizacion.beneficiario?.id,
+                        }),
+                      })
+                      const data = await res.json()
+                      if (!res.ok) { toast.error(data.error || 'Error enviando credenciales'); return }
+                      setCredencialesResult({ credenciales: data.credenciales, emailEnviado: data.emailEnviado })
+                      // Actualizar el correo en el objeto local si cambió
+                      if (!tieneCorreo) {
+                        setSelectedCaracterizacion(prev =>
+                          prev ? { ...prev, beneficiario: prev.beneficiario ? { ...prev.beneficiario, correo: credencialesEmail.trim() } : prev.beneficiario } : prev
+                        )
+                      }
+                      toast.success(data.emailEnviado ? 'Credenciales enviadas por correo' : 'Credenciales generadas')
+                    } catch {
+                      toast.error('Error al enviar credenciales')
+                    } finally {
+                      setIsSendingCredenciales(false)
+                    }
+                  }
+                  return (
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-primary" />
+                          Acceso del Beneficiario
+                        </CardTitle>
+                        <CardDescription>
+                          {tieneCorreo ? 'Reenvía credenciales si el beneficiario olvidó su contraseña' : 'El beneficiario no tiene correo registrado. Agrega uno para crear su acceso'}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {!credencialesResult ? (
+                          <>
+                            <div className="flex gap-2">
+                              <input
+                                type="email"
+                                value={credencialesEmail}
+                                onChange={e => setCredencialesEmail(e.target.value)}
+                                placeholder="correo@ejemplo.com"
+                                readOnly={tieneCorreo}
+                                className={`h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${tieneCorreo ? 'opacity-70 cursor-default' : ''}`}
+                              />
+                              <Button
+                                size="sm"
+                                className="gap-2 shrink-0"
+                                disabled={isSendingCredenciales || !credencialesEmail.trim()}
+                                onClick={handleEnviarCredenciales}
+                              >
+                                {isSendingCredenciales ? (
+                                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                ) : (
+                                  <Mail className="h-4 w-4" />
+                                )}
+                                {tieneCorreo ? 'Reenviar' : 'Crear y enviar'}
+                              </Button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-2">
+                            <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                              {credencialesResult.emailEnviado ? '✓ Credenciales enviadas por correo' : '✓ Credenciales generadas'}
+                            </p>
+                            <div className="space-y-1 text-sm">
+                              <p><span className="text-muted-foreground">Correo:</span> <code className="rounded bg-background px-1">{credencialesResult.credenciales.email}</code></p>
+                              <p className="flex items-center gap-2">
+                                <span className="text-muted-foreground">Contraseña:</span>
+                                <code className="rounded bg-background px-1 font-bold">{credencialesResult.credenciales.password}</code>
+                                <button
+                                  className="text-xs text-primary underline-offset-2 hover:underline"
+                                  onClick={() => navigator.clipboard.writeText(credencialesResult!.credenciales.password)}
+                                >copiar</button>
+                              </p>
+                            </div>
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setCredencialesResult(null)}>
+                              Enviar de nuevo
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )
+                })()}
 
                 {/* Cambiar Estado */}
                 <Card>

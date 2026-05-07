@@ -3,13 +3,16 @@
 import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { motion } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Smartphone, Database, Bell, Leaf } from "lucide-react"
+import { ArrowLeft, Smartphone, Database, Bell } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { staggerContainer, staggerItem } from "@/lib/animations"
 
 export default function SettingsPage() {
   const { isAuthenticated, loading } = useAuth()
@@ -52,10 +55,7 @@ export default function SettingsPage() {
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <Leaf className="h-4 w-4 text-primary" />
-            </div>
-            <span className="text-sm font-bold text-foreground">Agro360</span>
+            <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={48} height={48} className="rounded-xl" />
           </Link>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild className="gap-1.5">
@@ -69,10 +69,15 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl px-4 py-6 md:px-6">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="mx-auto max-w-2xl px-4 py-6 md:px-6"
+      >
         <div className="space-y-6">
           {/* Configuración de sesión */}
-          <Card>
+          <motion.div variants={staggerItem}><Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Smartphone className="h-5 w-5" />
@@ -95,10 +100,10 @@ export default function SettingsPage() {
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Card></motion.div>
 
           {/* Datos y privacidad */}
-          <Card>
+          <motion.div variants={staggerItem}><Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Database className="h-5 w-5" />
@@ -118,10 +123,10 @@ export default function SettingsPage() {
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Card></motion.div>
 
           {/* Notificaciones */}
-          <Card>
+          <motion.div variants={staggerItem}><Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Bell className="h-5 w-5" />
@@ -139,16 +144,16 @@ export default function SettingsPage() {
                     Recibir alertas de sincronización y estados
                   </p>
                 </div>
-                <Switch 
+                <Switch
                   checked={settings.notificacionesEnabled}
                   onCheckedChange={() => handleToggle('notificacionesEnabled')}
                 />
               </div>
             </CardContent>
-          </Card>
+          </Card></motion.div>
 
           {/* Información técnica */}
-          <Card>
+          <motion.div variants={staggerItem}><Card>
             <CardHeader>
               <CardTitle className="text-base">Información técnica</CardTitle>
             </CardHeader>
@@ -157,9 +162,9 @@ export default function SettingsPage() {
               <p>Almacenamiento: Supabase (nube) + LocalStorage (sesión)</p>
               <p>Autenticación: Supabase Auth (JWT)</p>
             </CardContent>
-          </Card>
+          </Card></motion.div>
         </div>
-      </div>
+      </motion.div>
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient, SupabaseClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { sendEmail, buildSyncNotificationEmail, buildConfirmacionRegistroEmail } from '@/lib/email/mailer'
+import { prisma } from '@/lib/prisma'
 
 /**
  * Sube un base64 data URL a Supabase Storage y retorna la URL pública.
@@ -29,16 +30,24 @@ async function uploadBase64ToStorage(
   }
   const buffer = Buffer.from(base64Data, 'base64')
 
-  const { data: uploadData, error: uploadError } = await supabase.storage
-    .from(bucket)
-    .upload(filePath, buffer, { contentType, cacheControl: '3600', upsert: true })
+  const MAX_ATTEMPTS = 3
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, buffer, { contentType, cacheControl: '3600', upsert: true })
 
-  if (uploadError) {
-    console.error(`[API] Error subiendo archivo a ${bucket}/${filePath}:`, uploadError.message)
-    return null
+    if (!uploadError) {
+      return supabase.storage.from(bucket).getPublicUrl(uploadData.path).data.publicUrl
+    }
+
+    if (attempt < MAX_ATTEMPTS) {
+      console.warn(`[API] Intento ${attempt} fallido para ${bucket}/${filePath}: ${uploadError.message}. Reintentando...`)
+      await new Promise(r => setTimeout(r, 600 * attempt))
+    } else {
+      console.error(`[API] Error subiendo ${bucket}/${filePath} tras ${MAX_ATTEMPTS} intentos:`, uploadError.message)
+    }
   }
-
-  return supabase.storage.from(bucket).getPublicUrl(uploadData.path).data.publicUrl
+  return null
 }
 
 function generateRadicadoOficial(): string {
@@ -72,7 +81,7 @@ async function ensureStorageBuckets(adminClient: SupabaseClient): Promise<void> 
   }
 }
 
-async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
+async function verifyTurnstile(token: string): Promise<boolean> {
   const secret = process.env.TURNSTILE_SECRET_KEY
   if (!secret || secret === 'your-secret-key-here') {
     if (process.env.NODE_ENV === 'production') {
@@ -85,13 +94,16 @@ async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
   const form = new URLSearchParams()
   form.append('secret', secret)
   form.append('response', token)
-  form.append('remoteip', ip)
+  // No se envía remoteip: es opcional y causa falsos negativos con VPN/proxies
 
   const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
     method: 'POST',
     body: form,
   })
-  const data = await res.json() as { success: boolean }
+  const data = await res.json() as { success: boolean; 'error-codes'?: string[] }
+  if (!data.success) {
+    console.error('[Turnstile] Verificación fallida. error-codes:', data['error-codes'])
+  }
   return data.success === true
 }
 
@@ -111,7 +123,7 @@ async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { turnstileToken, ...c } = body
+    const { turnstileToken, offlineSync, ...c } = body
 
     // === Auth: sesión opcional ===
     const supabase = await createClient()
@@ -129,14 +141,13 @@ export async function POST(request: Request) {
       }
     }
 
-    // === Captcha (solo si no hay asesor autenticado) ===
-    if (!asesorId) {
-      const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('x-forwarded-for') || ''
+    // === Captcha (solo si no hay asesor autenticado y no es sync offline) ===
+    if (!asesorId && !offlineSync) {
       if (process.env.TURNSTILE_SECRET_KEY && process.env.TURNSTILE_SECRET_KEY !== 'your-secret-key-here') {
         if (!turnstileToken) {
           return NextResponse.json({ error: 'Verificación de seguridad requerida' }, { status: 400 })
         }
-        const valid = await verifyTurnstile(turnstileToken, ip)
+        const valid = await verifyTurnstile(turnstileToken)
         if (!valid) {
           return NextResponse.json({ error: 'Verificación de seguridad inválida' }, { status: 403 })
         }
@@ -191,33 +202,10 @@ export async function POST(request: Request) {
 
     const radicadoOficial = generateRadicadoOficial()
 
-    // === 1. BENEFICIARIO ===
-    const { data: existingBenef } = await adminClient
-      .from('beneficiarios')
-      .select('id')
-      .eq('numero_documento', docNum)
-      .maybeSingle()
-
-    // === Validar proceso activo: bloquear si ya existe una caracterización en curso ===
-    const ESTADOS_ACTIVOS = ['INICIADO', 'REVISADO', 'EN_ESTUDIO_CREDITO']
-    if (existingBenef) {
-      const { data: caracActiva } = await adminClient
-        .from('caracterizaciones')
-        .select('id, estado')
-        .eq('id_beneficiario', existingBenef.id)
-        .in('estado', ESTADOS_ACTIVOS)
-        .limit(1)
-        .maybeSingle()
-
-      if (caracActiva) {
-        return NextResponse.json(
-          { error: 'Este agricultor ya tiene un proceso activo. Solo puede iniciar uno nuevo cuando el proceso actual esté cancelado.' },
-          { status: 409 }
-        )
-      }
-    }
-
-    let beneficiarioId: string
+    // === 1. BENEFICIARIO — upsert atómico ===
+    // Usar upsert con onConflict garantiza que peticiones simultáneas con el mismo
+    // numero_documento no generen dos beneficiarios distintos (condición de carrera).
+    // Requiere UNIQUE constraint en beneficiarios.numero_documento.
     const benefData = {
       tipo_documento: c.beneficiario?.tipoDocumento || 'CC',
       numero_documento: docNum,
@@ -233,23 +221,42 @@ export async function POST(request: Request) {
       nombre_contacto_secundario: c.beneficiario?.nombreContactoSecundario || null,
       telefono_secundario: c.beneficiario?.telefonoSecundario || null,
       parentesco_contacto_secundario: c.beneficiario?.parentescoContactoSecundario || null,
+      asociacion: c.beneficiario?.asociacion || null,
     }
 
-    if (existingBenef) {
-      const { error } = await adminClient
-        .from('beneficiarios')
-        .update({ ...benefData, updated_at: new Date().toISOString() })
-        .eq('id', existingBenef.id)
-      if (error) throw new Error(`Error actualizando beneficiario: ${error.message}`)
-      beneficiarioId = existingBenef.id
-    } else {
-      const { data: newBenef, error } = await adminClient
-        .from('beneficiarios')
-        .insert(benefData)
-        .select('id')
-        .single()
-      if (error) throw new Error(`Error creando beneficiario: ${error.message}`)
-      beneficiarioId = newBenef.id
+    const { data: benefResult, error: benefErr } = await adminClient
+      .from('beneficiarios')
+      .upsert(benefData, { onConflict: 'numero_documento' })
+      .select('id')
+      .single()
+    if (benefErr) throw new Error(`Error creando beneficiario: ${benefErr.message}`)
+    const beneficiarioId = benefResult.id
+
+    // === Validar proceso activo / duplicado ===
+    // Se corre SIEMPRE (no solo si el beneficiario ya existía), porque upsert puede
+    // haber resuelto una condición de carrera y el beneficiario fue creado por otra petición.
+    const ESTADOS_BLOQUEANTES = ['INICIADO', 'REVISADO', 'EN_ESTUDIO_CREDITO', 'SINCRONIZADO', 'EN_REVISION', 'RECHAZADO']
+    const { data: caracActiva } = await adminClient
+      .from('caracterizaciones')
+      .select('id, estado, radicado_oficial')
+      .eq('id_beneficiario', beneficiarioId)
+      .in('estado', ESTADOS_BLOQUEANTES)
+      .limit(1)
+      .maybeSingle()
+
+    if (caracActiva) {
+      // Si es sync offline, devolver 200 para que el cliente descarte el formulario
+      // de IndexedDB sin tratarlo como error y no reintente indefinidamente.
+      if (offlineSync) {
+        return NextResponse.json(
+          { radicadoOficial: caracActiva.radicado_oficial || 'YA_REGISTRADO', duplicate: true },
+          { status: 200 }
+        )
+      }
+      return NextResponse.json(
+        { error: 'Este agricultor ya tiene un proceso activo. Solo puede iniciar uno nuevo cuando el proceso actual esté cancelado o aprobado.' },
+        { status: 409 }
+      )
     }
 
     // === 2. PREDIO ===
@@ -285,61 +292,72 @@ export async function POST(request: Request) {
 
     // === 3. ABASTECIMIENTO AGUA ===
     if (c.aguaRiesgos) {
-      await adminClient.from('abastecimiento_agua').insert({
-        id_predio: predioId,
-        nacimiento_manantial: c.aguaRiesgos.nacimientoManantial ?? false,
-        rio_quebrada: c.aguaRiesgos.rioQuebrada ?? false,
-        pozo: c.aguaRiesgos.pozo ?? false,
-        acueducto_rural: c.aguaRiesgos.acueductoRural ?? false,
-        canal_distrito_riego: c.aguaRiesgos.canalDistritoRiego ?? false,
-        jaguey_reservorio: c.aguaRiesgos.jagueyReservorio ?? false,
-        agua_lluvia: c.aguaRiesgos.aguaLluvia ?? false,
-        otra_fuente: c.aguaRiesgos.otraFuente || null,
+      await prisma.abastecimiento_agua.create({
+        data: {
+          id_predio: predioId,
+          nacimiento_manantial: c.aguaRiesgos.nacimientoManantial ?? false,
+          rio_quebrada:         c.aguaRiesgos.rioQuebrada ?? false,
+          pozo:                 c.aguaRiesgos.pozo ?? false,
+          acueducto_rural:      c.aguaRiesgos.acueductoRural ?? false,
+          canal_distrito_riego: c.aguaRiesgos.canalDistritoRiego ?? false,
+          jaguey_reservorio:    c.aguaRiesgos.jagueyReservorio ?? false,
+          agua_lluvia:          c.aguaRiesgos.aguaLluvia ?? false,
+          otra_fuente:          c.aguaRiesgos.otraFuente || null,
+        },
       })
     }
 
     // === 4. RIESGOS ===
     if (c.aguaRiesgos) {
-      await adminClient.from('riesgos_predio').insert({
-        id_predio: predioId,
-        inundacion: c.aguaRiesgos.inundacion ?? false,
-        sequia: c.aguaRiesgos.sequia ?? false,
-        viento: c.aguaRiesgos.viento ?? false,
-        helada: c.aguaRiesgos.helada ?? false,
-        otros_riesgos: c.aguaRiesgos.otrosRiesgos || null,
+      await prisma.riesgos_predio.create({
+        data: {
+          id_predio:     predioId,
+          inundacion:    c.aguaRiesgos.inundacion ?? false,
+          sequia:        c.aguaRiesgos.sequia ?? false,
+          viento:        c.aguaRiesgos.viento ?? false,
+          helada:        c.aguaRiesgos.helada ?? false,
+          otros_riesgos: c.aguaRiesgos.otrosRiesgos || null,
+        },
       })
     }
 
     // === 5. CARACTERIZACION PREDIO ===
     if (c.caracterizacion) {
-      await adminClient.from('caracterizacion_predio').insert({
-        id_predio: predioId,
-        ruta_acceso: c.caracterizacion.rutaAcceso || null,
-        distancia_km: c.caracterizacion.distanciaKm ?? null,
-        tiempo_acceso: c.caracterizacion.tiempoAcceso || null,
-        temperatura_celsius: c.caracterizacion.temperaturaCelsius ?? null,
-        meses_lluvia: c.caracterizacion.mesesLluvia || null,
-        topografia: c.caracterizacion.topografia || null,
-        cobertura_bosque: c.caracterizacion.coberturaBosque ?? false,
-        cobertura_cultivos: c.caracterizacion.coberturaCultivos ?? false,
-        cobertura_pastos: c.caracterizacion.coberturaPastos ?? false,
-        cobertura_rastrojo: c.caracterizacion.coberturaRastrojo ?? false,
+      await prisma.caracterizacion_predio.create({
+        data: {
+          id_predio:           predioId,
+          ruta_acceso:         c.caracterizacion.rutaAcceso || null,
+          distancia_km:        c.caracterizacion.distanciaKm ?? null,
+          tiempo_acceso:       c.caracterizacion.tiempoAcceso || null,
+          temperatura_celsius: c.caracterizacion.temperaturaCelsius ?? null,
+          meses_lluvia:        c.caracterizacion.mesesLluvia || null,
+          topografia:          c.caracterizacion.topografia || null,
+          cobertura_bosque:    c.caracterizacion.coberturaBosque ?? false,
+          cobertura_cultivos:  c.caracterizacion.coberturaCultivos ?? false,
+          cobertura_pastos:    c.caracterizacion.coberturaPastos ?? false,
+          cobertura_rastrojo:  c.caracterizacion.coberturaRastrojo ?? false,
+        },
       })
     }
 
     // === 6. AREA PRODUCTIVA ===
     if (c.areaProductiva) {
-      await adminClient.from('area_productiva').insert({
-        id_predio: predioId,
-        sistema_productivo: c.areaProductiva.sistemaProductivo || null,
-        caracterizacion_cultivo: c.areaProductiva.caracterizacionCultivo || null,
-        cantidad_produccion: c.areaProductiva.cantidadProduccion || null,
-        estado_cultivo: c.areaProductiva.estadoCultivo || null,
-        tiene_infraestructura_procesamiento: c.areaProductiva.tieneInfraestructuraProcesamiento ?? false,
-        estructuras: c.areaProductiva.estructuras || null,
-        interesado_programa: c.areaProductiva.interesadoPrograma ?? false,
-        donde_comercializa: c.areaProductiva.dondeComercializa || null,
-        ingreso_mensual_ventas: c.areaProductiva.ingresoMensualVentas ?? null,
+      await prisma.area_productiva.create({
+        data: {
+          id_predio:                           predioId,
+          sistema_productivo:                  c.areaProductiva.sistemaProductivo || null,
+          caracterizacion_cultivo:             c.areaProductiva.caracterizacionCultivo || null,
+          cantidad_produccion:                 c.areaProductiva.cantidadProduccion || null,
+          estado_cultivo:                      c.areaProductiva.estadoCultivo || null,
+          tiene_infraestructura_procesamiento: c.areaProductiva.tieneInfraestructuraProcesamiento ?? false,
+          estructuras:                         c.areaProductiva.estructuras || null,
+          interesado_programa:                 c.areaProductiva.interesadoPrograma ?? false,
+          donde_comercializa:                  c.areaProductiva.dondeComercializa || null,
+          ingreso_mensual_ventas:              c.areaProductiva.ingresoMensualVentas ?? null,
+          sistema_productivo_interes:          c.areaProductiva.sistemaProductivoInteres || null,
+          hectareas_siembra_nueva:             c.areaProductiva.hectareasSiembraNueva ?? null,
+          hectareas_renovacion:                c.areaProductiva.hectareasRenovacion ?? null,
+        },
       })
     }
 
@@ -372,7 +390,7 @@ export async function POST(request: Request) {
       .from('visitas')
       .insert({
         fecha_visita: c.visita?.fechaVisita || new Date().toISOString().split('T')[0],
-        nombre_tecnico: c.visita?.nombreTecnico || asesorAutoNombre || '',
+        nombre_tecnico: asesorAutoNombre || c.visita?.nombreTecnico || '',
         codigo_formulario: c.visita?.codigoFormulario || null,
         version_formulario: c.visita?.versionFormulario || '1.0',
         fecha_emision_formulario: c.visita?.fechaEmisionFormulario || null,
@@ -461,7 +479,7 @@ export async function POST(request: Request) {
 
             await sendEmail({
               to: correoAg,
-              subject: 'Tu caracterización agropecuaria fue registrada — Agro360',
+              subject: 'Tu caracterización agropecuaria fue registrada — Santander Agro360',
               html: buildSyncNotificationEmail({
                 nombreCompleto: nombreAg,
                 email: correoAg,
@@ -475,7 +493,7 @@ export async function POST(request: Request) {
         } else {
           await sendEmail({
             to: correoAg,
-            subject: 'Tu caracterización fue registrada — Agro360',
+            subject: 'Tu caracterización fue registrada — Santander Agro360',
             html: buildConfirmacionRegistroEmail({
               nombreCompleto: nombreAg,
               radicadoOficial,

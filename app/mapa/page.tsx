@@ -4,10 +4,12 @@ import { useEffect, useState } from "react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { motion } from "framer-motion"
 import { Home, Loader2 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/hooks/use-auth"
 import type { MapMarker } from "@/components/map-viewer"
+import { fadeUp } from "@/lib/animations"
 
 const MapViewer = dynamic(
   () => import("@/components/map-viewer").then((mod) => mod.MapViewer),
@@ -135,13 +137,13 @@ export default function MapaPage() {
 
       {/* Marker count badge */}
       {markers.length > 0 && (
-        <div className="absolute left-3 top-3 z-[1002] rounded-lg border border-border bg-card/95 px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur-md">
+        <motion.div variants={fadeUp} initial="hidden" animate="visible" className="absolute left-3 top-3 z-[1002] rounded-lg border border-border bg-card/95 px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur-md">
           {markers.length} predio{markers.length !== 1 ? 's' : ''} registrado{markers.length !== 1 ? 's' : ''}
-        </div>
+        </motion.div>
       )}
 
       {/* Navigation controls */}
-      <div className="absolute bottom-3 left-3 z-[1002] flex items-center gap-2 md:bottom-4">
+      <motion.div variants={fadeUp} initial="hidden" animate="visible" className="absolute bottom-3 left-3 z-[1002] flex items-center gap-2 md:bottom-4">
         <Link
           href="/dashboard"
           className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2.5 text-muted-foreground shadow-lg backdrop-blur-md transition-colors hover:bg-secondary hover:text-foreground md:h-9 md:gap-2 md:px-3"
@@ -151,7 +153,7 @@ export default function MapaPage() {
           <span className="hidden text-xs font-medium sm:inline md:text-sm">Dashboard</span>
         </Link>
         <ThemeToggle />
-      </div>
+      </motion.div>
     </main>
   )
 }

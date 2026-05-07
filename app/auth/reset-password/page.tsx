@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Leaf, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from "lucide-react"
+import { motion } from "framer-motion"
+import { Lock, Eye, EyeOff, AlertCircle, CheckCircle } from "lucide-react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,6 +13,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { createClient } from "@/lib/supabase/client"
 import type { AuthChangeEvent, Session, AuthResponse } from "@supabase/supabase-js"
+import { scaleIn, celebrationVariants, staggerContainer, staggerItem } from "@/lib/animations"
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -88,7 +91,8 @@ export default function ResetPasswordPage() {
   if (hasSession === false) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
-        <Card className="w-full max-w-md">
+        <motion.div variants={scaleIn} initial="hidden" animate="visible" className="w-full max-w-md">
+        <Card>
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
               <AlertCircle className="h-7 w-7 text-destructive" />
@@ -104,6 +108,7 @@ export default function ResetPasswordPage() {
             </Button>
           </CardFooter>
         </Card>
+        </motion.div>
       </div>
     )
   }
@@ -111,27 +116,30 @@ export default function ResetPasswordPage() {
   if (success) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
-        <Card className="w-full max-w-md">
+        <motion.div variants={scaleIn} initial="hidden" animate="visible" className="w-full max-w-md">
+        <Card>
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
+            <motion.div variants={celebrationVariants} className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
               <CheckCircle className="h-7 w-7 text-green-600 dark:text-green-400" />
-            </div>
+            </motion.div>
             <CardTitle className="text-2xl">Contraseña actualizada</CardTitle>
             <CardDescription>
               Tu contraseña fue cambiada exitosamente. Redirigiendo...
             </CardDescription>
           </CardHeader>
         </Card>
+        </motion.div>
       </div>
     )
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-            <Leaf className="h-7 w-7 text-primary" />
+      <motion.div variants={scaleIn} initial="hidden" animate="visible" className="w-full max-w-md">
+      <Card>
+        <CardHeader className="text-center pb-6">
+          <div className="mx-auto mb-4">
+            <Image src="/icons/icon-384x384.png" alt="Santander Agro360" width={96} height={96} className="rounded-2xl" />
           </div>
           <CardTitle className="text-2xl">Nueva Contraseña</CardTitle>
           <CardDescription>
@@ -155,6 +163,7 @@ export default function ResetPasswordPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
                   placeholder="Mínimo 8 caracteres"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -165,7 +174,8 @@ export default function ResetPasswordPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -179,6 +189,7 @@ export default function ResetPasswordPage() {
                 <Input
                   id="confirm"
                   type={showConfirm ? "text" : "password"}
+                  autoComplete="new-password"
                   placeholder="Repite la contraseña"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
@@ -188,7 +199,8 @@ export default function ResetPasswordPage() {
                 <button
                   type="button"
                   onClick={() => setShowConfirm(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showConfirm ? "Ocultar confirmación" : "Mostrar confirmación"}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground"
                 >
                   {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -206,6 +218,7 @@ export default function ResetPasswordPage() {
           </CardFooter>
         </form>
       </Card>
+      </motion.div>
     </div>
   )
 }

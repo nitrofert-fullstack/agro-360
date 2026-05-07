@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +13,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { createClient } from "@/lib/supabase/client"
 import { AgricultorDashboard } from "@/components/agricultor-dashboard"
 import { toast } from "sonner"
+import { staggerContainer, staggerItem, fadeUp } from "@/lib/animations"
 import {
   FileText,
   Map,
@@ -123,13 +125,7 @@ export default function DashboardPage() {
     <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
         <div className="flex items-center gap-2 md:gap-3">
-          <Image src="/icons/icon-192x192.png" alt="Agro360" width={36} height={36} className="rounded-lg" />
-          <div>
-            <h1 className="text-base font-bold text-foreground">Agro360</h1>
-            <p className="hidden text-xs text-muted-foreground sm:block">
-              {isAgricultor ? 'Mi Portal' : 'Panel del Asesor'}
-            </p>
-          </div>
+          <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={60} height={60} className="rounded-xl" />
         </div>
         <nav className="flex items-center gap-1.5 md:gap-2">
           <Button
@@ -195,189 +191,221 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="mx-auto max-w-5xl px-4 py-6 md:px-6">
-
-        {/* Bienvenida + acciones */}
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-foreground md:text-2xl">
-              Bienvenido, {profile?.nombre_completo?.split(' ')[0] || 'Asesor'}
-            </h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Gestiona tus visitas de caracterización
-            </p>
-            <Badge variant="outline" className="mt-2 bg-primary/10 text-primary border-primary/20 text-xs">
-              Asesor de campo
-            </Badge>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => { loadAsesorStats(); toast.info('Actualizando...') }}
-              disabled={isLoadingStats}
-            >
-              {isLoadingStats ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              <span className="hidden sm:inline">Actualizar</span>
-            </Button>
-          </div>
-        </div>
-
-        {/* Stats simples */}
-        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Card className="border-border">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                <FileText className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{serverStats?.total ?? 0}</p>
-                <p className="text-xs text-muted-foreground">Caracterizaciones registradas</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Acciones rápidas */}
-        <div className="mb-6 grid grid-cols-2 gap-3">
-          <Card
-            className="cursor-pointer transition-all hover:bg-muted/50 hover:shadow-sm"
-            onClick={() => router.push('/formulario')}
-          >
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                <Plus className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="font-semibold text-sm">Nueva Caracterización</p>
-                <p className="text-xs text-muted-foreground">Registrar productor</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card
-            className="cursor-pointer transition-all hover:bg-muted/50 hover:shadow-sm"
-            onClick={() => router.push('/mapa')}
-          >
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-500/10">
-                <Map className="h-5 w-5 text-green-500" />
-              </div>
-              <div>
-                <p className="font-semibold text-sm">Mapa NDVI</p>
-                <p className="text-xs text-muted-foreground">Ver vegetación</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Registros en servidor */}
-        <div className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-base font-semibold">
-              Mis registros
-              {serverStats?.total != null && (
-                <span className="ml-2 text-sm font-normal text-muted-foreground">({serverStats.total})</span>
-              )}
-            </h3>
-            <div className="relative w-full sm:w-56">
-              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Buscar nombre o radicado..."
-                value={recentSearch}
-                onChange={e => { setRecentSearch(e.target.value); setRecentPage(1) }}
-                className="w-full rounded-md border border-border bg-background py-1.5 pl-8 pr-3 text-sm outline-none focus:ring-1 focus:ring-primary"
-              />
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="space-y-6"
+        >
+          {/* Bienvenida + acciones */}
+          <motion.div variants={fadeUp} className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-foreground md:text-2xl">
+                Bienvenido, {profile?.nombre_completo?.split(' ')[0] || 'Asesor'}
+              </h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Gestiona tus visitas de caracterización
+              </p>
+              <Badge variant="outline" className="mt-2 bg-primary/10 text-primary border-primary/20 text-xs">
+                Asesor de campo
+              </Badge>
             </div>
-          </div>
-
-          {isLoadingStats ? (
-            <div className="flex items-center justify-center py-10">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="flex gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => { loadAsesorStats(); toast.info('Actualizando...') }}
+                disabled={isLoadingStats}
+              >
+                {isLoadingStats ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                <span className="hidden sm:inline">Actualizar</span>
+              </Button>
             </div>
-          ) : paginated.length > 0 ? (
-            <>
-              <div className="space-y-2">
-                {paginated.map((item: any) => {
-                  const carac = item.caracterizaciones?.[0]
-                  const benef = carac?.beneficiarios
-                  const nombre = benef
-                    ? `${benef.nombres || ''} ${benef.apellidos || ''}`.trim()
-                    : item.nombre_tecnico || 'Sin nombre'
-                  const estadoLabels: Record<string, string> = {
-                    INICIADO: 'Iniciado', REVISADO: 'En Revisión',
-                    EN_ESTUDIO_CREDITO: 'En Estudio', APROBADO: 'Viable', CANCELADO: 'No Viable',
-                  }
-                  const estadoColors: Record<string, string> = {
-                    INICIADO: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
-                    REVISADO: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
-                    EN_ESTUDIO_CREDITO: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
-                    APROBADO: 'bg-green-500/10 text-green-600 border-green-500/20',
-                    CANCELADO: 'bg-red-500/10 text-red-600 border-red-500/20',
-                  }
-                  const est = carac?.estado || 'INICIADO'
-                  return (
-                    <Card
-                      key={item.id}
-                      className="cursor-pointer transition-colors hover:bg-muted/30"
-                      onClick={() => router.push(`/dashboard/caracterizacion/${item.id}`)}
-                    >
-                      <CardContent className="flex items-center gap-3 p-4">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                          <FileText className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="truncate font-medium text-sm">{nombre}</p>
-                            <Badge variant="outline" className={`shrink-0 text-xs ${estadoColors[est] || estadoColors.INICIADO}`}>
-                              {estadoLabels[est] || est}
-                            </Badge>
-                          </div>
-                          <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                            {item.radicado_oficial || item.radicado_local} · {new Date(item.created_at).toLocaleDateString('es-CO')}
-                          </p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
+          </motion.div>
 
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-border pt-3">
-                  <p className="text-sm text-muted-foreground">Pág. {safePage} de {totalPages}</p>
-                  <div className="flex gap-1">
-                    <Button variant="outline" size="sm" disabled={safePage === 1} onClick={() => setRecentPage(p => p - 1)}>
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" disabled={safePage === totalPages} onClick={() => setRecentPage(p => p + 1)}>
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
+          {/* Stats simples */}
+          <motion.div variants={staggerItem} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Card className="border-border">
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <FileText className="h-5 w-5 text-primary" />
                 </div>
-              )}
-            </>
-          ) : (
-            <Card className="py-10 text-center">
-              <CardContent>
-                <FileText className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-                <p className="font-medium">
-                  {recentSearch ? `Sin resultados para "${recentSearch}"` : 'Aún no tienes registros'}
-                </p>
-                {!recentSearch && (
-                  <Button asChild className="mt-4 gap-2" size="sm">
-                    <Link href="/formulario">
-                      <Plus className="h-4 w-4" />
-                      Crear primera caracterización
-                    </Link>
-                  </Button>
-                )}
+                <div>
+                  <p className="text-2xl font-bold">{serverStats?.total ?? 0}</p>
+                  <p className="text-xs text-muted-foreground">Caracterizaciones registradas</p>
+                </div>
               </CardContent>
             </Card>
-          )}
-        </div>
+          </motion.div>
+
+          {/* Acciones rápidas */}
+          <motion.div variants={staggerContainer} className="grid grid-cols-2 gap-3">
+            <motion.div variants={staggerItem}>
+              <Card
+                className="cursor-pointer transition-all hover:bg-muted/50 hover:shadow-md hover:-translate-y-0.5"
+                role="button"
+                tabIndex={0}
+                aria-label="Nueva Caracterización — Registrar productor"
+                onClick={() => router.push('/formulario')}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push('/formulario') } }}
+              >
+                <CardContent className="flex items-center gap-3 p-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                    <Plus className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm">Nueva Caracterización</p>
+                    <p className="text-xs text-muted-foreground">Registrar productor</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div variants={staggerItem}>
+              <Card
+                className="cursor-pointer transition-all hover:bg-muted/50 hover:shadow-md hover:-translate-y-0.5"
+                role="button"
+                tabIndex={0}
+                aria-label="Mapa — Ver vegetación"
+                onClick={() => router.push('/mapa')}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push('/mapa') } }}
+              >
+                <CardContent className="flex items-center gap-3 p-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-500/10">
+                    <Map className="h-5 w-5 text-green-500" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm">Mapa NDVI</p>
+                    <p className="text-xs text-muted-foreground">Ver vegetación</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </motion.div>
+
+          {/* Registros en servidor */}
+          <motion.div variants={fadeUp} className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-base font-semibold">
+                Mis registros
+                {serverStats?.total != null && (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">({serverStats.total})</span>
+                )}
+              </h3>
+              <div className="relative w-full sm:w-56">
+                <label htmlFor="search-registros" className="sr-only">Buscar registros</label>
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  id="search-registros"
+                  type="search"
+                  placeholder="Buscar nombre o radicado..."
+                  value={recentSearch}
+                  onChange={e => { setRecentSearch(e.target.value); setRecentPage(1) }}
+                  className="w-full rounded-md border border-border bg-background py-1.5 pl-8 pr-3 text-sm outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+            </div>
+
+            {isLoadingStats ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : paginated.length > 0 ? (
+              <>
+                <motion.div
+                  variants={staggerContainer}
+                  initial="hidden"
+                  animate="visible"
+                  className="space-y-2"
+                >
+                  {paginated.map((item: any) => {
+                    const carac = item.caracterizaciones?.[0]
+                    const benef = carac?.beneficiarios
+                    const nombre = benef
+                      ? `${benef.nombres || ''} ${benef.apellidos || ''}`.trim()
+                      : item.nombre_tecnico || 'Sin nombre'
+                    const estadoLabels: Record<string, string> = {
+                      INICIADO: 'Iniciado', REVISADO: 'En Revisión',
+                      EN_ESTUDIO_CREDITO: 'En Estudio', APROBADO: 'Viable', CANCELADO: 'No Viable',
+                    }
+                    const estadoColors: Record<string, string> = {
+                      INICIADO: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+                      REVISADO: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+                      EN_ESTUDIO_CREDITO: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+                      APROBADO: 'bg-green-500/10 text-green-600 border-green-500/20',
+                      CANCELADO: 'bg-red-500/10 text-red-600 border-red-500/20',
+                    }
+                    const est = carac?.estado || 'INICIADO'
+                    return (
+                      <motion.div key={item.id} variants={staggerItem}>
+                        <Card
+                          className="cursor-pointer transition-all hover:bg-muted/30 hover:shadow-sm hover:-translate-y-px"
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Ver detalle de ${nombre}`}
+                          onClick={() => router.push(`/dashboard/caracterizacion/${item.id}`)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/dashboard/caracterizacion/${item.id}`) } }}
+                        >
+                          <CardContent className="flex items-center gap-3 p-4">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                              <FileText className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="truncate font-medium text-sm">{nombre}</p>
+                                <Badge variant="outline" className={`shrink-0 text-xs ${estadoColors[est] || estadoColors.INICIADO}`}>
+                                  {estadoLabels[est] || est}
+                                </Badge>
+                              </div>
+                              <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                                {item.radicado_oficial || item.radicado_local} · {new Date(item.created_at).toLocaleDateString('es-CO')}
+                              </p>
+                            </div>
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    )
+                  })}
+                </motion.div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between border-t border-border pt-3">
+                    <p className="text-sm text-muted-foreground">Pág. {safePage} de {totalPages}</p>
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="sm" disabled={safePage === 1} onClick={() => setRecentPage(p => p - 1)}>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" disabled={safePage === totalPages} onClick={() => setRecentPage(p => p + 1)}>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <motion.div variants={staggerItem}>
+                <Card className="py-10 text-center">
+                  <CardContent>
+                    <FileText className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+                    <p className="font-medium">
+                      {recentSearch ? `Sin resultados para "${recentSearch}"` : 'Aún no tienes registros'}
+                    </p>
+                    {!recentSearch && (
+                      <Button asChild className="mt-4 gap-2" size="sm">
+                        <Link href="/formulario">
+                          <Plus className="h-4 w-4" />
+                          Crear primera caracterización
+                        </Link>
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </motion.div>
+        </motion.div>
       </main>
     </div>
   )

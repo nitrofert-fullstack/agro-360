@@ -104,7 +104,7 @@ export async function POST(request: Request) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
       emailEnviado = await sendEmail({
         to: email,
-        subject: 'Bienvenido a Agro360 — Tus credenciales de acceso',
+        subject: 'Bienvenido a Santander Agro360 — Tus credenciales de acceso',
         html: buildCredentialsEmail({ nombreCompleto, email, password: tempPassword, rol, appUrl }),
       })
     }

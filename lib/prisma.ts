@@ -2,17 +2,14 @@ import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 
-// Supabase pooler usa certificado self-signed en su cadena TLS.
-// En producción Vercel esto no aplica; en dev y CI es necesario para conectar.
-if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === undefined) {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-}
-
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }
 
 function createPrismaClient() {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL!,
+    // El pooler de Supabase usa cert self-signed en la cadena TLS.
+    // rejectUnauthorized:false solo afecta este pool — no contamina otras conexiones HTTPS
+    // (a diferencia de NODE_TLS_REJECT_UNAUTHORIZED=0 que es global al proceso).
     ssl: { rejectUnauthorized: false },
   })
   const adapter = new PrismaPg(pool)

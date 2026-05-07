@@ -7,16 +7,24 @@ import { SessionValidator } from '@/components/session-validator'
 import { EnvVarChecker } from '@/components/env-var-checker'
 import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider } from '@/context/auth-context'
+import { SuppressInstallPrompt } from '@/components/suppress-install-prompt'
+import { AutoSync } from '@/components/auto-sync'
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Agro360 - Sistema de Caracterizacion Predial',
+  title: 'Santander Agro360 - Sistema de Caracterizacion Predial',
   description: 'Sistema de caracterizacion predial con monitoreo NDVI, temperatura y precipitacion en Santander, Colombia',
   formatDetection: {
     telephone: false,
+  },
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Santander Agro360',
   },
   icons: {
     icon: [
@@ -47,10 +55,12 @@ export default function RootLayout({
             <SessionValidator>
               {children}
             </SessionValidator>
+            <AutoSync />
           </AuthProvider>
         </ThemeProvider>
         <Toaster richColors position="top-center" />
         <EnvVarChecker />
+        <SuppressInstallPrompt />
         <Analytics />
       </body>
     </html>

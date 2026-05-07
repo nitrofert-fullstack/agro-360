@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Documentación API Externa — AgroSantander 360</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: #1a1a1a;
+      background: #fff;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 48px;
+    }
+
+    /* ── Portada ── */
+    .cover {
+      text-align: center;
+      padding: 60px 0 40px;
+      border-bottom: 3px solid #16a34a;
+      margin-bottom: 48px;
+    }
+    .cover .logo { font-size: 2.4em; font-weight: 800; color: #15803d; letter-spacing: -1px; }
+    .cover .logo span { color: #1a1a1a; }
+    .cover h1 { font-size: 1.7em; font-weight: 700; margin: 18px 0 8px; color: #111; }
+    .cover .subtitle { color: #555; font-size: 1.05em; }
+    .cover .meta { margin-top: 24px; display: flex; justify-content: center; gap: 32px; font-size: 0.9em; color: #666; }
+    .cover .meta strong { color: #111; }
+
+    /* ── Headings ── */
+    h2 {
+      font-size: 1.25em;
+      font-weight: 700;
+      color: #15803d;
+      margin: 40px 0 14px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #d1fae5;
+    }
+    h3 {
+      font-size: 1.05em;
+      font-weight: 700;
+      color: #111;
+      margin: 26px 0 10px;
+    }
+    h4 {
+      font-size: 0.95em;
+      font-weight: 700;
+      color: #166534;
+      margin: 18px 0 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    p { margin-bottom: 10px; }
+
+    /* ── Callouts ── */
+    .callout {
+      border-left: 4px solid #16a34a;
+      background: #f0fdf4;
+      padding: 12px 16px;
+      border-radius: 0 6px 6px 0;
+      margin: 14px 0;
+    }
+    .callout.warn { border-color: #f59e0b; background: #fffbeb; }
+    .callout.info { border-color: #3b82f6; background: #eff6ff; }
+    .callout strong { display: block; margin-bottom: 4px; }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; margin: 14px 0 22px; font-size: 0.9em; }
+    thead th {
+      background: #15803d;
+      color: #fff;
+      padding: 8px 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.88em;
+      letter-spacing: 0.02em;
+    }
+    tbody tr:nth-child(even) { background: #f9fafb; }
+    tbody tr:hover { background: #f0fdf4; }
+    td { padding: 7px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    td code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; font-size: 0.88em; }
+    td.req { color: #dc2626; font-weight: 700; text-align: center; }
+    td.opt { color: #6b7280; text-align: center; }
+    td.type { color: #7c3aed; font-family: monospace; font-size: 0.87em; }
+
+    /* ── Code blocks ── */
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 16px 20px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 0.85em;
+      line-height: 1.6;
+      margin: 12px 0 20px;
+    }
+    code { font-family: 'Consolas', 'Courier New', monospace; }
+    pre .c { color: #64748b; }
+    pre .k { color: #93c5fd; }
+    pre .s { color: #86efac; }
+    pre .n { color: #fca5a5; }
+    pre .p { color: #cbd5e1; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 0.78em;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+    .badge.get    { background: #dcfce7; color: #15803d; }
+    .badge.post   { background: #fef9c3; color: #854d0e; }
+    .badge.green  { background: #dcfce7; color: #15803d; }
+    .badge.yellow { background: #fef9c3; color: #92400e; }
+    .badge.blue   { background: #dbeafe; color: #1d4ed8; }
+    .badge.red    { background: #fee2e2; color: #b91c1c; }
+    .badge.gray   { background: #f3f4f6; color: #374151; }
+    .badge.purple { background: #ede9fe; color: #6d28d9; }
+
+    /* ── Endpoint box ── */
+    .endpoint {
+      background: #f8fafc;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .endpoint .method { font-size: 0.85em; font-weight: 800; }
+    .endpoint .url { font-family: monospace; font-size: 1em; color: #0f172a; }
+    .endpoint .desc { color: #64748b; font-size: 0.88em; margin-left: auto; }
+
+    /* ── TOC ── */
+    .toc { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px 24px; margin: 28px 0; }
+    .toc h3 { margin-top: 0; margin-bottom: 12px; color: #111; font-size: 0.95em; }
+    .toc ol { padding-left: 20px; }
+    .toc li { margin: 5px 0; font-size: 0.92em; color: #374151; }
+
+    /* ── Page break ── */
+    .page-break { page-break-before: always; margin-top: 0; padding-top: 32px; }
+
+    /* ── Print ── */
+    @media print {
+      body { padding: 24px 32px; font-size: 12px; }
+      pre { font-size: 0.78em; }
+      .cover { padding: 40px 0 30px; }
+    }
+
+    hr { border: none; border-top: 1px solid #e5e7eb; margin: 32px 0; }
+    ul, ol { padding-left: 22px; margin-bottom: 10px; }
+    li { margin-bottom: 4px; }
+    strong { font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════ PORTADA -->
+<div class="cover">
+  <div class="logo">Agro<span>Santander</span> 360</div>
+  <h1>Documentación API Externa de Consulta</h1>
+  <p class="subtitle">Consulta de agricultores, predios y estados de formularios de caracterización</p>
+  <div class="meta">
+    <div><strong>Versión</strong> 1.0</div>
+    <div><strong>Fecha</strong> Mayo 2026</div>
+    <div><strong>Clasificación</strong> Confidencial — uso restringido</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ TOC -->
+<div class="toc">
+  <h3>📋 Contenido</h3>
+  <ol>
+    <li>Introducción y propósito</li>
+    <li>Autenticación</li>
+    <li>URL base y entorno</li>
+    <li>Endpoints disponibles</li>
+    <li>Parámetros de consulta</li>
+    <li>Estructura completa de la respuesta</li>
+    <li>Campos del agricultor — descripción detallada</li>
+    <li>Campos del predio — descripción detallada</li>
+    <li>Estados del formulario — descripción y flujo</li>
+    <li>Paginación</li>
+    <li>Códigos de error</li>
+    <li>Ejemplos de uso</li>
+    <li>Notas y limitaciones</li>
+  </ol>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ 1 -->
+<h2>1. Introducción y propósito</h2>
+<p>
+  La <strong>API Externa de AgroSantander 360</strong> permite a sistemas de terceros autorizados
+  consultar de forma segura y estructurada el registro de agricultores caracterizados por
+  <strong>CONSULTORES Y OPERADORES AGROINDUSTRIALES S.A.S. (COA)</strong> en el departamento
+  de Santander, Colombia.
+</p>
+<p>
+  Esta API es de <strong>solo lectura</strong>. No permite crear, modificar ni eliminar registros.
+  Expone información de beneficiarios (agricultores), sus predios, el estado de avance del proceso
+  de caracterización y los datos de la visita técnica.
+</p>
+
+<div class="callout warn">
+  <strong>⚠️ Uso confidencial</strong>
+  La información expuesta por esta API contiene datos personales protegidos bajo la
+  Ley 1581 de 2012. El consumidor se compromete a tratarla conforme a la política
+  de tratamiento de datos personales de COA.
+</div>
+
+<!-- ══════════════════════════════════════════════════════ 2 -->
+<h2>2. Autenticación</h2>
+<p>
+  La API usa autenticación por <strong>API Key fija</strong>. Cada petición debe incluir
+  el header <code>X-API-Key</code> con la clave asignada.
+</p>
+
+<table>
+  <thead><tr><th>Header</th><th>Valor</th><th>Obligatorio</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>X-API-Key</code></td>
+      <td>Clave entregada por COA</td>
+      <td class="req">✓</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>Ejemplo de header</strong>
+  <code>X-API-Key: agro360_ext_yHJB9IKrQSJBuMsuXqrg0fYIAWTUJDKl</code>
+</div>
+
+<div class="callout warn">
+  <strong>Seguridad</strong>
+  La clave debe mantenerse confidencial. No incluirla en código fuente público ni repositorios.
+  Si se compromete, contactar a COA para rotarla.
+</div>
+
+Si la clave es incorrecta o está ausente, la API responde con <code>HTTP 401 Unauthorized</code>.
+
+<!-- ══════════════════════════════════════════════════════ 3 -->
+<h2>3. URL base y entorno</h2>
+
+<table>
+  <thead><tr><th>Entorno</th><th>URL base</th></tr></thead>
+  <tbody>
+    <tr><td>Producción</td><td><code>https://agro-360.com</code></td></tr>
+  </tbody>
+</table>
+
+<p>Todas las peticiones deben realizarse sobre <strong>HTTPS</strong>. Peticiones HTTP serán rechazadas.</p>
+
+<!-- ══════════════════════════════════════════════════════ 4 -->
+<h2>4. Endpoints disponibles</h2>
+
+<div class="endpoint">
+  <span class="badge get">GET</span>
+  <span class="url">/api/external/agricultores</span>
+  <span class="desc">Lista paginada de agricultores con predio y estado</span>
+</div>
+
+<p>Es el único endpoint disponible en esta versión. Retorna los registros de caracterización
+con toda la información del agricultor, predio y visita técnica asociada.</p>
+
+<!-- ══════════════════════════════════════════════════════ 5 -->
+<h2>5. Parámetros de consulta (Query Params)</h2>
+<p>Todos los parámetros son <strong>opcionales</strong>. Sin parámetros, retorna todos los registros paginados.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Parámetro</th>
+      <th>Tipo</th>
+      <th>Descripción</th>
+      <th>Ejemplo</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>estado</code></td>
+      <td class="type">string</td>
+      <td>Filtra por estado del formulario. Acepta uno o varios separados por coma.</td>
+      <td><code>APROBADO</code> o <code>REVISADO,APROBADO</code></td>
+    </tr>
+    <tr>
+      <td><code>fecha_desde</code></td>
+      <td class="type">string (fecha)</td>
+      <td>Retorna solo registros cuya visita técnica fue en o después de esta fecha.</td>
+      <td><code>2026-01-01</code></td>
+    </tr>
+    <tr>
+      <td><code>fecha_hasta</code></td>
+      <td class="type">string (fecha)</td>
+      <td>Retorna solo registros cuya visita técnica fue en o antes de esta fecha. Incluye todo el día (hasta las 23:59:59).</td>
+      <td><code>2026-05-31</code></td>
+    </tr>
+    <tr>
+      <td><code>municipio</code></td>
+      <td class="type">string</td>
+      <td>Filtra por municipio del predio. Búsqueda parcial, insensible a mayúsculas y tildes.</td>
+      <td><code>Bucaramanga</code></td>
+    </tr>
+    <tr>
+      <td><code>pagina</code></td>
+      <td class="type">integer</td>
+      <td>Número de página a retornar. Inicia en 1.</td>
+      <td><code>2</code></td>
+    </tr>
+    <tr>
+      <td><code>limite</code></td>
+      <td class="type">integer</td>
+      <td>Cantidad de registros por página. Mínimo 1, máximo 100. Default: 50.</td>
+      <td><code>25</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Combinación de filtros</h3>
+<p>Los filtros son acumulativos (AND). Ejemplo: registros aprobados, en Bucaramanga, visitados en el primer trimestre de 2026:</p>
+<pre><code>GET /api/external/agricultores
+    ?estado=APROBADO
+    &municipio=Bucaramanga
+    &fecha_desde=2026-01-01
+    &fecha_hasta=2026-03-31
+    &limite=100</code></pre>
+
+<!-- ══════════════════════════════════════════════════════ 6 -->
+<h2 class="page-break">6. Estructura completa de la respuesta</h2>
+<p>La respuesta es un objeto JSON con dos propiedades raíz: <code>data</code> (array de registros) y <code>paginacion</code>.</p>
+
+<pre><code>{
+  <span class="s">"data"</span>: [
+    {
+      <span class="s">"id"</span>:                   <span class="s">"3f8a1b2c-..."</span>,        <span class="c">// UUID del registro de caracterización</span>
+      <span class="s">"estado"</span>:               <span class="s">"REVISADO"</span>,            <span class="c">// Ver sección 9</span>
+      <span class="s">"observaciones"</span>:        <span class="s">"Predio con buen..."</span>,  <span class="c">// Notas del técnico (nullable)</span>
+      <span class="s">"fecha_registro"</span>:       <span class="s">"2026-03-15T10:30:00Z"</span>,
+      <span class="s">"ultima_actualizacion"</span>: <span class="s">"2026-04-02T08:15:00Z"</span>,
+
+      <span class="s">"agricultor"</span>: { <span class="c">/* Ver sección 7 */</span> },
+      <span class="s">"predio"</span>:      { <span class="c">/* Ver sección 8 */</span> },
+      <span class="s">"visita"</span>:      { <span class="c">/* Ver abajo */</span>      }
+    }
+  ],
+  <span class="s">"paginacion"</span>: {
+    <span class="s">"total"</span>:     <span class="n">248</span>,   <span class="c">// Total de registros que coinciden con los filtros</span>
+    <span class="s">"pagina"</span>:    <span class="n">1</span>,
+    <span class="s">"por_pagina"</span>:<span class="n">50</span>,
+    <span class="s">"paginas"</span>:   <span class="n">5</span>     <span class="c">// Total de páginas disponibles</span>
+  }
+}</code></pre>
+
+<h3>Objeto <code>visita</code></h3>
+<table>
+  <thead><tr><th>Campo</th><th>Tipo</th><th>Descripción</th></tr></thead>
+  <tbody>
+    <tr><td><code>fecha</code></td><td class="type">date</td><td>Fecha en que el técnico realizó la visita al predio. Formato <code>YYYY-MM-DD</code>.</td></tr>
+    <tr><td><code>tecnico</code></td><td class="type">string</td><td>Nombre completo del asesor/técnico que diligencia el formulario.</td></tr>
+    <tr><td><code>codigo_formulario</code></td><td class="type">string | null</td><td>Código interno asignado al formulario por el sistema.</td></tr>
+    <tr><td><code>radicado</code></td><td class="type">string | null</td><td>Número de radicado oficial o local del formulario. Se usa para trazabilidad en procesos de crédito.</td></tr>
+  </tbody>
+</table>
+
+<!-- ══════════════════════════════════════════════════════ 7 -->
+<h2>7. Campos del agricultor — descripción detallada</h2>
+
+<table>
+  <thead><tr><th>Campo</th><th>Tipo</th><th>Descripción</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>nombres</code></td>
+      <td class="type">string</td>
+      <td>Primer y segundo nombre del agricultor/productor.</td>
+    </tr>
+    <tr>
+      <td><code>apellidos</code></td>
+      <td class="type">string</td>
+      <td>Primer y segundo apellido.</td>
+    </tr>
+    <tr>
+      <td><code>tipo_documento</code></td>
+      <td class="type">string</td>
+      <td>
+        Tipo de documento de identidad. Valores posibles:
+        <code>CC</code> (Cédula de Ciudadanía),
+        <code>CE</code> (Cédula de Extranjería),
+        <code>NIT</code>,
+        <code>PA</code> (Pasaporte),
+        <code>TI</code> (Tarjeta de Identidad).
+      </td>
+    </tr>
+    <tr>
+      <td><code>numero_documento</code></td>
+      <td class="type">string</td>
+      <td>Número del documento de identidad. Siempre como cadena de texto para preservar ceros iniciales.</td>
+    </tr>
+    <tr>
+      <td><code>correo</code></td>
+      <td class="type">string | null</td>
+      <td>Correo electrónico del agricultor. Puede ser nulo si no lo proporcionó o si no tiene.</td>
+    </tr>
+    <tr>
+      <td><code>telefono</code></td>
+      <td class="type">string | null</td>
+      <td>Número de teléfono o celular. Formato libre, sin separadores.</td>
+    </tr>
+    <tr>
+      <td><code>genero</code></td>
+      <td class="type">string | null</td>
+      <td>Género declarado. Valores: <code>Masculino</code>, <code>Femenino</code>, <code>Otro</code>, <code>Prefiero no decir</code>.</td>
+    </tr>
+    <tr>
+      <td><code>edad</code></td>
+      <td class="type">integer | null</td>
+      <td>Edad en años al momento del registro. Puede calcularse automáticamente a partir de <code>fecha_nacimiento</code>.</td>
+    </tr>
+    <tr>
+      <td><code>fecha_nacimiento</code></td>
+      <td class="type">date | null</td>
+      <td>Fecha de nacimiento en formato <code>YYYY-MM-DD</code>.</td>
+    </tr>
+    <tr>
+      <td><code>ocupacion_principal</code></td>
+      <td class="type">string | null</td>
+      <td>Actividad u ocupación principal del agricultor. Ej: <em>Agricultor</em>, <em>Caficultor</em>, <em>Ganadero</em>.</td>
+    </tr>
+    <tr>
+      <td><code>asociacion</code></td>
+      <td class="type">string | null</td>
+      <td>Nombre de la asociación, cooperativa o federación a la que pertenece el agricultor, si aplica. Ej: <em>ASOCAFÉ Santander</em>.</td>
+    </tr>
+    <tr>
+      <td><code>personas_a_cargo</code></td>
+      <td class="type">integer | null</td>
+      <td>Número de personas que dependen económicamente del agricultor (núcleo familiar).</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ══════════════════════════════════════════════════════ 8 -->
+<h2 class="page-break">8. Campos del predio — descripción detallada</h2>
+<p>
+  El predio es la unidad productiva visitada. Cada agricultor puede tener múltiples predios,
+  pero el registro de caracterización siempre está asociado a uno específico.
+</p>
+
+<table>
+  <thead><tr><th>Campo</th><th>Tipo</th><th>Unidad</th><th>Descripción</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>nombre</code></td>
+      <td class="type">string | null</td>
+      <td>—</td>
+      <td>Nombre del predio o finca. Ej: <em>Finca La Esperanza</em>.</td>
+    </tr>
+    <tr>
+      <td><code>departamento</code></td>
+      <td class="type">string</td>
+      <td>—</td>
+      <td>Departamento donde se ubica el predio. Actualmente siempre <code>Santander</code>.</td>
+    </tr>
+    <tr>
+      <td><code>municipio</code></td>
+      <td class="type">string</td>
+      <td>—</td>
+      <td>Municipio de Santander al que pertenece el predio. Ver lista de municipios en el Anexo.</td>
+    </tr>
+    <tr>
+      <td><code>vereda</code></td>
+      <td class="type">string | null</td>
+      <td>—</td>
+      <td>Nombre de la vereda o corregimiento donde está ubicado el predio.</td>
+    </tr>
+    <tr>
+      <td><code>direccion</code></td>
+      <td class="type">string | null</td>
+      <td>—</td>
+      <td>Dirección o descripción de acceso al predio.</td>
+    </tr>
+    <tr>
+      <td><code>tipo_tenencia</code></td>
+      <td class="type">string | null</td>
+      <td>—</td>
+      <td>
+        Forma de tenencia del predio. Valores posibles:
+        <code>Propio</code>, <code>Arrendado</code>, <code>Comodato</code>,
+        <code>Sucesión</code>, <code>Otro</code>.
+        Indica si el agricultor es dueño, arrendatario u otro tipo de tenedor.
+      </td>
+    </tr>
+    <tr>
+      <td><code>area_total_ha</code></td>
+      <td class="type">decimal | null</td>
+      <td><strong>Hectáreas</strong></td>
+      <td>Área total del predio expresada en hectáreas. Incluye toda la extensión: productiva, bosque, vivienda, etc.</td>
+    </tr>
+    <tr>
+      <td><code>area_productiva_ha</code></td>
+      <td class="type">decimal | null</td>
+      <td><strong>Hectáreas</strong></td>
+      <td>
+        Área dedicada a actividades agropecuarias productivas dentro del predio.
+        Siempre es menor o igual a <code>area_total_ha</code>.
+      </td>
+    </tr>
+    <tr>
+      <td><code>altitud_msnm</code></td>
+      <td class="type">decimal | null</td>
+      <td><strong>msnm</strong></td>
+      <td>
+        Altitud del predio en metros sobre el nivel del mar (msnm). Dato relevante para
+        determinar pisos térmicos, cultivos viables y condiciones climáticas.
+        <br/>
+        Rangos orientativos en Santander:
+        <em>Cálido</em> (&lt;1.000 msnm), <em>Templado</em> (1.000–2.000),
+        <em>Frío</em> (2.000–3.000), <em>Páramo</em> (&gt;3.000).
+      </td>
+    </tr>
+    <tr>
+      <td><code>latitud</code></td>
+      <td class="type">decimal | null</td>
+      <td>Grados decimales</td>
+      <td>
+        Latitud geográfica del predio (WGS84). Rango en Santander: entre 5.5° N y 8.2° N.
+        Puede ser el centroide del polígono o el punto marcado por el técnico.
+      </td>
+    </tr>
+    <tr>
+      <td><code>longitud</code></td>
+      <td class="type">decimal | null</td>
+      <td>Grados decimales</td>
+      <td>
+        Longitud geográfica del predio (WGS84). Rango en Santander: entre -74.5° W y -72.4° W.
+        Valor negativo (oeste del meridiano de Greenwich).
+      </td>
+    </tr>
+    <tr>
+      <td><code>cultivos_existentes</code></td>
+      <td class="type">string | null</td>
+      <td>—</td>
+      <td>
+        Descripción libre de los cultivos presentes en el predio al momento de la visita.
+        Puede incluir varios separados por coma. Ej: <em>Cacao, Plátano, Café</em>.
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ══════════════════════════════════════════════════════ 9 -->
+<h2>9. Estados del formulario — descripción y flujo</h2>
+<p>
+  El campo <code>estado</code> refleja en qué etapa del proceso de evaluación se encuentra
+  el formulario de caracterización de un agricultor. El flujo es progresivo y solo
+  ciertos roles pueden mover un registro entre estados.
+</p>
+
+<h3>Diagrama de flujo de estados</h3>
+<pre><code>  INICIADO ──► REVISADO ──► EN_ESTUDIO_CREDITO ──► APROBADO
+                   │                                    │
+                   └──────────────────────────────► CANCELADO</code></pre>
+
+<h3>Descripción de cada estado</h3>
+
+<table>
+  <thead><tr><th>Estado</th><th>Etiqueta UI</th><th>Quién lo asigna</th><th>Descripción detallada</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>INICIADO</code></td>
+      <td><span class="badge gray">Iniciado</span></td>
+      <td>Sistema (automático)</td>
+      <td>
+        Estado inicial asignado automáticamente cuando el formulario de caracterización
+        es sincronizado por primera vez con el servidor. Indica que el registro existe
+        pero aún no ha sido revisado por ningún analista o administrador.
+        Todos los formularios nuevos comienzan aquí.
+      </td>
+    </tr>
+    <tr>
+      <td><code>REVISADO</code></td>
+      <td><span class="badge blue">Revisado</span></td>
+      <td>Asesor / Administrador</td>
+      <td>
+        El asesor de campo o un administrador ha verificado la información del formulario
+        y la considera completa y válida. Es el primer estado que requiere acción humana.
+        No implica aprobación de crédito, solo validación del formulario.
+      </td>
+    </tr>
+    <tr>
+      <td><code>EN_ESTUDIO_CREDITO</code></td>
+      <td><span class="badge yellow">En estudio</span></td>
+      <td>Analista / Administrador</td>
+      <td>
+        El caso ha sido enviado al área financiera/analistas para evaluar la viabilidad
+        crediticia o de acompañamiento. En este estado se está analizando la información
+        financiera del agricultor, el tamaño del predio y el sistema productivo.
+      </td>
+    </tr>
+    <tr>
+      <td><code>APROBADO</code></td>
+      <td><span class="badge green">Viable</span></td>
+      <td>Analista / Administrador</td>
+      <td>
+        El agricultor ha sido evaluado positivamente. Su perfil y predio son considerados
+        <strong>viables</strong> para acceder a programas de acompañamiento técnico,
+        financiero o crediticio de COA. Este es el estado final positivo del proceso.
+      </td>
+    </tr>
+    <tr>
+      <td><code>CANCELADO</code></td>
+      <td><span class="badge red">No Viable</span></td>
+      <td>Analista / Administrador</td>
+      <td>
+        El proceso fue cancelado o el agricultor fue evaluado como <strong>no viable</strong>
+        para los programas actuales de COA. Puede deberse a información incompleta,
+        predio fuera del área de cobertura, o perfil no apto para los productos disponibles.
+        El agricultor puede presentar un nuevo formulario en el futuro.
+      </td>
+    </tr>
+    <tr>
+      <td><code>SINCRONIZADO</code></td>
+      <td><span class="badge gray">Sincronizado</span></td>
+      <td>Sistema (legado)</td>
+      <td>
+        Estado de compatibilidad con versiones anteriores del sistema. Equivale funcionalmente
+        a <code>INICIADO</code>. Registros antiguos pueden aparecer con este valor.
+      </td>
+    </tr>
+    <tr>
+      <td><code>EN_REVISION</code></td>
+      <td><span class="badge blue">En revisión</span></td>
+      <td>Sistema (legado)</td>
+      <td>
+        Estado de compatibilidad. Equivale a <code>REVISADO</code> en versiones anteriores.
+      </td>
+    </tr>
+    <tr>
+      <td><code>RECHAZADO</code></td>
+      <td><span class="badge red">Rechazado</span></td>
+      <td>Sistema (legado)</td>
+      <td>
+        Estado de compatibilidad. Equivale a <code>CANCELADO</code> en versiones anteriores.
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout info">
+  <strong>💡 Recomendación para consumidores</strong>
+  Para consultar solo registros activos y vigentes, filtrar por los estados modernos:
+  <code>INICIADO,REVISADO,EN_ESTUDIO_CREDITO,APROBADO,CANCELADO</code>.
+  Los estados legado (<code>SINCRONIZADO</code>, <code>EN_REVISION</code>, <code>RECHAZADO</code>)
+  corresponden a registros históricos.
+</div>
+
+<h3>Permisos por rol — quién puede cambiar qué</h3>
+<table>
+  <thead><tr><th>Rol</th><th>Puede asignar</th></tr></thead>
+  <tbody>
+    <tr><td>Administrador</td><td><code>REVISADO</code>, <code>EN_ESTUDIO_CREDITO</code>, <code>APROBADO</code>, <code>CANCELADO</code></td></tr>
+    <tr><td>Asesor</td><td><code>REVISADO</code></td></tr>
+    <tr><td>Analista</td><td><code>EN_ESTUDIO_CREDITO</code>, <code>APROBADO</code>, <code>CANCELADO</code></td></tr>
+    <tr><td>Sistema</td><td><code>INICIADO</code> (automático al sincronizar)</td></tr>
+  </tbody>
+</table>
+
+<!-- ══════════════════════════════════════════════════════ 10 -->
+<h2 class="page-break">10. Paginación</h2>
+<p>
+  Todos los resultados están paginados. El objeto <code>paginacion</code> en la respuesta
+  contiene la información necesaria para navegar entre páginas.
+</p>
+
+<pre><code><span class="s">"paginacion"</span>: {
+  <span class="s">"total"</span>:      <span class="n">248</span>,   <span class="c">// Total de registros que coinciden con los filtros aplicados</span>
+  <span class="s">"pagina"</span>:     <span class="n">1</span>,     <span class="c">// Página actual</span>
+  <span class="s">"por_pagina"</span>: <span class="n">50</span>,    <span class="c">// Registros en esta respuesta</span>
+  <span class="s">"paginas"</span>:    <span class="n">5</span>      <span class="c">// Total de páginas (ceil(248/50))</span>
+}</code></pre>
+
+<p>Para obtener todos los registros, iterar desde <code>pagina=1</code> hasta <code>paginas</code>:</p>
+
+<pre><code><span class="c"># Página 1</span>
+GET /api/external/agricultores?limite=100&pagina=1
+
+<span class="c"># Página 2</span>
+GET /api/external/agricultores?limite=100&pagina=2
+
+<span class="c"># ... hasta pagina = paginacion.paginas</span></code></pre>
+
+<!-- ══════════════════════════════════════════════════════ 11 -->
+<h2>11. Códigos de error</h2>
+
+<table>
+  <thead><tr><th>HTTP</th><th>Error</th><th>Causa</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="badge red">401</span></td>
+      <td><code>No autorizado</code></td>
+      <td>El header <code>X-API-Key</code> está ausente o la clave es incorrecta.</td>
+    </tr>
+    <tr>
+      <td><span class="badge yellow">400</span></td>
+      <td><code>Parámetro inválido</code></td>
+      <td>Una fecha tiene formato incorrecto o se pasó un estado no reconocido.</td>
+    </tr>
+    <tr>
+      <td><span class="badge yellow">405</span></td>
+      <td><code>Método no permitido</code></td>
+      <td>Se usó POST, PUT, DELETE u otro método distinto de GET.</td>
+    </tr>
+    <tr>
+      <td><span class="badge red">500</span></td>
+      <td><code>Error interno</code></td>
+      <td>Error inesperado en el servidor. Contactar a COA si persiste.</td>
+    </tr>
+    <tr>
+      <td><span class="badge gray">503</span></td>
+      <td><code>API no configurada</code></td>
+      <td>La API key no está configurada en el servidor. Contactar a COA.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Formato de error</h3>
+<pre><code>{
+  <span class="s">"error"</span>: <span class="s">"Descripción legible del error"</span>
+}</code></pre>
+
+<!-- ══════════════════════════════════════════════════════ 12 -->
+<h2>12. Ejemplos de uso</h2>
+
+<h3>cURL</h3>
+<pre><code><span class="c"># Todos los agricultores aprobados</span>
+curl -X GET \
+  "https://agro-360.com/api/external/agricultores?estado=APROBADO&limite=50" \
+  -H "X-API-Key: agro360_ext_yHJB9IKrQSJBuMsuXqrg0fYIAWTUJDKl"
+
+<span class="c"># Registros de enero a mayo 2026 en Bucaramanga</span>
+curl -X GET \
+  "https://agro-360.com/api/external/agricultores\
+?fecha_desde=2026-01-01&fecha_hasta=2026-05-31&municipio=Bucaramanga" \
+  -H "X-API-Key: agro360_ext_yHJB9IKrQSJBuMsuXqrg0fYIAWTUJDKl"</code></pre>
+
+<h3>JavaScript / Node.js (fetch)</h3>
+<pre><code>const API_KEY = <span class="s">'agro360_ext_yHJB9IKrQSJBuMsuXqrg0fYIAWTUJDKl'</span>
+const BASE    = <span class="s">'https://agro-360.com/api/external/agricultores'</span>
+
+async function obtenerAgricultores(params = {}) {
+  const qs = new URLSearchParams(params).toString()
+  const res = await fetch(`${BASE}?${qs}`, {
+    headers: { <span class="s">'X-API-Key'</span>: API_KEY }
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+<span class="c">// Todos los aprobados</span>
+const { data, paginacion } = await obtenerAgricultores({
+  estado: <span class="s">'APROBADO'</span>,
+  limite: 100,
+  pagina: 1
+})
+console.log(`Total: ${paginacion.total}`)
+data.forEach(r => console.log(r.agricultor.nombres, r.predio.municipio))</code></pre>
+
+<h3>Python (requests)</h3>
+<pre><code>import requests
+
+API_KEY = <span class="s">"agro360_ext_yHJB9IKrQSJBuMsuXqrg0fYIAWTUJDKl"</span>
+BASE    = <span class="s">"https://agro-360.com/api/external/agricultores"</span>
+
+headers = {<span class="s">"X-API-Key"</span>: API_KEY}
+
+<span class="c"># Obtener todos los registros paginando</span>
+pagina, todos = 1, []
+while True:
+    r = requests.get(BASE, headers=headers, params={
+        <span class="s">"estado"</span>: <span class="s">"APROBADO,REVISADO"</span>,
+        <span class="s">"limite"</span>: 100,
+        <span class="s">"pagina"</span>: pagina
+    })
+    r.raise_for_status()
+    body = r.json()
+    todos.extend(body[<span class="s">"data"</span>])
+    if pagina >= body[<span class="s">"paginacion"</span>][<span class="s">"paginas"</span>]:
+        break
+    pagina += 1
+
+print(f"Total descargados: {len(todos)}")</code></pre>
+
+<!-- ══════════════════════════════════════════════════════ 13 -->
+<h2 class="page-break">13. Notas y limitaciones</h2>
+
+<ul>
+  <li><strong>Solo lectura:</strong> No existe ningún endpoint de escritura. La API no permite crear, modificar ni eliminar registros.</li>
+  <li><strong>Un consumidor:</strong> La API key es única y personal. No debe compartirse ni usarse en sistemas públicos.</li>
+  <li><strong>Sin rate limiting activo:</strong> En esta versión no hay límite de peticiones por minuto, pero se recomienda no superar 60 peticiones/minuto para no sobrecargar el servidor.</li>
+  <li><strong>Fotos y firmas:</strong> Las URLs de fotografías del predio, del agricultor y la firma del productor <em>no</em> se exponen por esta API por razones de privacidad y tamaño.</li>
+  <li><strong>Información financiera:</strong> Los datos de ingresos, egresos y activos del agricultor no se exponen por esta API.</li>
+  <li><strong>Zona horaria:</strong> Todas las fechas con hora (<code>fecha_registro</code>, <code>ultima_actualizacion</code>) están en UTC (Z). Las fechas sin hora (<code>visita.fecha</code>, <code>fecha_nacimiento</code>) son solo fecha local.</li>
+  <li><strong>Campos null:</strong> Los campos opcionales que no tienen valor retornan <code>null</code> (no se omiten del objeto).</li>
+  <li><strong>Rotación de clave:</strong> En caso de comprometerse la API key, contactar a COA para obtener una nueva. La clave anterior quedará inválida de inmediato.</li>
+</ul>
+
+<hr/>
+
+<h2>Anexo — Municipios disponibles</h2>
+<p>Municipios de Santander registrados en el sistema (para usar con el filtro <code>municipio</code>):</p>
+
+<p style="font-size:0.88em;line-height:2;color:#374151">
+Aguada · Albania · Aratoca · Barbosa · Barichara · Barrancabermeja · Betulia · Bolívar ·
+Bucaramanga · Cabrera · California · Capitanejo · Carcasí · Cepitá · Cerrito · Charalá ·
+Charta · Chima · Chipatá · Cimitarra · Concepción · Confines · Contratación · Coromoro ·
+Curití · El Carmen de Chucurí · El Guacamayo · El Peñón · El Playón · Encino · Enciso ·
+Floridablanca · Galán · Gambita · Girón · Guaca · Guadalupe · Guapotá · Guavatá · Güepsa ·
+Hato · Jesús María · Jordán · La Belleza · La Paz · Landázuri · Lebrija · Los Santos ·
+Macaravita · Málaga · Matanza · Mogotes · Molagavita · Ocamonte · Oiba · Onzaga ·
+Palmar · Palmas del Socorro · Páramo · Piedecuesta · Pinchote · Puente Nacional ·
+Puerto Parra · Puerto Wilches · Rionegro · Sabana de Torres · San Andrés · San Benito ·
+San Gil · San Joaquín · San José de Miranda · San Miguel · San Vicente de Chucurí ·
+Santa Bárbara · Santa Helena del Opón · Simacota · Socorro · Suaita · Sucre ·
+Suratá · Tona · Valle de San José · Vélez · Vetas · Villanueva · Zapatoca
+</p>
+
+<hr/>
+<p style="font-size:0.82em;color:#9ca3af;text-align:center;margin-top:32px">
+  CONSULTORES Y OPERADORES AGROINDUSTRIALES S.A.S. — AgroSantander 360 v1.0 · Mayo 2026<br/>
+  Documento confidencial — uso restringido al destinatario autorizado
+</p>
+
+</body>
+</html>
