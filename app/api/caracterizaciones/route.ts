@@ -200,6 +200,23 @@ export async function POST(request: Request) {
 
     await ensureStorageBuckets(adminClient).catch(e => console.warn('[API] ensureStorageBuckets:', e))
 
+    // === Validar correo duplicado con distinto documento ===
+    const correoEnviado = c.beneficiario?.email
+    if (correoEnviado) {
+      const { data: benefExistente } = await adminClient
+        .from('beneficiarios')
+        .select('numero_documento')
+        .eq('correo', correoEnviado)
+        .maybeSingle()
+
+      if (benefExistente && benefExistente.numero_documento !== docNum) {
+        return NextResponse.json(
+          { error: 'El correo electrónico ingresado ya está registrado con otro número de documento.' },
+          { status: 409 }
+        )
+      }
+    }
+
     const radicadoOficial = generateRadicadoOficial()
 
     // === 1. BENEFICIARIO — upsert atómico ===
