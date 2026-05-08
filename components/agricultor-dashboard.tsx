@@ -165,7 +165,7 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
         </motion.div>
 
         {/* KPIs */}
-        <motion.div variants={staggerItem} className="grid grid-cols-3 gap-3">
+        <motion.div variants={staggerItem} className="grid grid-cols-3 gap-2 sm:gap-3">
           {[
             { label: 'Viables',     value: viables,   icon: CheckCircle2, color: 'text-green-500',  border: 'border-l-green-500',  bg: 'bg-green-500/5' },
             { label: 'En Revisión', value: revision,  icon: Eye,          color: 'text-blue-500',   border: 'border-l-blue-500',   bg: 'bg-blue-500/5' },
