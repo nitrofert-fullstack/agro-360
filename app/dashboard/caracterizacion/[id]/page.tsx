@@ -3,13 +3,11 @@
 import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
-import Image from "next/image"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/hooks/use-auth"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
@@ -39,6 +37,7 @@ import {
 } from "lucide-react"
 import { generateCaracterizacionPDF, pdfFromServerData } from "@/lib/generate-pdf"
 import { staggerContainer, staggerItem, fadeUp } from "@/lib/animations"
+import { AppLayout } from "@/components/app-layout"
 
 const MapViewer = dynamic(
   () => import("@/components/map-viewer").then((mod) => mod.MapViewer),
@@ -534,40 +533,35 @@ function ServerDetailView({
   const canManageStatus = profile?.rol === "admin" || profile?.rol === "asesor" || profile?.rol === "analista"
 
   return (
-    <div className="min-h-screen bg-background pb-12">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-2 md:px-6 md:py-3">
-          {/* Izquierda: volver + título */}
-          <div className="flex min-w-0 items-center gap-1.5">
-            <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0 md:h-8 md:w-8" aria-label="Volver al dashboard" onClick={() => router.push("/dashboard")}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="min-w-0">
-              <h1 className="text-sm font-bold leading-tight">Detalle Caracterización</h1>
-              <p className="truncate text-xs font-mono text-muted-foreground">
-                {visita?.radicado_oficial || visita?.radicado_local}
-              </p>
-            </div>
-          </div>
-          {/* Derecha: acciones */}
-          <div className="flex shrink-0 items-center gap-1">
-            <Badge variant="outline" className={`${est.color} gap-1`}>
-              <EstIcon className="h-3 w-3" />
-              <span className="hidden sm:inline">{est.label}</span>
-            </Badge>
-            {((profile?.rol === "agricultor" && !["CANCELADO", "RECHAZADO"].includes(caracterizacion?.estado)) || ["admin", "asesor"].includes(profile?.rol)) && (
-              <Button variant="outline" size="icon" className="h-10 w-10 md:h-8 md:w-8" aria-label="Editar caracterización" onClick={() => router.push(`/formulario/editar/${visita?.id}`)}>
-                <PenTool className="h-4 w-4" />
-              </Button>
-            )}
-            <Button variant="outline" size="icon" className="h-10 w-10 md:h-8 md:w-8" aria-label="Descargar PDF" onClick={() => generateCaracterizacionPDF(pdfFromServerData(data))}>
-              <Download className="h-4 w-4" />
-            </Button>
-            <ThemeToggle />
+    <AppLayout>
+      {/* Barra de acciones de la página */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Volver al dashboard" onClick={() => router.push("/dashboard")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0">
+            <h1 className="font-display text-lg font-bold leading-tight">Detalle Caracterización</h1>
+            <p className="truncate text-xs font-mono text-muted-foreground">
+              {visita?.radicado_oficial || visita?.radicado_local}
+            </p>
           </div>
         </div>
-      </header>
+        <div className="flex shrink-0 items-center gap-1">
+          <Badge variant="outline" className={`${est.color} gap-1`}>
+            <EstIcon className="h-3 w-3" />
+            <span className="hidden sm:inline">{est.label}</span>
+          </Badge>
+          {((profile?.rol === "agricultor" && !["CANCELADO", "RECHAZADO"].includes(caracterizacion?.estado)) || ["admin", "asesor"].includes(profile?.rol)) && (
+            <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Editar caracterización" onClick={() => router.push(`/formulario/editar/${visita?.id}`)}>
+              <PenTool className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Descargar PDF" onClick={() => generateCaracterizacionPDF(pdfFromServerData(data))}>
+            <Download className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
       <motion.main
         variants={fadeUp}
@@ -898,6 +892,6 @@ function ServerDetailView({
       </motion.main>
 
       {photoModal && <PhotoModal url={photoModal} label="imagen" onClose={() => setPhotoModal(null)} />}
-    </div>
+    </AppLayout>
   )
 }
