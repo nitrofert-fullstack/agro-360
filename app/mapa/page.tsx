@@ -5,9 +5,9 @@ import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { Home, Loader2 } from "lucide-react"
-import { ThemeToggle } from "@/components/theme-toggle"
+import { Loader2 } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
+import { AppLayout } from "@/components/app-layout"
 import type { MapMarker } from "@/components/map-viewer"
 import { fadeUp } from "@/lib/animations"
 
@@ -120,40 +120,27 @@ export default function MapaPage() {
 
   if (!isAuthenticated || !mounted) {
     return (
-      <main className="relative h-screen w-screen overflow-hidden bg-background">
-        <div className="flex h-full w-full items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            <span className="text-sm text-muted-foreground">Cargando mapa...</span>
-          </div>
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <span className="text-sm text-muted-foreground">Cargando mapa...</span>
         </div>
-      </main>
+      </div>
     )
   }
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-background">
-      <MapViewer markers={markers} />
+    <AppLayout>
+      <div className="relative flex-1 min-h-0 overflow-hidden rounded-xl border border-border">
+        <MapViewer markers={markers} />
 
-      {/* Marker count badge */}
-      {markers.length > 0 && (
-        <motion.div variants={fadeUp} initial="hidden" animate="visible" className="absolute left-3 top-3 z-[1002] rounded-lg border border-border bg-card/95 px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur-md">
-          {markers.length} predio{markers.length !== 1 ? 's' : ''} registrado{markers.length !== 1 ? 's' : ''}
-        </motion.div>
-      )}
-
-      {/* Navigation controls */}
-      <motion.div variants={fadeUp} initial="hidden" animate="visible" className="absolute bottom-3 left-3 z-[1002] flex items-center gap-2 md:bottom-4">
-        <Link
-          href="/dashboard"
-          className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2.5 text-muted-foreground shadow-lg backdrop-blur-md transition-colors hover:bg-secondary hover:text-foreground md:h-9 md:gap-2 md:px-3"
-          aria-label="Volver al Dashboard"
-        >
-          <Home className="h-4 w-4" />
-          <span className="hidden text-xs font-medium sm:inline md:text-sm">Dashboard</span>
-        </Link>
-        <ThemeToggle />
-      </motion.div>
-    </main>
+        {/* Marker count badge */}
+        {markers.length > 0 && (
+          <motion.div variants={fadeUp} initial="hidden" animate="visible" className="absolute left-3 top-3 z-[1002] rounded-lg border border-border bg-card/95 px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur-md">
+            {markers.length} predio{markers.length !== 1 ? 's' : ''} registrado{markers.length !== 1 ? 's' : ''}
+          </motion.div>
+        )}
+      </div>
+    </AppLayout>
   )
 }
