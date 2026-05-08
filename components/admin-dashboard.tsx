@@ -1607,66 +1607,53 @@ export function AdminDashboard() {
                         u.rol === 'agricultor' || u.rol === 'campesino' ? 'border-l-green-500 bg-gradient-to-r from-green-500/8 to-transparent' :
                         'border-l-blue-500 bg-gradient-to-r from-blue-500/8 to-transparent'
                       }`} style={{boxShadow:'var(--shadow-sm)'}}>
-                        <CardContent className="flex flex-col gap-2 p-3 sm:p-4 sm:flex-row sm:items-center sm:gap-3">
-                          {/* Avatar + info */}
-                          <div className="flex min-w-0 flex-1 items-start gap-3">
-                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${u.activo ? 'bg-primary/10' : 'bg-red-500/10'}`}>
-                              {u.activo ? (
-                                <User className="h-5 w-5 text-primary" />
-                              ) : (
-                                <UserX className="h-5 w-5 text-red-500" />
-                              )}
+                        <CardContent className="p-3 sm:p-4">
+                          <div className="flex items-start gap-3">
+                            {/* Avatar */}
+                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${u.activo ? 'bg-primary/10' : 'bg-red-500/10'}`}>
+                              {u.activo ? <User className="h-4 w-4 text-primary" /> : <UserX className="h-4 w-4 text-red-500" />}
                             </div>
+
+                            {/* Info — nombre, badges, contacto */}
                             <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="truncate font-medium">{u.nombre_completo || 'Sin nombre'}</h3>
-                                <Badge variant="outline" className={
+                              {/* Nombre — línea propia con truncate real */}
+                              <p className="truncate font-medium text-sm leading-tight">{u.nombre_completo || 'Sin nombre'}</p>
+
+                              {/* Badges en línea separada */}
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                <Badge variant="outline" className={`text-xs ${
                                   u.rol === 'admin' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
-                                    u.rol === 'analista' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
-                                      u.rol === 'agricultor' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
-                                        'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                                }>
-                                  {u.rol === 'admin' ? <><Shield className="mr-1 h-3 w-3" />Admin</> :
-                                    u.rol === 'analista' ? <><Eye className="mr-1 h-3 w-3" />Analista</> :
-                                      u.rol === 'agricultor' ? <><Sprout className="mr-1 h-3 w-3" />Agricultor</> :
-                                        <><User className="mr-1 h-3 w-3" />Asesor</>}
+                                  u.rol === 'analista' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
+                                  u.rol === 'agricultor' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+                                  'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                                }`}>
+                                  {u.rol === 'admin' ? 'Admin' : u.rol === 'analista' ? 'Analista' : u.rol === 'agricultor' ? 'Agricultor' : 'Asesor'}
                                 </Badge>
                                 {invitation && (
-                                  <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-600 border-green-500/20">
-                                    <CheckCircle className="h-3 w-3" />
-                                    {invitation.usado ? 'Accedió' : 'Cred. enviadas'}
+                                  <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/20">
+                                    {invitation.usado ? 'Accedió' : 'Invitado'}
                                   </Badge>
                                 )}
                                 {!u.activo && (
-                                  <Badge variant="destructive" className="gap-1">
-                                    <XCircle className="h-3 w-3" />
-                                    Inhabilitado
-                                  </Badge>
+                                  <Badge variant="destructive" className="text-xs">Inhabilitado</Badge>
                                 )}
                               </div>
-                              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                                <span className="flex items-center gap-1 truncate">
+
+                              {/* Contacto */}
+                              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1 min-w-0">
                                   <Mail className="h-3 w-3 shrink-0" />
-                                  <span className="truncate">{u.email}</span>
+                                  <span className="truncate max-w-[180px]">{u.email}</span>
                                 </span>
-                                {u.telefono && (
-                                  <span className="flex items-center gap-1">
-                                    <Phone className="h-3 w-3" />
-                                    {u.telefono}
-                                  </span>
-                                )}
-                                {u.created_at && (
-                                  <span className="flex items-center gap-1">
-                                    <Calendar className="h-3 w-3" />
-                                    {new Date(u.created_at).toLocaleDateString()}
-                                  </span>
-                                )}
+                                {u.telefono && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{u.telefono}</span>}
+                                {u.created_at && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(u.created_at).toLocaleDateString('es-CO', {day:'2-digit',month:'short',year:'2-digit'})}</span>}
                               </div>
                             </div>
                           </div>
 
                           {/* Acciones */}
-                          <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">
+                          {/* Acciones — siempre debajo del info */}
+                          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pl-12">
                             {/* Selector de rol — solo admin, no sobre sí mismo */}
                             {isAdmin && u.id !== currentUser?.id && (
                               <div className="flex items-center gap-1">
