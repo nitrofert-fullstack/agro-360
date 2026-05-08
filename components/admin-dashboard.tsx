@@ -1224,7 +1224,7 @@ export function AdminDashboard() {
                   {/* Virtual scroll container */}
                   <div
                     ref={parentRef}
-                    style={{ height: 'calc(100vh - 310px)', overflowY: 'auto' }}
+                    style={{ height: 'calc(100svh - 340px)', overflowY: 'auto' }}
                     className="rounded-md"
                   >
                     <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
@@ -1503,6 +1503,7 @@ export function AdminDashboard() {
                   </CardContent>
                 </Card>
               ) : (
+                <div className="overflow-y-auto" style={{maxHeight: 'calc(100svh - 340px)'}}>
                 <div className="space-y-3">
                   {paginatedUsuarios.map((u) => {
                     const invitation = getInvitationForEmail(u.email)
@@ -1652,6 +1653,7 @@ export function AdminDashboard() {
                       </Button>
                     </div>
                   </div>
+                </div>
                 </div>
               )}
 
