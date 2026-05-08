@@ -8,10 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Mail, Phone, Shield } from "lucide-react"
-import Link from "next/link"
-import Image from "next/image"
-import { ThemeToggle } from "@/components/theme-toggle"
+import { Mail, Phone, Shield } from "lucide-react"
+import { AppLayout } from "@/components/app-layout"
 import { staggerContainer, staggerItem } from "@/lib/animations"
 
 export default function ProfilePage() {
@@ -47,24 +45,7 @@ export default function ProfilePage() {
     : user.email?.[0].toUpperCase() || "U"
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-          <Link href="/dashboard" className="flex items-center">
-            <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={48} height={48} className="rounded-xl" />
-          </Link>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" asChild className="gap-1.5">
-              <Link href="/dashboard">
-                <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Dashboard</span>
-              </Link>
-            </Button>
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-
+    <AppLayout>
       <motion.div
         variants={staggerContainer}
         initial="hidden"
@@ -158,6 +139,6 @@ export default function ProfilePage() {
           </motion.div>
         </div>
       </motion.div>
-    </div>
+    </AppLayout>
   )
 }
