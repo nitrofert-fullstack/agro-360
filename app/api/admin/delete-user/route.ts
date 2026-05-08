@@ -78,19 +78,22 @@ export async function POST(request: Request) {
           curr.carga < min.carga ? curr : min
         )
 
-        // ── 5. Reasignar visitas ────────────────────────────────────────────
+        // ── 5. Reasignar visitas y actualizar nombre_tecnico ──────────────
         await prisma.visitas.updateMany({
           where: { asesor_id: userId },
-          data: { asesor_id: asesorDestino.id },
+          data: {
+            asesor_id: asesorDestino.id,
+            nombre_tecnico: asesorDestino.nombre ?? undefined,
+          },
         })
 
         reasignadoA = asesorDestino.id
         reasignadoNombre = asesorDestino.nombre
       } else {
-        // No hay otros asesores — dejar sin asignar
+        // No hay otros asesores — dejar sin asignar y limpiar nombre
         await prisma.visitas.updateMany({
           where: { asesor_id: userId },
-          data: { asesor_id: null },
+          data: { asesor_id: null, nombre_tecnico: undefined },
         })
       }
     }

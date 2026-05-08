@@ -78,15 +78,18 @@ export async function POST(request: Request) {
 
           await prisma.visitas.updateMany({
             where: { asesor_id: userId },
-            data: { asesor_id: destino.id },
+            data: {
+              asesor_id: destino.id,
+              nombre_tecnico: destino.nombre ?? undefined,
+            },
           })
 
           reasignacion = { cantidad: visitasCount, asesorNombre: destino.nombre }
         } else {
-          // Sin otros asesores — dejar sin asignar
+          // Sin otros asesores — dejar sin asignar, limpiar nombre
           await prisma.visitas.updateMany({
             where: { asesor_id: userId },
-            data: { asesor_id: null },
+            data: { asesor_id: null, nombre_tecnico: undefined },
           })
           reasignacion = { cantidad: visitasCount, asesorNombre: null }
         }
