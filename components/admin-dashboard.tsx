@@ -1752,15 +1752,30 @@ export function AdminDashboard() {
             const viablePct = total > 0 ? Math.round((viables / total) * 100) : 0
 
             return (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-primary" />
-                    Estadísticas del Sistema
-                  </h2>
-                  <p className="text-sm text-muted-foreground">Análisis de caracterizaciones y productores registrados</p>
-                </div>
+              <div className="space-y-6 pb-6">
 
+                {/* Header */}
+                <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5">
+                  <div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
+                  <div className="relative flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="text-xl font-semibold flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-primary" />
+                        Estadísticas del Sistema
+                      </h2>
+                      <p className="text-sm text-muted-foreground mt-0.5">Análisis de caracterizaciones y productores registrados</p>
+                    </div>
+                    {dashStats && (
+                      <div className="flex items-center gap-2 rounded-lg bg-background/60 px-4 py-2 backdrop-blur-sm border border-border/40">
+                        <span className="text-3xl font-bold text-foreground">{dashStats.totalRegistros}</span>
+                        <div>
+                          <p className="text-xs font-medium text-foreground leading-tight">Total</p>
+                          <p className="text-xs text-muted-foreground">registros</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 {isLoadingStats ? (
                   <div className="flex items-center justify-center py-20">
@@ -1778,259 +1793,211 @@ export function AdminDashboard() {
                   </Card>
                 ) : (
                   <>
-                    {/* KPI Cards */}
+                    {/* KPI Cards — con borde izquierdo coloreado */}
+                    <motion.div
+                      variants={staggerContainer}
+                      initial="hidden"
+                      animate="visible"
+                      className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+                    >
+                      {[
+                        { label: 'Viables', value: viables, sub: `${viablePct}% del total`, icon: CheckCircle, color: 'text-green-500', border: 'border-l-green-500', bg: 'bg-green-500/5' },
+                        { label: 'En Revisión', value: dashStats.porEstado['REVISADO'] || 0, sub: 'En proceso', icon: Eye, color: 'text-blue-500', border: 'border-l-blue-500', bg: 'bg-blue-500/5' },
+                        { label: 'En Estudio', value: dashStats.porEstado['EN_ESTUDIO_CREDITO'] || 0, sub: 'Crédito', icon: TrendingUp, color: 'text-purple-500', border: 'border-l-purple-500', bg: 'bg-purple-500/5' },
+                        { label: 'No Viables', value: (dashStats.porEstado['CANCELADO'] || 0) + (dashStats.porEstado['RECHAZADO'] || 0), sub: 'Cancelados', icon: XCircle, color: 'text-red-500', border: 'border-l-red-500', bg: 'bg-red-500/5' },
+                      ].map(({ label, value, sub, icon: Icon, color, border, bg }) => (
+                        <motion.div key={label} variants={staggerItem}>
+                          <Card className={`border-l-4 ${border} ${bg} transition-all duration-200 hover:-translate-y-0.5`} style={{boxShadow: 'var(--shadow-sm)'}}>
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                                <Icon className={`h-4 w-4 ${color}`} />
+                              </div>
+                              <p className={`text-3xl font-bold ${color}`}>{value}</p>
+                              <p className={`text-xs mt-1 ${color} opacity-70`}>{sub}</p>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+
+                    {/* Promedios — fila de métricas secundarias */}
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      <Card>
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-2 mb-1">
-                            <FileText className="h-4 w-4 text-primary" />
-                            <span className="text-xs text-muted-foreground">Total Registros</span>
-                          </div>
-                          <p className="text-3xl font-bold">{dashStats.totalRegistros}</p>
-                        </CardContent>
-                      </Card>
-                      <Card className="border-green-500/20 bg-green-500/5">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-2 mb-1">
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                            <span className="text-xs text-muted-foreground">Viables</span>
-                          </div>
-                          <p className="text-3xl font-bold text-green-500">{viables}</p>
-                          <p className="text-xs text-green-500/70 mt-0.5">{viablePct}% del total</p>
-                        </CardContent>
-                      </Card>
-                      <Card className="border-purple-500/20 bg-purple-500/5">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Eye className="h-4 w-4 text-purple-500" />
-                            <span className="text-xs text-muted-foreground">En Estudio</span>
-                          </div>
-                          <p className="text-3xl font-bold text-purple-500">
-                            {dashStats.porEstado['EN_ESTUDIO_CREDITO'] || 0}
-                          </p>
-                        </CardContent>
-                      </Card>
-                      <Card className="border-red-500/20 bg-red-500/5">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-2 mb-1">
-                            <XCircle className="h-4 w-4 text-red-500" />
-                            <span className="text-xs text-muted-foreground">No Viables</span>
-                          </div>
-                          <p className="text-3xl font-bold text-red-500">
-                            {(dashStats.porEstado['CANCELADO'] || 0) + (dashStats.porEstado['RECHAZADO'] || 0)}
-                          </p>
-                        </CardContent>
-                      </Card>
+                      {[
+                        dashStats.promedios.edad != null && { label: 'Edad promedio', value: dashStats.promedios.edad, unit: 'años' },
+                        dashStats.promedios.personasACargo != null && { label: 'Personas a cargo', value: dashStats.promedios.personasACargo, unit: 'prom.' },
+                        dashStats.promedios.hectareas != null && { label: 'Hectáreas prom.', value: dashStats.promedios.hectareas, unit: 'ha' },
+                        { label: 'Con asesor asignado', value: dashStats.asignacion.conAsesor, unit: `/ ${dashStats.asignacion.conAsesor + dashStats.asignacion.sinAsesor}` },
+                      ].filter(Boolean).map((item: any) => (
+                        <Card key={item.label} className="bg-muted/30 border-border/60">
+                          <CardContent className="p-4">
+                            <p className="text-xs text-muted-foreground mb-2">{item.label}</p>
+                            <p className="text-2xl font-bold">{item.value} <span className="text-sm font-normal text-muted-foreground">{item.unit}</span></p>
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
 
-                    {/* Promedios */}
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      {dashStats.promedios.edad != null && (
-                        <Card className="border-border bg-muted/20">
-                          <CardContent className="p-4">
-                            <p className="text-xs text-muted-foreground mb-1">Edad Promedio</p>
-                            <p className="text-2xl font-bold">{dashStats.promedios.edad} <span className="text-sm font-normal text-muted-foreground">años</span></p>
-                          </CardContent>
-                        </Card>
-                      )}
-                      {dashStats.promedios.personasACargo != null && (
-                        <Card className="border-border bg-muted/20">
-                          <CardContent className="p-4">
-                            <p className="text-xs text-muted-foreground mb-1">Personas a Cargo</p>
-                            <p className="text-2xl font-bold">{dashStats.promedios.personasACargo} <span className="text-sm font-normal text-muted-foreground">prom.</span></p>
-                          </CardContent>
-                        </Card>
-                      )}
-                      {dashStats.promedios.hectareas != null && (
-                        <Card className="border-border bg-muted/20">
-                          <CardContent className="p-4">
-                            <p className="text-xs text-muted-foreground mb-1">Hectáreas Prom.</p>
-                            <p className="text-2xl font-bold">{dashStats.promedios.hectareas} <span className="text-sm font-normal text-muted-foreground">ha</span></p>
-                          </CardContent>
-                        </Card>
-                      )}
-                      <Card className="border-border bg-muted/20">
-                        <CardContent className="p-4">
-                          <p className="text-xs text-muted-foreground mb-1">Con Asesor</p>
-                          <p className="text-2xl font-bold">{dashStats.asignacion.conAsesor} <span className="text-sm font-normal text-muted-foreground">/ {dashStats.asignacion.conAsesor + dashStats.asignacion.sinAsesor}</span></p>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Charts Row 1: Estado + Municipios */}
-                    <div className="grid gap-4 lg:grid-cols-2">
-                      <Card>
-                        <CardHeader className="pb-2">
+                    {/* Tendencia mensual — ancho completo y prominente */}
+                    <Card className="border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
+                      <CardHeader className="pb-1 pt-4 px-5">
+                        <div className="flex items-center justify-between">
                           <CardTitle className="text-base flex items-center gap-2">
                             <TrendingUp className="h-4 w-4 text-primary" />
-                            Distribución por Estado
+                            Registros por mes
                           </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          {estadosChartData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={230}>
-                              <PieChart>
-                                <Pie
-                                  data={estadosChartData}
-                                  cx="50%"
-                                  cy="50%"
-                                  innerRadius={55}
-                                  outerRadius={85}
-                                  paddingAngle={2}
-                                  dataKey="value"
-                                >
-                                  {estadosChartData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                                  ))}
-                                </Pie>
-                                <Tooltip formatter={(value) => [`${value} registros`, '']} />
-                                <Legend iconType="circle" iconSize={10} />
-                              </PieChart>
-                            </ResponsiveContainer>
-                          ) : (
-                            <div className="flex h-[230px] items-center justify-center text-sm text-muted-foreground">Sin datos</div>
-                          )}
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-primary" />
-                            Top Municipios
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          {dashStats.porMunicipio.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={230}>
-                              <BarChart data={dashStats.porMunicipio} layout="vertical" margin={{ left: 4, right: 16, top: 4, bottom: 4 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />
-                                <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                                <YAxis type="category" dataKey="municipio" tick={{ fontSize: 10 }} width={88} />
-                                <Tooltip formatter={(value) => [`${value} registros`, 'Total']} />
-                                <Bar dataKey="total" fill="#16a34a" radius={[0, 4, 4, 0]} />
-                              </BarChart>
-                            </ResponsiveContainer>
-                          ) : (
-                            <div className="flex h-[230px] items-center justify-center text-sm text-muted-foreground">Sin datos</div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Tendencia mensual */}
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4 text-primary" />
-                          Tendencia de Nuevos Registros
-                        </CardTitle>
-                        <CardDescription>Últimos 12 meses</CardDescription>
+                          <CardDescription>Últimos 12 meses</CardDescription>
+                        </div>
                       </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={200}>
-                          <AreaChart data={dashStats.porMes} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+                      <CardContent className="px-2 pb-3">
+                        <ResponsiveContainer width="100%" height={220}>
+                          <AreaChart data={dashStats.porMes} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
                             <defs>
                               <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#16a34a" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="#16a34a" stopOpacity={0.02} />
+                                <stop offset="5%" stopColor="oklch(0.45 0.18 145)" stopOpacity={0.35} />
+                                <stop offset="95%" stopColor="oklch(0.45 0.18 145)" stopOpacity={0.02} />
                               </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                             <XAxis dataKey="mes" tick={{ fontSize: 11 }} tickFormatter={mesFormatter} />
                             <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                            <Tooltip labelFormatter={(v) => `Mes: ${mesFormatter(String(v))}`} formatter={(value) => [`${value}`, 'Nuevos registros']} />
-                            <Area type="monotone" dataKey="total" stroke="#16a34a" fill="url(#areaGrad)" strokeWidth={2} dot={{ r: 3 }} />
+                            <Tooltip
+                              contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }}
+                              labelFormatter={(v) => mesFormatter(String(v))}
+                              formatter={(value) => [`${value}`, 'Registros']}
+                            />
+                            <Area type="monotone" dataKey="total" stroke="oklch(0.45 0.18 145)" fill="url(#areaGrad)" strokeWidth={2.5} dot={{ r: 3, fill: 'oklch(0.45 0.18 145)', strokeWidth: 0 }} activeDot={{ r: 5 }} />
                           </AreaChart>
                         </ResponsiveContainer>
                       </CardContent>
                     </Card>
 
-                    {/* Género + Departamentos */}
+                    {/* Fila: Distribución estado + Top municipios */}
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <Card className="border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
+                        <CardHeader className="pb-1 pt-4 px-5">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-primary" />
+                            Distribución por Estado
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pb-3">
+                          {estadosChartData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={240}>
+                              <PieChart>
+                                <Pie data={estadosChartData} cx="50%" cy="48%" innerRadius={60} outerRadius={90} paddingAngle={3} dataKey="value" strokeWidth={0}>
+                                  {estadosChartData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                                </Pie>
+                                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }} formatter={(v) => [`${v} registros`, '']} />
+                                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, paddingTop: 4 }} />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          ) : (
+                            <div className="flex h-[240px] items-center justify-center text-sm text-muted-foreground">Sin datos</div>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
+                        <CardHeader className="pb-1 pt-4 px-5">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-primary" />
+                            Top Municipios
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-2 pb-3">
+                          {dashStats.porMunicipio.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={240}>
+                              <BarChart data={dashStats.porMunicipio} layout="vertical" margin={{ left: 4, right: 20, top: 4, bottom: 4 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />
+                                <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                                <YAxis type="category" dataKey="municipio" tick={{ fontSize: 10 }} width={92} />
+                                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }} formatter={(v) => [`${v}`, 'Registros']} />
+                                <Bar dataKey="total" radius={[0, 5, 5, 0]}>
+                                  {dashStats.porMunicipio.map((_, i) => (
+                                    <Cell key={i} fill={`oklch(${0.45 + i * 0.04} 0.18 145)`} />
+                                  ))}
+                                </Bar>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          ) : (
+                            <div className="flex h-[240px] items-center justify-center text-sm text-muted-foreground">Sin datos</div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Fila: Género + Por asesor */}
                     <div className="grid gap-4 lg:grid-cols-2">
                       {genderData.length > 0 && (
-                        <Card>
-                          <CardHeader className="pb-2">
+                        <Card className="border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
+                          <CardHeader className="pb-1 pt-4 px-5">
                             <CardTitle className="text-base flex items-center gap-2">
                               <Users className="h-4 w-4 text-primary" />
                               Distribución por Género
                             </CardTitle>
                           </CardHeader>
-                          <CardContent>
+                          <CardContent className="pb-3">
                             <ResponsiveContainer width="100%" height={200}>
                               <PieChart>
-                                <Pie
-                                  data={genderData}
-                                  cx="50%"
-                                  cy="50%"
-                                  outerRadius={75}
-                                  dataKey="value"
-                                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                  labelLine={false}
-                                >
+                                <Pie data={genderData} cx="50%" cy="50%" outerRadius={78} dataKey="value" strokeWidth={0} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
                                   {genderData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                                 </Pie>
-                                <Tooltip formatter={(value) => [`${value}`, 'Productores']} />
+                                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }} formatter={(v) => [`${v}`, 'Productores']} />
                               </PieChart>
+                            </ResponsiveContainer>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {(dashStats.porAsesor?.length ?? 0) > 0 && (
+                        <Card className="border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
+                          <CardHeader className="pb-1 pt-4 px-5">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <UserCheck className="h-4 w-4 text-primary" />
+                              Visitas por Asesor
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="px-2 pb-3">
+                            <ResponsiveContainer width="100%" height={Math.max(200, (dashStats.porAsesor?.length ?? 0) * 40)}>
+                              <BarChart data={dashStats.porAsesor} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />
+                                <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                                <YAxis type="category" dataKey="nombre" tick={{ fontSize: 11 }} width={140} />
+                                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }} formatter={(v) => [`${v} visitas`, '']} />
+                                <Bar dataKey="total" radius={[0, 5, 5, 0]}>
+                                  {(dashStats.porAsesor ?? []).map((_, i) => (
+                                    <Cell key={i} fill={i % 2 === 0 ? '#f59e0b' : '#d97706'} />
+                                  ))}
+                                </Bar>
+                              </BarChart>
                             </ResponsiveContainer>
                           </CardContent>
                         </Card>
                       )}
 
                       {dashStats.porDepartamento.length > 1 && (
-                        <Card>
-                          <CardHeader className="pb-2">
+                        <Card className="border-border/60 lg:col-span-2" style={{boxShadow: 'var(--shadow-sm)'}}>
+                          <CardHeader className="pb-1 pt-4 px-5">
                             <CardTitle className="text-base flex items-center gap-2">
                               <Map className="h-4 w-4 text-primary" />
                               Por Departamento
                             </CardTitle>
                           </CardHeader>
-                          <CardContent>
+                          <CardContent className="px-2 pb-3">
                             <ResponsiveContainer width="100%" height={200}>
-                              <BarChart data={dashStats.porDepartamento} margin={{ top: 4, right: 4, left: -10, bottom: 4 }}>
+                              <BarChart data={dashStats.porDepartamento} margin={{ top: 4, right: 8, left: -10, bottom: 4 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                                <XAxis dataKey="departamento" tick={{ fontSize: 10 }} />
+                                <XAxis dataKey="departamento" tick={{ fontSize: 11 }} />
                                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                                <Tooltip formatter={(value) => [`${value}`, 'Registros']} />
-                                <Bar dataKey="total" fill="#a855f7" radius={[4, 4, 0, 0]} />
+                                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }} formatter={(v) => [`${v}`, 'Registros']} />
+                                <Bar dataKey="total" fill="#a855f7" radius={[5, 5, 0, 0]} />
                               </BarChart>
                             </ResponsiveContainer>
                           </CardContent>
                         </Card>
                       )}
                     </div>
-
-                    {/* Caracterizaciones por Asesor */}
-                    {(dashStats.porAsesor?.length ?? 0) > 0 && (
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <UserCheck className="h-4 w-4 text-primary" />
-                            Visitas por Asesor
-                          </CardTitle>
-                          <CardDescription>Total de visitas registradas por cada asesor</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={Math.max(200, (dashStats.porAsesor?.length ?? 0) * 40)}>
-                            <BarChart
-                              data={dashStats.porAsesor}
-                              layout="vertical"
-                              margin={{ left: 8, right: 24, top: 4, bottom: 4 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />
-                              <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                              <YAxis type="category" dataKey="nombre" tick={{ fontSize: 11 }} width={140} />
-                              <Tooltip formatter={(value) => [`${value} visitas`, 'Total']} />
-                              <Bar dataKey="total" fill="#f59e0b" radius={[0, 4, 4, 0]}>
-                                {(dashStats.porAsesor ?? []).map((_, i) => (
-                                  <Cell key={i} fill={i % 2 === 0 ? '#f59e0b' : '#d97706'} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    )}
                   </>
                 )}
               </div>
