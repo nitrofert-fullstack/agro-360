@@ -414,7 +414,7 @@ export function AdminDashboard() {
     }
   }, [])
 
-  const [userToDelete, setUserToDelete] = useState<{ id: string; nombre: string } | null>(null)
+  const [userToDelete, setUserToDelete] = useState<{ id: string; nombre: string; rol: string } | null>(null)
   const [isDeletingUser, setIsDeletingUser] = useState(false)
 
   interface DashboardStats {
@@ -1630,7 +1630,7 @@ export function AdminDashboard() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => setUserToDelete({ id: u.id, nombre: u.nombre_completo || u.email })}
+                                  onClick={() => setUserToDelete({ id: u.id, nombre: u.nombre_completo || u.email, rol: u.rol })}
                                   className="gap-1.5 hover:bg-red-50 hover:text-red-600 hover:border-red-300 dark:hover:bg-red-950"
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -2705,10 +2705,22 @@ export function AdminDashboard() {
               <Trash2 className="h-5 w-5" />
               Eliminar cuenta
             </DialogTitle>
-            <DialogDescription>
-              Esta acción es irreversible. Se eliminará completamente la cuenta de{' '}
-              <strong>{userToDelete?.nombre}</strong>, incluyendo su acceso al sistema.
-              Sus caracterizaciones asociadas se conservarán.
+            <DialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  Se eliminará permanentemente la cuenta de{' '}
+                  <strong className="text-foreground">{userToDelete?.nombre}</strong>.
+                </p>
+                {userToDelete?.rol === 'asesor' && (
+                  <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-yellow-700 dark:text-yellow-400 flex items-start gap-2">
+                    <svg className="h-4 w-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                    <span>
+                      Las caracterizaciones asignadas a este asesor se <strong>reasignarán automáticamente</strong> al asesor con menor carga de trabajo actualmente.
+                    </span>
+                  </div>
+                )}
+                <p className="text-xs">Esta acción es irreversible.</p>
+              </div>
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 pt-2">

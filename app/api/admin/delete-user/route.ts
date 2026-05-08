@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     }
 
     const targetProfile = await prisma.profiles.findUnique({
-      where:  { id: userId },
+      where: { id: userId },
       select: { rol: true, email: true, nombre_completo: true },
     })
 
@@ -44,22 +44,67 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No se puede eliminar a un administrador' }, { status: 400 })
     }
 
-    // ── 1. Desasociar visitas del asesor ────────────────────────────────────
-    await prisma.visitas.updateMany({
+    // ── 1. Contar visitas asignadas al asesor ────────────────────────────────
+    const visitasCount = await prisma.visitas.count({
       where: { asesor_id: userId },
-      data:  { asesor_id: null },
     })
 
-    // ── 2. Eliminar invitaciones ────────────────────────────────────────────
+    let reasignadoA: string | null = null
+    let reasignadoNombre: string | null = null
+
+    if (visitasCount > 0) {
+      // ── 2. Buscar todos los asesores activos (excluir al que se elimina) ──
+      const asesoresActivos = await prisma.profiles.findMany({
+        where: {
+          id: { not: userId },
+          rol: { in: ['asesor'] },
+          activo: true,
+        },
+        select: { id: true, nombre_completo: true },
+      })
+
+      if (asesoresActivos.length > 0) {
+        // ── 3. Contar carga de cada asesor activo ──────────────────────────
+        const cargas = await Promise.all(
+          asesoresActivos.map(async (a) => ({
+            id: a.id,
+            nombre: a.nombre_completo,
+            carga: await prisma.visitas.count({ where: { asesor_id: a.id } }),
+          }))
+        )
+
+        // ── 4. Elegir el de menor carga ────────────────────────────────────
+        const asesorDestino = cargas.reduce((min, curr) =>
+          curr.carga < min.carga ? curr : min
+        )
+
+        // ── 5. Reasignar visitas ────────────────────────────────────────────
+        await prisma.visitas.updateMany({
+          where: { asesor_id: userId },
+          data: { asesor_id: asesorDestino.id },
+        })
+
+        reasignadoA = asesorDestino.id
+        reasignadoNombre = asesorDestino.nombre
+      } else {
+        // No hay otros asesores — dejar sin asignar
+        await prisma.visitas.updateMany({
+          where: { asesor_id: userId },
+          data: { asesor_id: null },
+        })
+      }
+    }
+
+    // ── 6. Eliminar invitaciones ────────────────────────────────────────────
     await prisma.invitations.deleteMany({ where: { invitado_por: userId } })
     if (targetProfile.email) {
       await prisma.invitations.deleteMany({ where: { email: targetProfile.email } })
     }
 
-    // ── 3. Eliminar perfil ──────────────────────────────────────────────────
+    // ── 7. Eliminar perfil ──────────────────────────────────────────────────
     await prisma.profiles.delete({ where: { id: userId } })
 
-    // ── 4. Eliminar de auth.users (Supabase Auth — no manejado por Prisma) ──
+    // ── 8. Eliminar de auth.users ───────────────────────────────────────────
     const supabaseAdmin = createAdminClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -73,9 +118,24 @@ export async function POST(request: Request) {
       )
     }
 
+    // ── 9. Construir mensaje de respuesta ───────────────────────────────────
+    let mensaje = `Usuario ${targetProfile.email || targetProfile.nombre_completo} eliminado correctamente.`
+    if (visitasCount > 0) {
+      if (reasignadoNombre) {
+        mensaje += ` ${visitasCount} caracterización${visitasCount !== 1 ? 'es' : ''} reasignada${visitasCount !== 1 ? 's' : ''} a ${reasignadoNombre}.`
+      } else {
+        mensaje += ` ${visitasCount} caracterización${visitasCount !== 1 ? 'es' : ''} quedaron sin asesor asignado (no hay otros asesores activos).`
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      mensaje: `Usuario ${targetProfile.email || targetProfile.nombre_completo} eliminado correctamente`,
+      mensaje,
+      reasignacion: visitasCount > 0 ? {
+        cantidad: visitasCount,
+        asesorNombre: reasignadoNombre,
+        asesorId: reasignadoA,
+      } : null,
     })
   } catch (err) {
     console.error('[DeleteUser] Error:', err)
