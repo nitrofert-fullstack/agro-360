@@ -1147,9 +1147,12 @@ export function AdminDashboard() {
 
           {activeSection === 'caracterizaciones' && (
             <motion.div key="caracterizaciones" variants={fadeUp} initial="hidden" animate="visible" className="flex flex-col flex-1 min-h-0"><>
-              <div className="mb-4 flex items-center justify-between gap-2">
-                <h2 className="text-xl font-semibold">Caracterizaciones</h2>
-                <span className="text-sm text-muted-foreground">{totalCount} registro{totalCount !== 1 ? 's' : ''}</span>
+              <div className="mb-4 flex items-start justify-between gap-2">
+                <div>
+                  <h2 className="text-xl font-semibold">Caracterizaciones</h2>
+                  <p className="text-sm text-muted-foreground">Revisa, filtra y gestiona todas las caracterizaciones prediales registradas</p>
+                </div>
+                <span className="text-sm text-muted-foreground shrink-0">{totalCount} registro{totalCount !== 1 ? 's' : ''}</span>
               </div>
               {/* Filters */}
               <div className="mb-6 flex flex-col gap-3">

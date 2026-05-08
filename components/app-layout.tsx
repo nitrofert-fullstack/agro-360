@@ -29,7 +29,6 @@ import {
   Plus,
   LogOut,
   User,
-  Settings,
   Home,
   Loader2,
 } from "lucide-react"
@@ -136,18 +135,10 @@ export function AppLayout({ children }: AppLayoutProps) {
           <Separator className="mb-2" />
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Perfil" isActive={pathname === "/profile"}>
-                <Link href="/profile">
+              <SidebarMenuButton asChild tooltip="Mi Cuenta" isActive={pathname === "/settings" || pathname === "/profile"}>
+                <Link href="/settings">
                   <User className="h-4 w-4 shrink-0" />
                   <span className="truncate">{firstName}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Configuración" isActive={pathname === "/settings"}>
-                <Link href="/settings">
-                  <Settings className="h-4 w-4 shrink-0" />
-                  <span>Configuración</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
