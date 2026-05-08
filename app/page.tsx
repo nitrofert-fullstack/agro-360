@@ -5,56 +5,52 @@ import Image from "next/image"
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/hooks/use-auth"
-import { staggerContainer, staggerItem, fadeUp, scaleIn } from "@/lib/animations"
 import {
-  MapPin,
-  FileText,
-  Shield,
-  BarChart3,
-  Users,
-  ArrowRight,
-  Map,
-  Sprout,
-  Mountain,
-  LogIn,
-  LayoutDashboard
+  MapPin, FileText, Shield, BarChart3, Users, ArrowRight,
+  Map, Sprout, Mountain, LogIn, LayoutDashboard, Satellite,
+  TreePine, ClipboardCheck
 } from "lucide-react"
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } },
+}
+const stagger = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.1 } },
+}
 
 export default function Home() {
   const { isAuthenticated, loading } = useAuth()
   const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
+  useEffect(() => { setMounted(true) }, [])
   if (!mounted) return null
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
-          <div className="flex items-center gap-2 md:gap-3">
-            <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={64} height={64} className="rounded-xl" />
+      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-8">
+          <div className="flex items-center gap-3">
+            <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={36} height={36} className="rounded-xl" />
+            <span className="font-semibold text-sm hidden sm:block">Santander Agro360</span>
           </div>
-          <nav className="flex items-center gap-1 md:gap-2">
+          <nav className="flex items-center gap-2">
             {!loading && (
               isAuthenticated ? (
-                <Button asChild variant="default" size="sm" className="gap-2">
+                <Button asChild size="sm" className="gap-2 h-9">
                   <Link href="/dashboard">
                     <LayoutDashboard className="h-4 w-4" />
                     <span className="hidden sm:inline">Dashboard</span>
                   </Link>
                 </Button>
               ) : (
-                <Button asChild variant="default" size="sm" className="gap-2">
+                <Button asChild size="sm" className="gap-2 h-9">
                   <Link href="/auth/login">
                     <LogIn className="h-4 w-4" />
-                    <span className="hidden sm:inline">Iniciar Sesión</span>
+                    <span className="hidden sm:inline">Iniciar sesión</span>
                   </Link>
                 </Button>
               )
@@ -64,191 +60,180 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/5 via-background to-transparent">
-        <div className="pointer-events-none absolute inset-0 opacity-[0.04]" style={{backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E\")", backgroundSize: "128px 128px"}} />
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          animate="visible"
-          className="relative mx-auto max-w-6xl px-6 py-24 text-center sm:py-32"
-        >
-          <motion.div variants={scaleIn} className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-            <MapPin className="h-8 w-8 text-primary" />
-          </motion.div>
-          <motion.h2 variants={fadeUp} className="font-display mx-auto max-w-3xl text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-            Sistema de Caracterización Predial para Santander
-          </motion.h2>
-          <motion.p variants={fadeUp} className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground">
-            Plataforma integral para el registro, análisis y monitoreo de predios agrícolas
-            utilizando tecnología satelital NDVI y herramientas geoespaciales avanzadas.
-          </motion.p>
-          <motion.div variants={fadeUp} className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Button asChild size="lg" className="gap-2">
-              <Link href="/formulario">
-                <FileText className="h-5 w-5" />
-                Iniciar Caracterización
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </Button>
-          </motion.div>
-        </motion.div>
-      </section>
+      {/* Hero — split layout */}
+      <section className="relative overflow-hidden">
+        {/* Fondo decorativo */}
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-32 right-0 h-[600px] w-[600px] rounded-full bg-primary/6 blur-3xl" />
+          <div className="absolute bottom-0 left-0 h-[400px] w-[400px] rounded-full bg-primary/4 blur-3xl" />
+          {/* Líneas topográficas decorativas */}
+          <svg className="absolute inset-0 w-full h-full opacity-[0.04] dark:opacity-[0.06]" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="topo" x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
+                <path d="M0 40 Q20 20 40 40 Q60 60 80 40" fill="none" stroke="currentColor" strokeWidth="1"/>
+                <path d="M0 60 Q20 40 40 60 Q60 80 80 60" fill="none" stroke="currentColor" strokeWidth="1"/>
+                <path d="M0 20 Q20 0 40 20 Q60 40 80 20" fill="none" stroke="currentColor" strokeWidth="1"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#topo)"/>
+          </svg>
+        </div>
 
-      {/* Features */}
-      <section className="mx-auto max-w-6xl px-6 py-16">
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
-          className="mb-12 text-center"
-        >
-          <h3 className="font-display text-2xl font-bold text-foreground sm:text-3xl">Funcionalidades Principales</h3>
-          <p className="mt-2 text-muted-foreground">
-            Herramientas diseñadas para el sector agropecuario de Santander
-          </p>
-        </motion.div>
+        <div className="relative mx-auto max-w-7xl px-4 md:px-8">
+          <div className="grid min-h-[90vh] items-center gap-12 py-16 md:grid-cols-2 md:py-20">
+            {/* Left — texto */}
+            <motion.div
+              variants={stagger}
+              initial="hidden"
+              animate="visible"
+              className="flex flex-col gap-6"
+            >
+              <motion.div variants={fadeUp}>
+                <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/8 px-3 py-1 text-xs font-medium text-primary">
+                  <MapPin className="h-3 w-3" />
+                  Santander, Colombia
+                </span>
+              </motion.div>
 
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.1 }}
-          className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          {[
-            { icon: Sprout, color: "green", title: "Índice NDVI", desc: "Monitoreo de vegetación en tiempo real con datos satelitales NASA MODIS", body: "Visualiza la salud de los cultivos con mapas de vegetación coloreados que muestran desde zonas áridas hasta vegetación densa." },
-            { icon: Mountain, color: "blue", title: "Capas Climáticas", desc: "Temperatura y precipitación actualizadas con OpenWeatherMap", body: "Analiza las condiciones climáticas de cada predio para tomar decisiones informadas sobre cultivos y riesgos." },
-            { icon: FileText, color: "purple", title: "Caracterización Digital", desc: "Formulario completo basado en estándares del sector agropecuario", body: "Registra información del productor, predio, producción y aspectos financieros de forma estructurada y segura." },
-            { icon: MapPin, color: "orange", title: "Geolocalización", desc: "Marca puntos o dibuja polígonos para delimitar predios", body: "Herramientas de dibujo interactivas para definir con precisión los límites de cada predio agrícola." },
-            { icon: BarChart3, color: "cyan", title: "Análisis de Áreas", desc: "Cálculo automático de áreas, perímetros y estadísticas", body: "Dibuja zonas en el mapa y obtén mediciones precisas para planificación y análisis de terrenos." },
-            { icon: Shield, color: "red", title: "Gestión Administrativa", desc: "Panel para revisión, aprobación y seguimiento de solicitudes", body: "Los administradores pueden revisar caracterizaciones, analizar predios con herramientas NDVI y aprobar solicitudes." },
-          ].map(({ icon: Icon, color, title, desc, body }) => (
-            <motion.div key={title} variants={staggerItem}>
-              <Card
-                className="h-full border-border/60 bg-card/60 transition-all duration-300 hover:bg-card hover:-translate-y-1"
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = ''}
-              >
-                <CardHeader>
-                  <div className={`mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-${color}-500/10`}>
-                    <Icon className={`h-6 w-6 text-${color}-500`} />
-                  </div>
-                  <CardTitle className="text-lg">{title}</CardTitle>
-                  <CardDescription>{desc}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{body}</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </motion.div>
-      </section>
+              <motion.h1 variants={fadeUp} className="text-4xl font-bold leading-tight tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+                Caracterización<br />
+                <span className="text-primary">Predial</span><br />
+                Inteligente
+              </motion.h1>
 
-      {/* CTA Cards */}
-      <section className="mx-auto max-w-6xl px-6 pb-16">
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
-          className="grid gap-6 md:grid-cols-2"
-        >
-          <motion.div variants={staggerItem}>
-            <Card className="h-full border-primary/20 bg-primary/5">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-                    <Users className="h-6 w-6 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <CardTitle className="font-display text-xl">Para Agricultores</CardTitle>
-                    <CardDescription>Registre su predio en minutos</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Complete el formulario de caracterización con ayuda de un asesor.
-                  Marque la ubicación de su predio y envíe su solicitud para revisión.
-                </p>
-                <Button asChild className="w-full gap-2">
+              <motion.p variants={fadeUp} className="max-w-lg text-base text-muted-foreground sm:text-lg">
+                Plataforma digital para el registro, análisis y monitoreo de predios agrícolas en Santander.
+                Tecnología satelital NDVI, geolocalización y gestión administrativa en un solo lugar.
+              </motion.p>
+
+              <motion.div variants={fadeUp} className="flex flex-wrap gap-3">
+                <Button asChild size="lg" className="gap-2 min-h-[48px] px-6">
                   <Link href="/formulario">
-                    Completar Formulario
-                    <ArrowRight className="h-4 w-4" />
+                    <ClipboardCheck className="h-5 w-5" />
+                    Iniciar Caracterización
                   </Link>
                 </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
+                <Button asChild variant="outline" size="lg" className="gap-2 min-h-[48px] px-6 bg-transparent">
+                  <Link href="/auth/login">
+                    <LogIn className="h-5 w-5" />
+                    Acceso Asesores
+                  </Link>
+                </Button>
+              </motion.div>
 
-          <motion.div variants={staggerItem}>
-            <Card className="h-full border-border bg-card/50">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary">
-                    <Shield className="h-6 w-6 text-secondary-foreground" />
+              {/* Stats */}
+              <motion.div variants={fadeUp} className="grid grid-cols-3 gap-4 pt-4 border-t border-border/50">
+                {[
+                  { value: "87", label: "Municipios" },
+                  { value: "NDVI", label: "Satélite" },
+                  { value: "100%", label: "Digital" },
+                ].map(({ value, label }) => (
+                  <div key={label} className="text-center">
+                    <p className="text-2xl font-bold text-foreground">{value}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
                   </div>
-                  <div>
-                    <CardTitle className="font-display text-xl">Para Administradores</CardTitle>
-                    <CardDescription>Gestione las solicitudes</CardDescription>
+                ))}
+              </motion.div>
+            </motion.div>
+
+            {/* Right — visual card grid */}
+            <motion.div
+              variants={stagger}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-2 gap-3"
+            >
+              {[
+                { icon: Satellite, title: "NDVI Satelital", desc: "NASA MODIS", color: "text-green-500", bg: "bg-green-500/10" },
+                { icon: MapPin, title: "Geolocalización", desc: "Polígonos precisos", color: "text-blue-500", bg: "bg-blue-500/10" },
+                { icon: ClipboardCheck, title: "Formulario Digital", desc: "9 secciones", color: "text-primary", bg: "bg-primary/10" },
+                { icon: Mountain, title: "Capas Climáticas", desc: "Temperatura · Lluvia", color: "text-orange-500", bg: "bg-orange-500/10" },
+                { icon: BarChart3, title: "Estadísticas", desc: "Análisis en tiempo real", color: "text-purple-500", bg: "bg-purple-500/10" },
+                { icon: Shield, title: "Panel Admin", desc: "Gestión y aprobación", color: "text-cyan-500", bg: "bg-cyan-500/10" },
+              ].map(({ icon: Icon, title, desc, color, bg }, i) => (
+                <motion.div
+                  key={title}
+                  variants={fadeUp}
+                  custom={i}
+                  className={`rounded-xl border border-border/60 bg-card/80 p-4 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 ${i === 2 ? "col-span-2 sm:col-span-1" : ""}`}
+                  style={{ boxShadow: "var(--shadow-sm)" }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-md)"}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-sm)"}
+                >
+                  <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-lg ${bg}`}>
+                    <Icon className={`h-5 w-5 ${color}`} />
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Acceda al panel de administración para revisar caracterizaciones,
-                  analizar predios con NDVI y aprobar o rechazar solicitudes.
-                </p>
-                <Button asChild variant="outline" className="w-full gap-2 bg-transparent">
-                  <Link href="/admin">
-                    Ir al Panel Admin
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </motion.div>
+                  <p className="font-semibold text-sm text-foreground">{title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+                </motion.div>
+              ))}
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA inferior — dos audiencias */}
+      <section className="border-t border-border/50 bg-muted/30">
+        <div className="mx-auto max-w-7xl px-4 py-16 md:px-8">
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 space-y-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+                <TreePine className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <h3 className="font-semibold text-lg">Para Agricultores</h3>
+              <p className="text-sm text-muted-foreground">Registre su predio con la ayuda de un asesor. Rápido, seguro y desde cualquier dispositivo.</p>
+              <Button asChild className="w-full gap-2 min-h-[44px]">
+                <Link href="/formulario">
+                  Completar Formulario
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+
+            <div className="rounded-2xl border border-border/60 bg-card/80 p-6 space-y-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary">
+                <Users className="h-6 w-6 text-secondary-foreground" />
+              </div>
+              <h3 className="font-semibold text-lg">Para Asesores</h3>
+              <p className="text-sm text-muted-foreground">Acceda a su panel de campo, registre visitas y sincronice caracterizaciones offline.</p>
+              <Button asChild variant="outline" className="w-full gap-2 min-h-[44px] bg-transparent">
+                <Link href="/auth/login">
+                  Iniciar sesión
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+
+            <div className="rounded-2xl border border-border/60 bg-card/80 p-6 space-y-3 sm:col-span-2 md:col-span-1">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary">
+                <Shield className="h-6 w-6 text-secondary-foreground" />
+              </div>
+              <h3 className="font-semibold text-lg">Para Administradores</h3>
+              <p className="text-sm text-muted-foreground">Revise caracterizaciones, gestione usuarios y apruebe solicitudes con herramientas NDVI.</p>
+              <Button asChild variant="outline" className="w-full gap-2 min-h-[44px] bg-transparent">
+                <Link href="/admin">
+                  Panel Admin
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-card/30">
-        <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
-          <div className="grid gap-8 md:grid-cols-4">
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-2">
-                <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={28} height={28} className="rounded-lg" />
-                <span className="text-sm font-bold">Santander Agro360</span>
-              </div>
-              <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-                Sistema de caracterización predial para el sector agropecuario de Santander, Colombia.
-              </p>
+      <footer className="border-t border-border/50 bg-card/20">
+        <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={24} height={24} className="rounded-lg" />
+              <span className="text-sm font-semibold">Santander Agro360</span>
+              <span className="text-xs text-muted-foreground">— Santander, Colombia</span>
             </div>
-            <div>
-              <h4 className="mb-3 text-sm font-semibold text-foreground">Navegación</h4>
-              <div className="flex flex-col gap-2">
-                <Link href="/auth/login" className="text-sm text-muted-foreground hover:text-foreground">
-                  Acceso Asesores
-                </Link>
-              </div>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <Link href="/auth/login" className="hover:text-foreground transition-colors">Asesores</Link>
+              <Link href="/registro" className="hover:text-foreground transition-colors">Registro</Link>
             </div>
-            <div>
-              <h4 className="mb-3 text-sm font-semibold text-foreground">Cuenta</h4>
-              <div className="flex flex-col gap-2">
-                <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground">
-                  Iniciar Sesión
-                </Link>
-                <Link href="/registro" className="text-sm text-muted-foreground hover:text-foreground">
-                  Crear Cuenta
-                </Link>
-              </div>
-            </div>
-          </div>
-          <div className="mt-8 border-t border-border pt-6 text-center text-sm text-muted-foreground">
-            <p>Santander Agro360 - Santander, Colombia</p>
           </div>
         </div>
       </footer>

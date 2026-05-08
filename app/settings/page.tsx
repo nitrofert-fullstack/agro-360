@@ -100,7 +100,7 @@ export default function SettingsPage() {
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
-        className="mx-auto max-w-2xl overflow-y-auto"
+        className="mx-auto w-full max-w-3xl overflow-y-auto"
       >
         <div className="space-y-6 pb-8">
           <div>

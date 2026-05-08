@@ -18,6 +18,16 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from "@/components/ui/sidebar"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -80,122 +90,148 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { profile, user } = useAuth()
   const pathname = usePathname()
   const [isSigningOut, setIsSigningOut] = useState(false)
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   const rol = profile?.rol ?? "asesor"
   const navItems = navByRole[rol] ?? navByRole.asesor
   const firstName = profile?.nombre_completo?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "Usuario"
 
   const handleSignOut = async () => {
-    if (isSigningOut) return
     setIsSigningOut(true)
     await fetch("/auth/signout", { method: "POST" })
     window.location.href = "/auth/login"
   }
 
   return (
-    <SidebarProvider className="h-svh overflow-hidden">
-      <Sidebar variant="inset" collapsible="icon">
-        {/* Logo */}
-        <SidebarHeader className="p-4">
-          <Link href="/dashboard" className="flex items-center justify-center">
+    <>
+      <SidebarProvider className="h-svh overflow-hidden">
+        <Sidebar variant="inset" collapsible="icon">
+          {/* Logo + toggle */}
+          <SidebarHeader className="p-3 flex flex-row items-center gap-2">
+            <Link href="/dashboard" className="flex items-center justify-center shrink-0">
+              <Image
+                src="/icons/icon-192x192.png"
+                alt="Santander Agro360"
+                width={32}
+                height={32}
+                className="rounded-xl"
+              />
+            </Link>
+            <SidebarTrigger className="ml-auto hidden md:flex" />
+          </SidebarHeader>
+
+          <Separator />
+
+          {/* Nav items */}
+          <SidebarContent className="pt-2">
+            <SidebarMenu>
+              {navItems.map((item) => {
+                const Icon = item.icon
+                const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"))
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
+                      <Link href={item.href}>
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarContent>
+
+          {/* Footer */}
+          <SidebarFooter className="p-3 space-y-1">
+            <Separator className="mb-1" />
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Mi Cuenta" isActive={pathname === "/settings" || pathname === "/profile"}>
+                  <Link href="/settings">
+                    <User className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{firstName}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => setShowLogoutModal(true)}
+                  disabled={isSigningOut}
+                  tooltip="Cerrar sesión"
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  {isSigningOut
+                    ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                    : <LogOut className="h-4 w-4 shrink-0" />
+                  }
+                  <span>Cerrar sesión</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+
+            {/* ThemeToggle */}
+            <div className="flex items-center justify-between px-2 py-1 group-data-[collapsible=icon]:justify-center">
+              <span className="text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">Tema</span>
+              <ThemeToggle />
+            </div>
+
+            {profile?.rol && (
+              <div className="px-2 group-data-[collapsible=icon]:hidden">
+                <Badge variant="outline" className="w-full justify-center text-xs bg-primary/8 text-primary border-primary/20">
+                  {rolLabels[profile.rol] ?? profile.rol}
+                </Badge>
+              </div>
+            )}
+          </SidebarFooter>
+        </Sidebar>
+
+        {/* Main content area */}
+        <SidebarInset className="overflow-hidden">
+          {/* Topbar mobile */}
+          <header className="shrink-0 flex h-14 items-center gap-3 border-b border-border/40 bg-background/95 backdrop-blur-md px-4 md:hidden">
+            <SidebarTrigger className="-ml-1" />
             <Image
               src="/icons/icon-192x192.png"
               alt="Santander Agro360"
-              width={36}
-              height={36}
-              className="rounded-xl shrink-0"
+              width={28}
+              height={28}
+              className="rounded-lg"
             />
-          </Link>
-        </SidebarHeader>
-
-        <Separator className="mx-4 w-auto" />
-
-        {/* Nav items */}
-        <SidebarContent className="pt-2">
-          <SidebarMenu>
-            {navItems.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"))
-              return (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
-                    <Link href={item.href}>
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )
-            })}
-          </SidebarMenu>
-        </SidebarContent>
-
-        {/* Footer */}
-        <SidebarFooter className="p-3 space-y-1">
-          <Separator className="mb-2" />
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Mi Cuenta" isActive={pathname === "/settings" || pathname === "/profile"}>
-                <Link href="/settings">
-                  <User className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{firstName}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={handleSignOut}
-                disabled={isSigningOut}
-                tooltip="Cerrar sesión"
-                className="text-muted-foreground hover:text-destructive"
-              >
-                {isSigningOut
-                  ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                  : <LogOut className="h-4 w-4 shrink-0" />
-                }
-                <span>{isSigningOut ? "Saliendo…" : "Cerrar sesión"}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-
-          {/* ThemeToggle en sidebar */}
-          <div className="flex items-center justify-between px-2 py-1 group-data-[collapsible=icon]:justify-center">
-            <span className="text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">Tema</span>
-            <ThemeToggle />
-          </div>
-
-          {profile?.rol && (
-            <div className="px-2 group-data-[collapsible=icon]:hidden">
-              <Badge variant="outline" className="w-full justify-center text-xs bg-primary/8 text-primary border-primary/20">
-                {rolLabels[profile.rol] ?? profile.rol}
-              </Badge>
+            <span className="font-semibold text-sm">Agro360</span>
+            <div className="ml-auto">
+              <ThemeToggle />
             </div>
-          )}
-        </SidebarFooter>
-      </Sidebar>
+          </header>
 
-      {/* Main content area */}
-      <SidebarInset className="overflow-hidden">
-        {/* Topbar mobile */}
-        <header className="shrink-0 flex h-14 items-center gap-3 border-b border-border/40 bg-background/95 backdrop-blur-md px-4 md:hidden">
-          <SidebarTrigger className="-ml-1" />
-          <Image
-            src="/icons/icon-192x192.png"
-            alt="Santander Agro360"
-            width={28}
-            height={28}
-            className="rounded-lg"
-          />
-          <span className="font-display font-semibold text-sm">Agro360</span>
-          <div className="ml-auto">
-            <ThemeToggle />
-          </div>
-        </header>
+          <main className="flex-1 flex flex-col overflow-hidden p-4 md:p-6">
+            {children}
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
 
-        <main className="flex-1 flex flex-col overflow-hidden p-4 md:p-6">
-          {children}
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+      {/* Modal confirmación logout */}
+      <AlertDialog open={showLogoutModal} onOpenChange={setShowLogoutModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cerrar sesión?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se cerrará tu sesión en este dispositivo. Podrás volver a ingresar con tus credenciales.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSigningOut}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isSigningOut}
+              onClick={handleSignOut}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isSigningOut ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Sí, cerrar sesión
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

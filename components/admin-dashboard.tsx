@@ -70,6 +70,7 @@ import {
   BarChart2,
   TrendingUp,
   Activity,
+  X,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ThemeToggle } from "./theme-toggle"
@@ -1381,10 +1382,20 @@ export function AdminDashboard() {
               {showInviteForm && (
                 <Card className="border-primary/20 bg-primary/5">
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Mail className="h-4 w-4 text-primary" />
-                      Crear Usuario
-                    </CardTitle>
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Mail className="h-4 w-4 text-primary" />
+                        Crear Usuario
+                      </CardTitle>
+                      <button
+                        type="button"
+                        onClick={() => { setShowInviteForm(false); setLastInviteResult(null) }}
+                        className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        aria-label="Cerrar"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
                     <CardDescription>
                       Crea una cuenta para un asesor o beneficiario. Las credenciales se envian automaticamente por email.
                     </CardDescription>
