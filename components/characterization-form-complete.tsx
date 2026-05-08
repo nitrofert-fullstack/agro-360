@@ -2867,17 +2867,19 @@ export function CharacterizationFormComplete({
           </div>
         )}
 
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={currentStep}
-            initial={{ opacity: 0, x: stepDirection * 32 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: stepDirection * -24 }}
-            transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-          >
-            {renderStep()}
-          </motion.div>
-        </AnimatePresence>
+        <div className="rounded-xl" style={{boxShadow: 'var(--shadow-md)'}}>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, x: stepDirection * 32 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: stepDirection * -24 }}
+              transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              {renderStep()}
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
         {/* Navigation */}
         <div className="mt-4 flex items-center justify-between gap-4">
