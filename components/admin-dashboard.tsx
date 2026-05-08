@@ -416,6 +416,7 @@ export function AdminDashboard() {
 
   const [userToDelete, setUserToDelete] = useState<{ id: string; nombre: string; rol: string } | null>(null)
   const [isDeletingUser, setIsDeletingUser] = useState(false)
+  const [isReasignando, setIsReasignando] = useState(false)
 
   interface DashboardStats {
     porEstado: Record<string, number>
@@ -1366,10 +1367,33 @@ export function AdminDashboard() {
                   <h2 className="text-xl font-semibold">Gestión de Usuarios</h2>
                   <p className="text-sm text-muted-foreground">Administra las cuentas de asesores y sus permisos de acceso</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" onClick={() => loadUsers({ page: userPage, search: userSearch })} className="gap-2">
                     <RefreshCw className="h-4 w-4" />
                     <span className="hidden sm:inline">Actualizar</span>
+                  </Button>
+                  <Button
+                    variant="outline" size="sm"
+                    className="gap-2 border-yellow-500/40 text-yellow-700 hover:bg-yellow-500/10 dark:text-yellow-400"
+                    disabled={isReasignando}
+                    onClick={async () => {
+                      setIsReasignando(true)
+                      try {
+                        const res = await fetch('/api/admin/reasignar-huerfanos', { method: 'POST' })
+                        const data = await res.json()
+                        if (!res.ok) throw new Error(data.error)
+                        toast.success(data.mensaje)
+                        loadData({ page: 1, search: searchQuery, estado: filterEstado })
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : 'Error al reasignar')
+                      } finally {
+                        setIsReasignando(false)
+                      }
+                    }}
+                  >
+                    {isReasignando ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    <span className="hidden sm:inline">Reasignar desactualizados</span>
+                    <span className="sm:hidden">Reasignar</span>
                   </Button>
                   <Button size="sm" onClick={() => { setShowInviteForm(!showInviteForm); setLastInviteResult(null) }} className="gap-2">
                     <Mail className="h-4 w-4" />
