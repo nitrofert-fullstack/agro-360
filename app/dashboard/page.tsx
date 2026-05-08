@@ -94,13 +94,11 @@ export default function DashboardPage() {
     )
     return (
       <AppLayout>
-        <div className="mx-auto max-w-5xl">
-          <AgricultorDashboard
-            userEmail={user?.email || ''}
-            userName={profile.nombre_completo || 'Productor'}
-            userNumDoc={profile.numero_documento}
-          />
-        </div>
+        <AgricultorDashboard
+          userEmail={user?.email || ''}
+          userName={profile.nombre_completo || 'Productor'}
+          userNumDoc={profile.numero_documento}
+        />
       </AppLayout>
     )
   }
