@@ -621,8 +621,8 @@ function ServerDetailView({
 
   return (
     <AppLayout>
-      {/* Barra de acciones de la página */}
-      <div className="mb-4 flex items-center justify-between gap-2">
+      {/* Barra de acciones — sticky para que no desaparezca al hacer scroll */}
+      <div className="shrink-0 sticky top-0 z-20 -mx-4 md:-mx-6 px-4 md:px-6 py-3 mb-2 bg-background/95 backdrop-blur-md border-b border-border/40 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0" aria-label="Volver al dashboard" onClick={() => router.push("/dashboard")}>
             <ArrowLeft className="h-4 w-4" />
