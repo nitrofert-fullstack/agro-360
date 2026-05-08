@@ -2867,20 +2867,17 @@ export function CharacterizationFormComplete({
           </div>
         )}
 
-        {/* Contenido del paso — card glassmorphism */}
-        <div className="rounded-xl border border-border/60 bg-card/80 backdrop-blur-sm p-5 md:p-7" style={{boxShadow: 'var(--shadow-md)'}}>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: stepDirection * 32 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: stepDirection * -24 }}
-              transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-            >
-              {renderStep()}
-            </motion.div>
-          </AnimatePresence>
-        </div>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={currentStep}
+            initial={{ opacity: 0, x: stepDirection * 32 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: stepDirection * -24 }}
+            transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            {renderStep()}
+          </motion.div>
+        </AnimatePresence>
 
         {/* Navigation */}
         <div className="mt-4 flex items-center justify-between gap-4">
