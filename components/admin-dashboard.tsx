@@ -22,6 +22,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "sonner"
@@ -277,6 +287,8 @@ export function AdminDashboard() {
   const [selectedCaracterizacion, setSelectedCaracterizacion] = useState<CaracterizacionDB | null>(null)
   const [showDetail, setShowDetail] = useState(false)
   const [showMap, setShowMap] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<CaracterizacionDB | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [filterEstado, setFilterEstado] = useState<string>("todos")
   const [searchQuery, setSearchQuery] = useState("")
   const [page, setPage] = useState(1)
@@ -740,6 +752,28 @@ export function AdminDashboard() {
     setShowMap(true)
   }
 
+  const handleDeleteCaracterizacion = async () => {
+    if (!deleteTarget) return
+    setIsDeleting(true)
+    try {
+      const res = await fetch('/api/admin/delete-caracterizacion', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ caracterizacionId: deleteTarget.id }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Error al eliminar')
+      setCaracterizaciones(prev => prev.filter(c => c.id !== deleteTarget.id))
+      setTotalCount(prev => prev - 1)
+      toast.success('Caracterización eliminada correctamente')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar')
+    } finally {
+      setIsDeleting(false)
+      setDeleteTarget(null)
+    }
+  }
+
   const getNombreCompleto = (c: CaracterizacionDB) => {
     if (!c.beneficiario) return 'Sin nombre'
     return `${c.beneficiario.nombres || ''} ${c.beneficiario.apellidos || ''}`.replace(/\s+/g, ' ').trim() || 'Sin nombre'
@@ -1110,7 +1144,7 @@ export function AdminDashboard() {
 
             <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-2">
               <motion.div variants={staggerItem}>
-              <Card className="border-border bg-card">
+              <Card className="border-border/60 bg-card/70 backdrop-blur-sm" style={{boxShadow: 'var(--shadow-sm)'}}>
                 <CardContent className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -1435,6 +1469,17 @@ export function AdminDashboard() {
                                       <Eye className="h-3.5 w-3.5" />
                                       <span className="hidden sm:inline text-xs">Ver</span>
                                     </Button>
+                                    {isAdmin && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setDeleteTarget(c)}
+                                        className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:gap-1 sm:px-3 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                        <span className="hidden sm:inline text-xs">Eliminar</span>
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
                               </CardContent>
@@ -1483,7 +1528,7 @@ export function AdminDashboard() {
             <div className="space-y-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold">Gestion de Usuarios</h2>
+                  <h2 className="font-display text-lg font-semibold">Gestion de Usuarios</h2>
                   <p className="text-sm text-muted-foreground">Administra las cuentas de asesores y sus permisos de acceso</p>
                 </div>
                 <div className="flex gap-2">
@@ -1869,7 +1914,7 @@ export function AdminDashboard() {
             return (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-xl font-bold flex items-center gap-2">
+                  <h2 className="font-display text-xl font-bold flex items-center gap-2">
                     <Activity className="h-5 w-5 text-primary" />
                     Estadísticas del Sistema
                   </h2>
@@ -2863,6 +2908,49 @@ export function AdminDashboard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* AlertDialog confirmar eliminación de caracterización */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !isDeleting) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Eliminar caracterización
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  Esta acción es <strong>irreversible</strong>. Se eliminará permanentemente la caracterización de{' '}
+                  <strong className="text-foreground">
+                    {deleteTarget ? `${deleteTarget.beneficiario?.nombres ?? ''} ${deleteTarget.beneficiario?.apellidos ?? ''}`.trim() || 'este beneficiario' : ''}
+                  </strong>{' '}
+                  junto con toda la información asociada:
+                </p>
+                <ul className="ml-4 list-disc space-y-0.5">
+                  <li>Datos del beneficiario e información financiera</li>
+                  <li>Datos del predio y área productiva</li>
+                  <li>Fotos, firma y documentos adjuntos</li>
+                  <li>Visita técnica (si no tiene otros registros)</li>
+                </ul>
+                <p className="font-medium text-foreground">
+                  El asesor vinculado NO será eliminado.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCaracterizacion}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Eliminar definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
