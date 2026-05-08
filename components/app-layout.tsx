@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { useMemo } from "react"
 import {
   LayoutDashboard,
   FileText,
@@ -92,6 +93,13 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
 
+  // Leer cookie para mantener estado del sidebar entre navegaciones
+  const defaultSidebarOpen = useMemo(() => {
+    if (typeof document === "undefined") return true
+    const cookie = document.cookie.split(";").find(c => c.trim().startsWith("sidebar_state="))
+    return cookie ? cookie.split("=")[1].trim() !== "false" : true
+  }, [])
+
   const rol = profile?.rol ?? "asesor"
   const navItems = navByRole[rol] ?? navByRole.asesor
   const firstName = profile?.nombre_completo?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "Usuario"
@@ -104,7 +112,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <>
-      <SidebarProvider className="h-svh overflow-hidden">
+      <SidebarProvider className="h-svh overflow-hidden" defaultOpen={defaultSidebarOpen}>
         <Sidebar variant="inset" collapsible="icon">
           {/* Logo + toggle */}
           <SidebarHeader className="p-3">

@@ -1839,7 +1839,7 @@ export function AdminDashboard() {
                     </div>
 
                     {/* Tendencia mensual — ancho completo y prominente */}
-                    <Card className="border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
+                    <Card className="border-l-4 border-l-primary bg-primary/5 border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
                       <CardHeader className="pb-1 pt-4 px-5">
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-base flex items-center gap-2">
@@ -1874,40 +1874,47 @@ export function AdminDashboard() {
 
                     {/* Fila: Distribución estado + Top municipios */}
                     <div className="grid gap-4 lg:grid-cols-2">
-                      <Card className="border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
+                      {/* Donut estado con número central */}
+                      <Card className="border-l-4 border-l-blue-500 bg-blue-500/5 border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
                         <CardHeader className="pb-1 pt-4 px-5">
                           <CardTitle className="text-base flex items-center gap-2">
-                            <TrendingUp className="h-4 w-4 text-primary" />
+                            <TrendingUp className="h-4 w-4 text-blue-500" />
                             Distribución por Estado
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="pb-3">
                           {estadosChartData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={240}>
+                            <ResponsiveContainer width="100%" height={260}>
                               <PieChart>
-                                <Pie data={estadosChartData} cx="50%" cy="48%" innerRadius={60} outerRadius={90} paddingAngle={3} dataKey="value" strokeWidth={0}>
+                                <Pie data={estadosChartData} cx="50%" cy="46%" innerRadius={65} outerRadius={95} paddingAngle={3} dataKey="value" strokeWidth={0}>
                                   {estadosChartData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                                  <text x="50%" y="43%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 28, fontWeight: 700, fill: 'var(--foreground)' }}>
+                                    {estadosChartData.reduce((a, b) => a + b.value, 0)}
+                                  </text>
+                                  <text x="50%" y="53%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 11, fill: 'var(--muted-foreground)' }}>
+                                    registros
+                                  </text>
                                 </Pie>
                                 <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }} formatter={(v) => [`${v} registros`, '']} />
                                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, paddingTop: 4 }} />
                               </PieChart>
                             </ResponsiveContainer>
                           ) : (
-                            <div className="flex h-[240px] items-center justify-center text-sm text-muted-foreground">Sin datos</div>
+                            <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">Sin datos</div>
                           )}
                         </CardContent>
                       </Card>
 
-                      <Card className="border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
+                      <Card className="border-l-4 border-l-cyan-500 bg-cyan-500/5 border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
                         <CardHeader className="pb-1 pt-4 px-5">
                           <CardTitle className="text-base flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-primary" />
+                            <MapPin className="h-4 w-4 text-cyan-600" />
                             Top Municipios
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="px-2 pb-3">
                           {dashStats.porMunicipio.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={240}>
+                            <ResponsiveContainer width="100%" height={260}>
                               <BarChart data={dashStats.porMunicipio} layout="vertical" margin={{ left: 4, right: 20, top: 4, bottom: 4 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />
                                 <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
@@ -1915,13 +1922,13 @@ export function AdminDashboard() {
                                 <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }} formatter={(v) => [`${v}`, 'Registros']} />
                                 <Bar dataKey="total" radius={[0, 5, 5, 0]}>
                                   {dashStats.porMunicipio.map((_, i) => (
-                                    <Cell key={i} fill={`oklch(${0.45 + i * 0.04} 0.18 145)`} />
+                                    <Cell key={i} fill={`oklch(${0.45 + i * 0.035} 0.18 145)`} />
                                   ))}
                                 </Bar>
                               </BarChart>
                             </ResponsiveContainer>
                           ) : (
-                            <div className="flex h-[240px] items-center justify-center text-sm text-muted-foreground">Sin datos</div>
+                            <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">Sin datos</div>
                           )}
                         </CardContent>
                       </Card>
@@ -1929,21 +1936,29 @@ export function AdminDashboard() {
 
                     {/* Fila: Género + Por asesor */}
                     <div className="grid gap-4 lg:grid-cols-2">
+                      {/* Donut género con número central */}
                       {genderData.length > 0 && (
-                        <Card className="border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
+                        <Card className="border-l-4 border-l-pink-500 bg-pink-500/5 border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
                           <CardHeader className="pb-1 pt-4 px-5">
                             <CardTitle className="text-base flex items-center gap-2">
-                              <Users className="h-4 w-4 text-primary" />
+                              <Users className="h-4 w-4 text-pink-500" />
                               Distribución por Género
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="pb-3">
-                            <ResponsiveContainer width="100%" height={200}>
+                            <ResponsiveContainer width="100%" height={220}>
                               <PieChart>
-                                <Pie data={genderData} cx="50%" cy="50%" outerRadius={78} dataKey="value" strokeWidth={0} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                                <Pie data={genderData} cx="50%" cy="48%" innerRadius={60} outerRadius={88} dataKey="value" strokeWidth={0} paddingAngle={3}>
                                   {genderData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                                  <text x="50%" y="45%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 26, fontWeight: 700, fill: 'var(--foreground)' }}>
+                                    {genderData.reduce((a, b) => a + b.value, 0)}
+                                  </text>
+                                  <text x="50%" y="56%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 11, fill: 'var(--muted-foreground)' }}>
+                                    productores
+                                  </text>
                                 </Pie>
                                 <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }} formatter={(v) => [`${v}`, 'Productores']} />
+                                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, paddingTop: 4 }} />
                               </PieChart>
                             </ResponsiveContainer>
                           </CardContent>
@@ -1951,15 +1966,15 @@ export function AdminDashboard() {
                       )}
 
                       {(dashStats.porAsesor?.length ?? 0) > 0 && (
-                        <Card className="border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
+                        <Card className="border-l-4 border-l-amber-500 bg-amber-500/5 border-border/60" style={{boxShadow: 'var(--shadow-sm)'}}>
                           <CardHeader className="pb-1 pt-4 px-5">
                             <CardTitle className="text-base flex items-center gap-2">
-                              <UserCheck className="h-4 w-4 text-primary" />
+                              <UserCheck className="h-4 w-4 text-amber-500" />
                               Visitas por Asesor
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="px-2 pb-3">
-                            <ResponsiveContainer width="100%" height={Math.max(200, (dashStats.porAsesor?.length ?? 0) * 40)}>
+                            <ResponsiveContainer width="100%" height={Math.max(220, (dashStats.porAsesor?.length ?? 0) * 44)}>
                               <BarChart data={dashStats.porAsesor} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />
                                 <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
@@ -1977,10 +1992,10 @@ export function AdminDashboard() {
                       )}
 
                       {dashStats.porDepartamento.length > 1 && (
-                        <Card className="border-border/60 lg:col-span-2" style={{boxShadow: 'var(--shadow-sm)'}}>
+                        <Card className="border-l-4 border-l-purple-500 bg-purple-500/5 border-border/60 lg:col-span-2" style={{boxShadow: 'var(--shadow-sm)'}}>
                           <CardHeader className="pb-1 pt-4 px-5">
                             <CardTitle className="text-base flex items-center gap-2">
-                              <Map className="h-4 w-4 text-primary" />
+                              <Map className="h-4 w-4 text-purple-500" />
                               Por Departamento
                             </CardTitle>
                           </CardHeader>
