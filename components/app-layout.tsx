@@ -94,7 +94,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="h-svh overflow-hidden">
       <Sidebar variant="inset" collapsible="icon">
         {/* Logo */}
         <SidebarHeader className="p-4">
@@ -181,9 +181,9 @@ export function AppLayout({ children }: AppLayoutProps) {
       </Sidebar>
 
       {/* Main content area */}
-      <SidebarInset>
+      <SidebarInset className="overflow-hidden">
         {/* Topbar mobile */}
-        <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/40 bg-background/95 backdrop-blur-md px-4 md:hidden">
+        <header className="shrink-0 flex h-14 items-center gap-3 border-b border-border/40 bg-background/95 backdrop-blur-md px-4 md:hidden">
           <SidebarTrigger className="-ml-1" />
           <Image
             src="/icons/icon-192x192.png"
@@ -203,7 +203,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <ThemeToggle />
         </div>
 
-        <main className="flex-1 p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
           {children}
         </main>
       </SidebarInset>

@@ -1101,39 +1101,9 @@ export function AdminDashboard() {
 
   return (
     <div className="bg-background">
-      {/* Stats bar — siempre visible, grid horizontal compacto */}
-      <motion.div
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-        className="grid grid-cols-2 gap-2 mb-4 sm:grid-cols-3 lg:grid-cols-5"
-      >
-        {[
-          { label: 'Total', value: totalCount || estadisticas.total, icon: FileText, color: 'text-primary', bg: 'bg-primary/10', border: 'border-border/60' },
-          { label: 'Iniciados', value: estadisticas.pendientes, icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' },
-          { label: 'En revisión', value: estadisticas.sincronizados, icon: Eye, color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
-          { label: 'Viables', value: estadisticas.aprobados, icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/10', border: 'border-green-500/20' },
-          { label: 'No viables', value: estadisticas.rechazados, icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/20' },
-        ].map(({ label, value, icon: Icon, color, bg, border }) => (
-          <motion.div key={label} variants={staggerItem}>
-            <Card className={`border ${border} bg-card/70 backdrop-blur-sm`} style={{boxShadow: 'var(--shadow-sm)'}}>
-              <CardContent className="flex items-center gap-3 p-3 md:p-4">
-                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${bg}`}>
-                  <Icon className={`h-4 w-4 ${color}`} />
-                </div>
-                <div className="min-w-0">
-                  <p className={`text-xl font-bold leading-tight ${color}`}>{value}</p>
-                  <p className="text-xs text-muted-foreground truncate">{label}</p>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </motion.div>
-
-      <div className="flex">
+      <div className="flex min-h-0">
         {/* Main Content */}
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 min-h-0">
           {/* Tabs de sección — visibles solo en mobile donde el sidebar está oculto */}
           <div className="mb-4 flex flex-wrap gap-2 md:hidden">
             <Button
@@ -1780,6 +1750,7 @@ export function AdminDashboard() {
                   </h2>
                   <p className="text-sm text-muted-foreground">Análisis de caracterizaciones y productores registrados</p>
                 </div>
+
 
                 {isLoadingStats ? (
                   <div className="flex items-center justify-center py-20">
