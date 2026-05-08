@@ -157,12 +157,12 @@ export default function DashboardPage() {
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-5xl flex flex-col flex-1 min-h-0">
         <motion.div
           variants={staggerContainer}
           initial="hidden"
           animate="visible"
-          className="space-y-6"
+          className="flex flex-col flex-1 min-h-0 gap-6"
         >
           {/* Bienvenida + acciones */}
           <motion.div variants={fadeUp} className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -287,7 +287,7 @@ export default function DashboardPage() {
           </motion.div>
 
           {/* Registros en servidor */}
-          <motion.div variants={fadeUp} className="space-y-4">
+          <motion.div variants={fadeUp} className="flex flex-col flex-1 min-h-0 gap-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="text-base font-semibold">
                 Mis registros
@@ -315,6 +315,7 @@ export default function DashboardPage() {
               </div>
             ) : paginated.length > 0 ? (
               <>
+                <div className="flex-1 min-h-0 overflow-y-auto">
                 <motion.div
                   variants={staggerContainer}
                   initial="hidden"
@@ -374,9 +375,10 @@ export default function DashboardPage() {
                     )
                   })}
                 </motion.div>
+                </div>
 
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between border-t border-border pt-3">
+                  <div className="shrink-0 flex items-center justify-between border-t border-border pt-3">
                     <p className="text-sm text-muted-foreground">Pág. {safePage} de {totalPages}</p>
                     <div className="flex gap-1">
                       <Button variant="outline" size="sm" disabled={safePage === 1} onClick={() => setRecentPage(p => p - 1)}>

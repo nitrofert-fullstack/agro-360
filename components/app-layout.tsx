@@ -98,7 +98,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <Sidebar variant="inset" collapsible="icon">
         {/* Logo */}
         <SidebarHeader className="p-4">
-          <Link href="/dashboard" className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
+          <Link href="/dashboard" className="flex items-center justify-center">
             <Image
               src="/icons/icon-192x192.png"
               alt="Santander Agro360"
@@ -106,9 +106,6 @@ export function AppLayout({ children }: AppLayoutProps) {
               height={36}
               className="rounded-xl shrink-0"
             />
-            <span className="font-display font-bold text-sm leading-tight group-data-[collapsible=icon]:hidden">
-              Santander<br />Agro360
-            </span>
           </Link>
         </SidebarHeader>
 
@@ -204,7 +201,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 flex flex-col overflow-hidden p-4 md:p-6">
           {children}
         </main>
       </SidebarInset>

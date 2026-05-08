@@ -1100,7 +1100,7 @@ export function AdminDashboard() {
   const paginatedUsuarios = usuarios
 
   return (
-    <div className="flex flex-col gap-0">
+    <div className="flex flex-col flex-1 min-h-0 gap-0">
           {/* Tabs de sección — visibles solo en mobile donde el sidebar está oculto */}
           <div className="mb-4 flex flex-wrap gap-2 md:hidden">
             <Button
@@ -1146,7 +1146,7 @@ export function AdminDashboard() {
           </div>
 
           {activeSection === 'caracterizaciones' && (
-            <motion.div key="caracterizaciones" variants={fadeUp} initial="hidden" animate="visible"><>
+            <motion.div key="caracterizaciones" variants={fadeUp} initial="hidden" animate="visible" className="flex flex-col flex-1 min-h-0"><>
               <div className="mb-4 flex items-center justify-between gap-2">
                 <h2 className="text-xl font-semibold">Caracterizaciones</h2>
                 <span className="text-sm text-muted-foreground">{totalCount} registro{totalCount !== 1 ? 's' : ''}</span>
@@ -1225,7 +1225,7 @@ export function AdminDashboard() {
                   {/* Virtual scroll container */}
                   <div
                     ref={parentRef}
-                    style={{ height: 'calc(100svh - 340px)', overflowY: 'auto' }}
+                    style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
                     className="rounded-md"
                   >
                     <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
@@ -1355,8 +1355,8 @@ export function AdminDashboard() {
 
           {/* Seccion Usuarios */}
           {activeSection === 'usuarios' && (
-            <motion.div key="usuarios" variants={fadeUp} initial="hidden" animate="visible">
-            <div className="space-y-6">
+            <motion.div key="usuarios" variants={fadeUp} initial="hidden" animate="visible" className="flex flex-col flex-1 min-h-0">
+            <div className="flex flex-col flex-1 min-h-0 gap-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-xl font-semibold">Gestión de Usuarios</h2>
@@ -1504,8 +1504,8 @@ export function AdminDashboard() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="overflow-y-auto" style={{maxHeight: 'calc(100svh - 340px)'}}>
-                <div className="space-y-3">
+                <div className="flex flex-col flex-1 min-h-0">
+                <div className="flex-1 min-h-0 overflow-y-auto space-y-3">
                   {paginatedUsuarios.map((u) => {
                     const invitation = getInvitationForEmail(u.email)
                     return (
@@ -1630,31 +1630,24 @@ export function AdminDashboard() {
                     )
                   })}
 
-                  {/* Paginación usuarios */}
-                  <div className="flex items-center justify-between border-t border-border pt-4">
-                    <p className="text-sm text-muted-foreground">
-                      {userTotalCount} usuario{userTotalCount !== 1 ? 's' : ''} · Pág. {userPage} de {userTotalPages}
-                    </p>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={userPage === 1 || isLoadingUsers}
-                        onClick={() => loadUsers({ page: userPage - 1, search: userSearch })}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={userPage >= userTotalPages || isLoadingUsers}
-                        onClick={() => loadUsers({ page: userPage + 1, search: userSearch })}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
                 </div>
+
+                  {/* Paginación usuarios — fuera del scroll, siempre visible */}
+                  {userTotalPages > 1 && (
+                    <div className="shrink-0 flex items-center justify-between border-t border-border pt-3">
+                      <p className="text-sm text-muted-foreground">
+                        {userTotalCount} usuario{userTotalCount !== 1 ? 's' : ''} · Pág. {userPage} de {userTotalPages}
+                      </p>
+                      <div className="flex gap-1">
+                        <Button variant="outline" size="sm" disabled={userPage === 1 || isLoadingUsers} onClick={() => loadUsers({ page: userPage - 1, search: userSearch })}>
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" disabled={userPage >= userTotalPages || isLoadingUsers} onClick={() => loadUsers({ page: userPage + 1, search: userSearch })}>
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2032,9 +2025,8 @@ export function AdminDashboard() {
 
           {/* Sección Mapa de Predios */}
           {activeSection === 'mapa' && (
-            <motion.div key="mapa" variants={fadeUp} initial="hidden" animate="visible">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between">
+            <motion.div key="mapa" variants={fadeUp} initial="hidden" animate="visible" className="flex flex-col flex-1 min-h-0 gap-3">
+              <div className="flex items-center justify-between shrink-0">
                 <div>
                   <h2 className="text-xl font-semibold">Mapa de Predios</h2>
                   <p className="text-sm text-muted-foreground">
@@ -2044,10 +2036,9 @@ export function AdminDashboard() {
                   </p>
                 </div>
               </div>
-              <div className="relative h-[calc(100vh-220px)] min-h-[400px] overflow-hidden rounded-xl border border-border">
+              <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-border">
                 <MapViewer markers={adminMapMarkers} />
               </div>
-            </div>
             </motion.div>
           )}
 
