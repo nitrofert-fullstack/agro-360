@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import React, { useEffect, useState, useCallback, useRef } from "react"
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -203,25 +203,89 @@ interface CaracterizacionDB {
   } | null
 }
 
+// ── Componente selector de asesor ──────────────────────────────────────────
+function AsesorSelector({ visitaId, currentAsesorNombre, onChanged }: {
+  visitaId?: string
+  currentAsesorNombre?: string | null
+  onChanged: () => void
+}) {
+  const [asesores, setAsesores] = React.useState<{ id: string; nombre_completo: string | null }[]>([])
+  const [selected, setSelected] = React.useState("")
+  const [isLoading, setIsLoading] = React.useState(false)
+  const [isSaving, setIsSaving] = React.useState(false)
+
+  React.useEffect(() => {
+    setIsLoading(true)
+    fetch('/api/admin/users?limit=100')
+      .then(r => r.json())
+      .then(d => {
+        const asesoresOnly = (d.users || []).filter((u: any) => u.rol === 'asesor' && u.activo)
+        setAsesores(asesoresOnly)
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
+  }, [])
+
+  const handleChange = async () => {
+    if (!selected || !visitaId) return
+    setIsSaving(true)
+    try {
+      const res = await fetch('/api/admin/cambiar-asesor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visitaId, asesorId: selected }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      onChanged()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <div className="flex gap-2 items-center">
+      <select
+        value={selected}
+        onChange={e => setSelected(e.target.value)}
+        disabled={isLoading}
+        className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-primary"
+      >
+        <option value="">Cambiar asesor...</option>
+        {asesores.map(a => (
+          <option key={a.id} value={a.id}>{a.nombre_completo || a.id}</option>
+        ))}
+      </select>
+      <button
+        onClick={handleChange}
+        disabled={!selected || isSaving}
+        className="shrink-0 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50 hover:bg-primary/90 transition-colors"
+      >
+        {isSaving ? '...' : 'Asignar'}
+      </button>
+    </div>
+  )
+}
+
 type EstadoKey =
   | "pendiente" | "pendiente_sincronizacion" | "sincronizado" | "aprobado" | "rechazado"
   | "en_revision" | "error_sincronizacion"
   | "iniciado" | "revisado" | "en_estudio_credito" | "cancelado"
 
-const estadoConfig: Record<EstadoKey, { label: string; color: string; icon: typeof Clock }> = {
-  // Nuevos estados BD
-  iniciado: { label: "Iniciado", color: "bg-slate-500/10 text-slate-500 border-slate-500/20", icon: Clock },
-  revisado: { label: "En Revisión", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Eye },
-  en_estudio_credito: { label: "En Estudio", color: "bg-purple-500/10 text-purple-500 border-purple-500/20", icon: Eye },
-  aprobado: { label: "Viable", color: "bg-green-500/10 text-green-500 border-green-500/20", icon: CheckCircle },
-  cancelado: { label: "No Viable", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: XCircle },
-  // Legado
-  pendiente: { label: "Pendiente", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", icon: Clock },
-  pendiente_sincronizacion: { label: "Pend. Sync", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", icon: Clock },
-  sincronizado: { label: "Sincronizado", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Eye },
-  en_revision: { label: "En Revisión", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Eye },
-  rechazado: { label: "No Viable", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: XCircle },
-  error_sincronizacion: { label: "Error", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: XCircle },
+const estadoConfig: Record<EstadoKey, { label: string; color: string; borderColor: string; icon: typeof Clock }> = {
+  iniciado:              { label: "Iniciado",      color: "bg-slate-500/10 text-slate-500 border-slate-500/20",   borderColor: "border-l-slate-400",  icon: Clock },
+  revisado:              { label: "En Revisión",   color: "bg-blue-500/10 text-blue-500 border-blue-500/20",      borderColor: "border-l-blue-500",   icon: Eye },
+  en_estudio_credito:    { label: "En Estudio",    color: "bg-purple-500/10 text-purple-500 border-purple-500/20",borderColor: "border-l-purple-500", icon: Eye },
+  aprobado:              { label: "Viable",        color: "bg-green-500/10 text-green-500 border-green-500/20",   borderColor: "border-l-green-500",  icon: CheckCircle },
+  cancelado:             { label: "No Viable",     color: "bg-red-500/10 text-red-500 border-red-500/20",         borderColor: "border-l-red-500",    icon: XCircle },
+  pendiente:             { label: "Pendiente",     color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",borderColor: "border-l-yellow-500", icon: Clock },
+  pendiente_sincronizacion: { label: "Pend. Sync", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",borderColor: "border-l-yellow-500", icon: Clock },
+  sincronizado:          { label: "Sincronizado",  color: "bg-blue-500/10 text-blue-500 border-blue-500/20",      borderColor: "border-l-blue-500",   icon: Eye },
+  en_revision:           { label: "En Revisión",   color: "bg-blue-500/10 text-blue-500 border-blue-500/20",      borderColor: "border-l-blue-500",   icon: Eye },
+  rechazado:             { label: "No Viable",     color: "bg-red-500/10 text-red-500 border-red-500/20",         borderColor: "border-l-red-500",    icon: XCircle },
+  error_sincronizacion:  { label: "Error",         color: "bg-red-500/10 text-red-500 border-red-500/20",         borderColor: "border-l-red-500",    icon: XCircle },
 }
 
 interface UserProfile {
@@ -1253,7 +1317,7 @@ export function AdminDashboard() {
                               paddingBottom: '12px',
                             }}
                           >
-                            <Card className="transition-colors hover:bg-muted/30">
+                            <Card className={`border-l-4 ${config.borderColor ?? 'border-l-slate-400'} bg-card/80 border-border/60 transition-all duration-150 hover:-translate-y-0.5`} style={{boxShadow:'var(--shadow-sm)'}} onMouseEnter={e=>(e.currentTarget as HTMLElement).style.boxShadow='var(--shadow-md)'} onMouseLeave={e=>(e.currentTarget as HTMLElement).style.boxShadow='var(--shadow-sm)'}>
                               <CardContent className="p-3 sm:p-4">
                                 <div className="flex items-start gap-3">
                                   <div className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
@@ -1547,7 +1611,13 @@ export function AdminDashboard() {
                   {paginatedUsuarios.map((u) => {
                     const invitation = getInvitationForEmail(u.email)
                     return (
-                      <Card key={u.id} className={`transition-colors ${!u.activo ? 'opacity-60 border-red-500/20' : ''}`}>
+                      <Card key={u.id} className={`border-l-4 bg-card/80 border-border/60 transition-all duration-150 hover:-translate-y-0.5 ${
+                        !u.activo ? 'border-l-red-500 opacity-70' :
+                        u.rol === 'admin' ? 'border-l-orange-500' :
+                        u.rol === 'analista' ? 'border-l-purple-500' :
+                        u.rol === 'agricultor' || u.rol === 'campesino' ? 'border-l-green-500' :
+                        'border-l-blue-500'
+                      }`} style={{boxShadow:'var(--shadow-sm)'}}>
                         <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-4">
                           {/* Avatar + info */}
                           <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -2159,9 +2229,19 @@ export function AdminDashboard() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
-                      <div className="flex justify-between gap-x-3">
-                        <span className="text-muted-foreground shrink-0">Asesor:</span>
-                        <span className="font-medium text-right">{selectedCaracterizacion.visita?.nombre_tecnico || selectedCaracterizacion.asesor?.nombre_completo || 'No registrado'}</span>
+                      {/* Asesor — con selector para admin */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Asesor:</span>
+                          <span className="font-medium text-right text-xs">{selectedCaracterizacion.visita?.nombre_tecnico || 'No asignado'}</span>
+                        </div>
+                        {isAdmin && (
+                          <AsesorSelector
+                            visitaId={selectedCaracterizacion.visita?.id}
+                            currentAsesorNombre={selectedCaracterizacion.visita?.nombre_tecnico}
+                            onChanged={() => { loadData({ page, search: searchQuery, estado: filterEstado }); setShowDetail(false) }}
+                          />
+                        )}
                       </div>
                       <div className="flex justify-between gap-x-3">
                         <span className="text-muted-foreground shrink-0">Fecha visita:</span>
