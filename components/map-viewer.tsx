@@ -77,7 +77,8 @@ interface MapViewerProps {
   markerPosition?: [number, number]
   polygonCoords?: [number, number][]
   markers?: MapMarker[]
-  minimal?: boolean  // oculta todos los paneles flotantes — solo mapa limpio
+  minimal?: boolean       // oculta todos los paneles flotantes — solo mapa limpio
+  controlledLayer?: LayerType  // capa controlada desde fuera (para minimal)
 }
 
 // Santander bounds - these will be created dynamically after Leaflet loads
@@ -253,6 +254,7 @@ export function MapViewer({
   polygonCoords,
   markers,
   minimal = false,
+  controlledLayer,
 }: MapViewerProps = {}) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
@@ -266,8 +268,13 @@ export function MapViewer({
   const markerLayersRef = useRef<(L.Marker | L.Polygon)[]>([])
   const ndviTileLayerRef = useRef<L.TileLayer | null>(null)
 
-  const [activeLayer, setActiveLayer] = useState<LayerType>("ndvi")
+  const [activeLayer, setActiveLayer] = useState<LayerType>(controlledLayer ?? "ndvi")
   const [opacity, setOpacity] = useState(0.85)
+
+  // Sync con controlledLayer externo
+  useEffect(() => {
+    if (controlledLayer) setActiveLayer(controlledLayer)
+  }, [controlledLayer])
   const [isLoading, setIsLoading] = useState(true)
   const [isMapReady, setIsMapReady] = useState(false)
   const [currentZoom, setCurrentZoom] = useState(initialZoom || 8)

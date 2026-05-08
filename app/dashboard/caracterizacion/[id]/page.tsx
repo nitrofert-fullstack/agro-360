@@ -495,72 +495,86 @@ function PhotoModal({ url, label, onClose }: { url: string; label?: string; onCl
 
 
 // ==================== MAP CARD ====================
-type MapLayer = "satellite" | "ndvi" | "terrain"
-const MAP_LAYERS: { key: MapLayer; label: string; emoji: string }[] = [
-  { key: "satellite", label: "Satélite", emoji: "🛰" },
-  { key: "ndvi", label: "NDVI", emoji: "🌿" },
-  { key: "terrain", label: "Terreno", emoji: "⛰" },
+const MAP_LAYERS = [
+  { key: "ndvi" as const,        label: "NDVI",      color: "text-green-600",  bg: "bg-green-500/10",  border: "border-green-500/30" },
+  { key: "satellite" as const,   label: "Satélite",  color: "text-blue-600",   bg: "bg-blue-500/10",   border: "border-blue-500/30" },
+  { key: "temperature" as const, label: "Temperatura", color: "text-orange-600", bg: "bg-orange-500/10", border: "border-orange-500/30" },
+  { key: "precipitation" as const, label: "Lluvia",  color: "text-cyan-600",   bg: "bg-cyan-500/10",   border: "border-cyan-500/30" },
 ]
 
 function MapCard({ lat, lng, predio }: { lat: number; lng: number; predio: any }) {
-  const [activeLayer] = useState<MapLayer>("satellite")
+  const [activeLayer, setActiveLayer] = useState<"ndvi" | "satellite" | "temperature" | "precipitation">("ndvi")
+
+  const polyCoords = (() => {
+    if (!predio?.poligono) return undefined
+    try {
+      const p = typeof predio.poligono === 'string' ? JSON.parse(predio.poligono) : predio.poligono
+      return Array.isArray(p) && p.length >= 3 ? p : undefined
+    } catch { return undefined }
+  })()
+
   return (
-    <Card className="border-l-4 border-l-green-500 bg-card/80 border-border/60 overflow-hidden" style={{boxShadow:'var(--shadow-md)'}}>
-      {/* Header con coordenadas y capa activa */}
-      <CardHeader className="pb-0 pt-3 px-4">
+    <Card className="border-l-4 border-l-green-500 bg-card/80 border-border/60 overflow-hidden flex flex-col" style={{boxShadow:'var(--shadow-md)'}}>
+      {/* Header */}
+      <CardHeader className="pb-2 pt-3 px-4 shrink-0">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="flex items-center gap-2 text-sm">
             <MapPin className="h-4 w-4 text-green-600" />
             Ubicación del Predio
           </CardTitle>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground font-mono hidden sm:block">
-              {lat.toFixed(5)}, {lng.toFixed(5)}
-              {predio?.altitud_msnm && ` · ${predio.altitud_msnm} msnm`}
-            </span>
-          </div>
+          <span className="text-xs text-muted-foreground font-mono hidden sm:block">
+            {lat.toFixed(5)}, {lng.toFixed(5)}
+            {predio?.altitud_msnm && ` · ${predio.altitud_msnm} msnm`}
+          </span>
         </div>
       </CardHeader>
 
-      {/* Mapa limpio — sin paneles flotantes */}
-      <CardContent className="p-0 mt-2">
-        <div className="h-[360px] md:h-[440px] lg:h-[480px]">
+      {/* Selector de capas — integrado en la card */}
+      <div className="shrink-0 px-4 pb-2">
+        <div className="flex flex-wrap gap-1.5">
+          {MAP_LAYERS.map(({ key, label, color, bg, border }) => (
+            <button
+              key={key}
+              onClick={() => setActiveLayer(key)}
+              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-all duration-150 ${
+                activeLayer === key
+                  ? `${bg} ${border} ${color}`
+                  : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
+              }`}
+            >
+              {label}
+              {activeLayer === key && <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Mapa limpio */}
+      <CardContent className="p-0 flex-1 min-h-0">
+        <div className="h-[320px] md:h-[400px] lg:h-[440px]">
           <MapViewer
             initialCenter={[lat, lng]}
             initialZoom={14}
             markerPosition={[lat, lng]}
-            polygonCoords={predio?.poligono ? (() => {
-              try { const p = typeof predio.poligono === 'string' ? JSON.parse(predio.poligono) : predio.poligono; return Array.isArray(p) && p.length >= 3 ? p : undefined } catch { return undefined }
-            })() : undefined}
+            polygonCoords={polyCoords}
             minimal={true}
+            controlledLayer={activeLayer}
           />
         </div>
       </CardContent>
 
-      {/* Footer con info del predio */}
+      {/* Footer con datos del predio */}
       {(predio?.municipio || predio?.vereda || predio?.area_total_hectareas) && (
-        <div className="border-t border-border/40 px-4 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 bg-muted/20">
+        <div className="shrink-0 border-t border-border/40 px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 bg-muted/20">
           {predio?.municipio && (
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <span className="text-xs">
               <span className="font-medium text-foreground">{predio.municipio}</span>
-              {predio?.departamento && <span className="text-muted-foreground/60">, {predio.departamento}</span>}
+              {predio?.departamento && <span className="text-muted-foreground">, {predio.departamento}</span>}
             </span>
           )}
-          {predio?.vereda && (
-            <span className="text-xs text-muted-foreground">
-              Vereda: <span className="font-medium text-foreground">{predio.vereda}</span>
-            </span>
-          )}
-          {predio?.area_total_hectareas && (
-            <span className="text-xs text-muted-foreground">
-              Área: <span className="font-medium text-foreground">{predio.area_total_hectareas} ha</span>
-            </span>
-          )}
-          {predio?.altitud_msnm && (
-            <span className="text-xs text-muted-foreground">
-              Altitud: <span className="font-medium text-foreground">{predio.altitud_msnm} msnm</span>
-            </span>
-          )}
+          {predio?.vereda && <span className="text-xs text-muted-foreground">Vereda: <span className="font-medium text-foreground">{predio.vereda}</span></span>}
+          {predio?.area_total_hectareas && <span className="text-xs text-muted-foreground">Área: <span className="font-medium text-foreground">{predio.area_total_hectareas} ha</span></span>}
+          {predio?.altitud_msnm && <span className="text-xs text-muted-foreground">Alt: <span className="font-medium text-foreground">{predio.altitud_msnm} msnm</span></span>}
         </div>
       )}
     </Card>

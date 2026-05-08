@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Thermometer, Wind, Droplets, Leaf, Loader2, AlertTriangle } from "lucide-react"
 
 interface WeatherData {
@@ -42,10 +41,7 @@ export function PredioInsights({ lat, lng, areaTotalHa, areaProductivaHa }: Pred
       body: JSON.stringify({ lat, lng }),
     })
       .then((r) => r.json())
-      .then((d) => {
-        if (d.error) throw new Error(d.error)
-        setWeather(d)
-      })
+      .then((d) => { if (d.error) throw new Error(d.error); setWeather(d) })
       .catch((e) => setErrorWeather(e.message))
       .finally(() => setLoadingWeather(false))
   }, [lat, lng])
@@ -54,142 +50,116 @@ export function PredioInsights({ lat, lng, areaTotalHa, areaProductivaHa }: Pred
     setLoadingNdvi(true)
     fetch(`/api/ndvi?lat=${lat}&lng=${lng}`)
       .then((r) => r.json())
-      .then((d) => {
-        if (d.error) throw new Error(d.error)
-        setNdvi(d)
-      })
+      .then((d) => { if (d.error) throw new Error(d.error); setNdvi(d) })
       .catch((e) => setErrorNdvi(e.message))
       .finally(() => setLoadingNdvi(false))
   }, [lat, lng])
 
-  const ndviPercent = ndvi
-    ? Math.max(0, Math.min(100, ((ndvi.ndvi + 1) / 2) * 100))
-    : 0
+  const ndviPercent = ndvi ? Math.max(0, Math.min(100, ((ndvi.ndvi + 1) / 2) * 100)) : 0
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="space-y-3">
       {/* Clima */}
-      <Card className="border-l-4 border-l-orange-500 bg-orange-500/5 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Thermometer className="h-4 w-4 text-orange-500" />
-            Clima Actual
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loadingWeather ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-xs">Cargando clima...</span>
+      <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Thermometer className="h-3.5 w-3.5 text-orange-500" />
+          <span className="text-xs font-semibold text-foreground">Clima Actual</span>
+        </div>
+        {loadingWeather ? (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span className="text-xs">Cargando...</span>
+          </div>
+        ) : errorWeather ? (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
+            <span>No disponible</span>
+          </div>
+        ) : weather ? (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <p className="text-xl font-bold">{weather.temperature}°C</p>
+              <p className="text-xs text-muted-foreground">Sensación {weather.feelsLike}°C</p>
             </div>
-          ) : errorWeather ? (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              <span>No disponible</span>
-            </div>
-          ) : weather ? (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-xs text-muted-foreground">Temperatura</p>
-                <p className="text-2xl font-bold">{weather.temperature}°C</p>
-                <p className="text-xs text-muted-foreground">Sens. {weather.feelsLike}°C</p>
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5">
+                <Droplets className="h-3 w-3 text-blue-500" />
+                <span className="text-xs">{weather.humidity}%</span>
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5">
-                  <Droplets className="h-3.5 w-3.5 text-blue-500" />
-                  <span className="text-xs">{weather.humidity}% humedad</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Wind className="h-3.5 w-3.5 text-gray-500" />
-                  <span className="text-xs">{weather.windSpeed} m/s</span>
-                </div>
-                <p className="text-xs text-muted-foreground capitalize">{weather.description}</p>
+              <div className="flex items-center gap-1.5">
+                <Wind className="h-3 w-3 text-slate-400" />
+                <span className="text-xs">{weather.windSpeed} m/s</span>
               </div>
+              <p className="text-xs text-muted-foreground capitalize">{weather.description}</p>
             </div>
-          ) : null}
-        </CardContent>
-      </Card>
+          </div>
+        ) : null}
+      </div>
 
       {/* NDVI */}
-      <Card className="border-l-4 border-l-green-500 bg-green-500/5 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Leaf className="h-4 w-4 text-green-600" />
-            Índice NDVI
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loadingNdvi ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-xs">Cargando NDVI...</span>
-            </div>
-          ) : errorNdvi ? (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              <span>No disponible</span>
-            </div>
-          ) : ndvi ? (
-            <div className="space-y-3">
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-2xl font-bold" style={{ color: ndvi.color }}>
-                    {ndvi.ndvi.toFixed(3)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{ndvi.interpretacion}</p>
-                </div>
-                <p className="text-xs text-muted-foreground">{ndvi.fecha}</p>
+      <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Leaf className="h-3.5 w-3.5 text-green-600" />
+          <span className="text-xs font-semibold text-foreground">Índice NDVI</span>
+        </div>
+        {loadingNdvi ? (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span className="text-xs">Cargando...</span>
+          </div>
+        ) : errorNdvi ? (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
+            <span>No disponible</span>
+          </div>
+        ) : ndvi ? (
+          <div className="space-y-2">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-xl font-bold" style={{ color: ndvi.color }}>{ndvi.ndvi.toFixed(3)}</p>
+                <p className="text-xs text-muted-foreground">{ndvi.interpretacion}</p>
               </div>
-              {/* Barra de color */}
-              <div className="relative h-3 overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full transition-all"
-                  style={{ width: `${ndviPercent}%`, backgroundColor: ndvi.color }}
-                />
-              </div>
-              <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>-1 (Agua)</span>
-                <span>+1 (Denso)</span>
-              </div>
+              <p className="text-xs text-muted-foreground">{ndvi.fecha}</p>
             </div>
-          ) : null}
-        </CardContent>
-      </Card>
+            <div className="relative h-2.5 overflow-hidden rounded-full bg-secondary">
+              <div className="absolute inset-y-0 left-0 rounded-full transition-all"
+                style={{ width: `${ndviPercent}%`, backgroundColor: ndvi.color }} />
+            </div>
+            <div className="flex justify-between text-[10px] text-muted-foreground">
+              <span>-1 Agua</span><span>+1 Denso</span>
+            </div>
+          </div>
+        ) : null}
+      </div>
 
-      {/* Cobertura del predio */}
+      {/* Cobertura */}
       {(areaTotalHa || areaProductivaHa) && (
-        <Card className="sm:col-span-2 border-l-4 border-l-primary bg-primary/5 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Leaf className="h-4 w-4 text-primary" />
-              Cobertura del Predio
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-6">
-              {areaTotalHa && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Área total</p>
-                  <p className="text-lg font-semibold">{areaTotalHa} ha</p>
-                </div>
-              )}
-              {areaProductivaHa && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Área productiva</p>
-                  <p className="text-lg font-semibold">{areaProductivaHa} ha</p>
-                </div>
-              )}
-              {areaTotalHa && areaProductivaHa && (
-                <div>
-                  <p className="text-xs text-muted-foreground">% Productivo</p>
-                  <p className="text-lg font-semibold">
-                    {Math.round((areaProductivaHa / areaTotalHa) * 100)}%
-                  </p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Leaf className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-semibold text-foreground">Cobertura del Predio</span>
+          </div>
+          <div className="flex gap-4 flex-wrap">
+            {areaTotalHa && (
+              <div>
+                <p className="text-xs text-muted-foreground">Área total</p>
+                <p className="font-semibold text-sm">{areaTotalHa} ha</p>
+              </div>
+            )}
+            {areaProductivaHa && (
+              <div>
+                <p className="text-xs text-muted-foreground">Área productiva</p>
+                <p className="font-semibold text-sm">{areaProductivaHa} ha</p>
+              </div>
+            )}
+            {areaTotalHa && areaProductivaHa && (
+              <div>
+                <p className="text-xs text-muted-foreground">% Productivo</p>
+                <p className="font-semibold text-sm">{Math.round((areaProductivaHa / areaTotalHa) * 100)}%</p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
