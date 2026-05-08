@@ -1688,7 +1688,7 @@ export function AdminDashboard() {
           )}
 
           {/* Sección Estadísticas */}
-          {activeSection === 'estadisticas' && (<motion.div key="estadisticas" variants={fadeUp} initial="hidden" animate="visible" className="flex-1 overflow-y-auto">{(() => {
+          {activeSection === 'estadisticas' && (<motion.div key="estadisticas" variants={fadeUp} initial="hidden" animate="visible" className="flex-1 overflow-y-auto -m-4 md:-m-6 p-4 md:p-6">{(() => {
             const estadoColors: Record<string, string> = {
               INICIADO: '#94a3b8',
               REVISADO: '#3b82f6',
