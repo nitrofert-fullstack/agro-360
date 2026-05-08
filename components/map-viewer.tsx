@@ -77,6 +77,7 @@ interface MapViewerProps {
   markerPosition?: [number, number]
   polygonCoords?: [number, number][]
   markers?: MapMarker[]
+  minimal?: boolean  // oculta todos los paneles flotantes — solo mapa limpio
 }
 
 // Santander bounds - these will be created dynamically after Leaflet loads
@@ -250,7 +251,8 @@ export function MapViewer({
   initialZoom,
   markerPosition,
   polygonCoords,
-  markers
+  markers,
+  minimal = false,
 }: MapViewerProps = {}) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
@@ -1063,7 +1065,7 @@ export function MapViewer({
       )}
 
       {/* Mobile Quick Actions Bar - Top right */}
-      <div className="absolute right-3 top-3 z-[1000] flex gap-2 md:hidden">
+      {!minimal && <div className="absolute right-3 top-3 z-[1000] flex gap-2 md:hidden">
         <button
           onClick={() => { setShowLayerPanel(!showLayerPanel); setShowDrawTools(false); setShowLegend(false); }}
           className={`flex h-10 w-10 items-center justify-center rounded-lg border shadow-lg backdrop-blur-md transition-all ${
@@ -1110,9 +1112,9 @@ export function MapViewer({
             </svg>
           </button>
         )}
-      </div>
+      </div>}
 
-      {/* Layer Controls - Desktop: fixed right, Mobile: bottom sheet */}
+      {!minimal && <>{/* Layer Controls - Desktop: fixed right, Mobile: bottom sheet */}
       <div className={`absolute z-[1000] transition-all duration-300 ${
         showLayerPanel 
           ? "bottom-0 left-0 right-0 md:bottom-auto md:left-auto md:right-4 md:top-4 md:w-64 lg:w-72" 
@@ -1641,6 +1643,7 @@ export function MapViewer({
           </div>
         </div>
       </div>
+      </>}
     </div>
   )
 }

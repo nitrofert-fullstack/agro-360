@@ -494,6 +494,79 @@ function PhotoModal({ url, label, onClose }: { url: string; label?: string; onCl
 }
 
 
+// ==================== MAP CARD ====================
+type MapLayer = "satellite" | "ndvi" | "terrain"
+const MAP_LAYERS: { key: MapLayer; label: string; emoji: string }[] = [
+  { key: "satellite", label: "Satélite", emoji: "🛰" },
+  { key: "ndvi", label: "NDVI", emoji: "🌿" },
+  { key: "terrain", label: "Terreno", emoji: "⛰" },
+]
+
+function MapCard({ lat, lng, predio }: { lat: number; lng: number; predio: any }) {
+  const [activeLayer] = useState<MapLayer>("satellite")
+  return (
+    <Card className="border-l-4 border-l-green-500 bg-card/80 border-border/60 overflow-hidden" style={{boxShadow:'var(--shadow-md)'}}>
+      {/* Header con coordenadas y capa activa */}
+      <CardHeader className="pb-0 pt-3 px-4">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <MapPin className="h-4 w-4 text-green-600" />
+            Ubicación del Predio
+          </CardTitle>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground font-mono hidden sm:block">
+              {lat.toFixed(5)}, {lng.toFixed(5)}
+              {predio?.altitud_msnm && ` · ${predio.altitud_msnm} msnm`}
+            </span>
+          </div>
+        </div>
+      </CardHeader>
+
+      {/* Mapa limpio — sin paneles flotantes */}
+      <CardContent className="p-0 mt-2">
+        <div className="h-[360px] md:h-[440px] lg:h-[480px]">
+          <MapViewer
+            initialCenter={[lat, lng]}
+            initialZoom={14}
+            markerPosition={[lat, lng]}
+            polygonCoords={predio?.poligono ? (() => {
+              try { const p = typeof predio.poligono === 'string' ? JSON.parse(predio.poligono) : predio.poligono; return Array.isArray(p) && p.length >= 3 ? p : undefined } catch { return undefined }
+            })() : undefined}
+            minimal={true}
+          />
+        </div>
+      </CardContent>
+
+      {/* Footer con info del predio */}
+      {(predio?.municipio || predio?.vereda || predio?.area_total_hectareas) && (
+        <div className="border-t border-border/40 px-4 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 bg-muted/20">
+          {predio?.municipio && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <span className="font-medium text-foreground">{predio.municipio}</span>
+              {predio?.departamento && <span className="text-muted-foreground/60">, {predio.departamento}</span>}
+            </span>
+          )}
+          {predio?.vereda && (
+            <span className="text-xs text-muted-foreground">
+              Vereda: <span className="font-medium text-foreground">{predio.vereda}</span>
+            </span>
+          )}
+          {predio?.area_total_hectareas && (
+            <span className="text-xs text-muted-foreground">
+              Área: <span className="font-medium text-foreground">{predio.area_total_hectareas} ha</span>
+            </span>
+          )}
+          {predio?.altitud_msnm && (
+            <span className="text-xs text-muted-foreground">
+              Altitud: <span className="font-medium text-foreground">{predio.altitud_msnm} msnm</span>
+            </span>
+          )}
+        </div>
+      )}
+    </Card>
+  )
+}
+
 // ==================== SERVER DETAIL VIEW ====================
 function ServerDetailView({
   data,
@@ -635,30 +708,7 @@ function ServerDetailView({
           <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_360px]">
             {/* Mapa */}
             {hasCoords && (
-              <Card className="border-l-4 border-l-green-500 bg-card/80 border-border/60 overflow-hidden" style={{boxShadow:'var(--shadow-md)'}}>
-                <CardHeader className="pb-2 pt-4 px-4">
-                  <CardTitle className="flex items-center justify-between gap-2 text-sm">
-                    <span className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-green-600" />
-                      Ubicación del Predio
-                    </span>
-                    <span className="text-xs font-normal text-muted-foreground">
-                      {lat!.toFixed(5)}, {lng!.toFixed(5)}
-                      {predio?.altitud_msnm && ` · ${predio.altitud_msnm} msnm`}
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="h-[380px] md:h-[460px] lg:h-[500px]">
-                    <MapViewer
-                      initialCenter={[lat!, lng!]}
-                      initialZoom={14}
-                      markerPosition={[lat!, lng!]}
-                      polygonCoords={parsePoligono(predio?.poligono)}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+              <MapCard lat={lat!} lng={lng!} predio={predio} />
             )}
 
             {/* Panel lateral: Insights + Gestión estado */}
