@@ -107,17 +107,24 @@ export function AppLayout({ children }: AppLayoutProps) {
       <SidebarProvider className="h-svh overflow-hidden">
         <Sidebar variant="inset" collapsible="icon">
           {/* Logo + toggle */}
-          <SidebarHeader className="p-3 flex flex-row items-center gap-2">
-            <Link href="/dashboard" className="flex items-center justify-center shrink-0">
-              <Image
-                src="/icons/icon-192x192.png"
-                alt="Santander Agro360"
-                width={32}
-                height={32}
-                className="rounded-xl"
-              />
-            </Link>
-            <SidebarTrigger className="ml-auto hidden md:flex" />
+          <SidebarHeader className="p-3">
+            {/* Expandido: logo + trigger */}
+            <div className="flex items-center justify-between group-data-[collapsible=icon]:hidden">
+              <Link href="/dashboard" className="flex items-center justify-center">
+                <Image
+                  src="/icons/icon-192x192.png"
+                  alt="Santander Agro360"
+                  width={32}
+                  height={32}
+                  className="rounded-xl"
+                />
+              </Link>
+              <SidebarTrigger className="hidden md:flex" />
+            </div>
+            {/* Colapsado: solo trigger centrado */}
+            <div className="hidden group-data-[collapsible=icon]:flex items-center justify-center">
+              <SidebarTrigger />
+            </div>
           </SidebarHeader>
 
           <Separator />
