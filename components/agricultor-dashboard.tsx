@@ -191,7 +191,7 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
       {/* Welcome + Stats */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold md:text-2xl">Bienvenido, {userName}</h2>
+          <h2 className="font-display text-xl font-bold md:text-2xl">Bienvenido, {userName}</h2>
           <p className="text-sm text-muted-foreground">
             Aquí puede ver la información de sus terrenos registrados
           </p>
@@ -209,8 +209,8 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
 
       <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="grid gap-3 sm:grid-cols-3">
         <motion.div variants={staggerItem}>
-          <Card className="border-primary/20 bg-primary/5">
-            <CardContent className="flex items-center gap-3 p-4">
+          <Card className="border-primary/20 bg-primary/5" style={{boxShadow: 'var(--shadow-sm)'}}>
+            <CardContent className="flex items-center gap-3 p-4 min-h-[64px]">
               <Home className="h-8 w-8 text-primary" />
               <div>
                 <p className="text-2xl font-bold">{predios.length}</p>
@@ -220,8 +220,8 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
           </Card>
         </motion.div>
         <motion.div variants={staggerItem}>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
+          <Card className="border-border/60 bg-card/70 backdrop-blur-sm" style={{boxShadow: 'var(--shadow-sm)'}}>
+            <CardContent className="flex items-center gap-3 p-4 min-h-[64px]">
               <Sprout className="h-8 w-8 text-green-600" />
               <div>
                 <p className="text-2xl font-bold">
@@ -233,8 +233,8 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
           </Card>
         </motion.div>
         <motion.div variants={staggerItem}>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
+          <Card className="border-border/60 bg-card/70 backdrop-blur-sm" style={{boxShadow: 'var(--shadow-sm)'}}>
+            <CardContent className="flex items-center gap-3 p-4 min-h-[64px]">
               <Eye className="h-8 w-8 text-blue-600" />
               <div>
                 <p className="text-2xl font-bold">
