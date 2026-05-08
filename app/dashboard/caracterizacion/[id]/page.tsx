@@ -99,12 +99,12 @@ function BooleanTag({ label, active }: { label: string; active: boolean | null |
   )
 }
 
-function SectionCard({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
+function SectionCard({ title, icon: Icon, children, accent = 'border-l-primary' }: { title: string; icon: React.ElementType; children: React.ReactNode; accent?: string }) {
   return (
-    <Card>
+    <Card className={`border-l-4 ${accent} border-border/60 bg-card/80`} style={{boxShadow: 'var(--shadow-sm)'}}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Icon className="h-5 w-5 text-primary" />
+          <Icon className="h-4 w-4 text-primary" />
           {title}
         </CardTitle>
       </CardHeader>
@@ -563,11 +563,11 @@ function ServerDetailView({
         </div>
       </div>
 
-      <motion.main
+      <motion.div
         variants={fadeUp}
         initial="hidden"
         animate="visible"
-        className="mx-auto max-w-7xl px-4 py-6 md:px-6"
+        className="flex-1 overflow-y-auto -m-4 md:-m-6 p-4 md:p-6"
       >
         {/* Summary cards */}
         <motion.div
@@ -577,9 +577,9 @@ function ServerDetailView({
           className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
         >
           <motion.div variants={staggerItem}>
-            <Card className="border-primary/20 bg-primary/5">
+            <Card className="border-l-4 border-l-primary bg-primary/5 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
               <CardContent className="flex items-center gap-3 p-4">
-                <User className="h-8 w-8 shrink-0 text-primary" />
+                <User className="h-7 w-7 shrink-0 text-primary" />
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">Productor</p>
                   <p className="truncate text-sm font-semibold">{nombre}</p>
@@ -588,9 +588,9 @@ function ServerDetailView({
             </Card>
           </motion.div>
           <motion.div variants={staggerItem}>
-            <Card>
+            <Card className="border-l-4 border-l-green-500 bg-green-500/5 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
               <CardContent className="flex items-center gap-3 p-4">
-                <MapPin className="h-8 w-8 shrink-0 text-green-600" />
+                <MapPin className="h-7 w-7 shrink-0 text-green-600" />
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">Predio</p>
                   <p className="truncate text-sm font-semibold">{predio?.nombre_predio || "Sin nombre"}</p>
@@ -599,9 +599,9 @@ function ServerDetailView({
             </Card>
           </motion.div>
           <motion.div variants={staggerItem}>
-            <Card>
+            <Card className="border-l-4 border-l-blue-500 bg-blue-500/5 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
               <CardContent className="flex items-center gap-3 p-4">
-                <Calendar className="h-8 w-8 shrink-0 text-blue-600" />
+                <Calendar className="h-7 w-7 shrink-0 text-blue-600" />
                 <div>
                   <p className="text-xs text-muted-foreground">Fecha visita</p>
                   <p className="text-sm font-semibold">
@@ -618,11 +618,11 @@ function ServerDetailView({
             </Card>
           </motion.div>
           <motion.div variants={staggerItem}>
-            <Card>
+            <Card className="border-l-4 border-l-orange-500 bg-orange-500/5 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
               <CardContent className="flex items-center gap-3 p-4">
-                <FileText className="h-8 w-8 shrink-0 text-orange-600" />
+                <FileText className="h-7 w-7 shrink-0 text-orange-600" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Tecnico</p>
+                  <p className="text-xs text-muted-foreground">Técnico</p>
                   <p className="text-sm font-semibold">{visita?.nombre_tecnico || "N/A"}</p>
                 </div>
               </CardContent>
@@ -685,7 +685,7 @@ function ServerDetailView({
 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Beneficiario */}
-          <SectionCard title="Datos del Beneficiario" icon={User}>
+          <SectionCard title="Datos del Beneficiario" icon={User} accent="border-l-primary">
             <div className="grid gap-3 sm:grid-cols-2">
               <InfoRow label="Nombre completo" value={nombre} />
               <InfoRow label="Tipo documento" value={beneficiario?.tipo_documento} />
@@ -710,7 +710,7 @@ function ServerDetailView({
           </SectionCard>
 
           {/* Predio */}
-          <SectionCard title="Datos del Predio" icon={MapPin}>
+          <SectionCard title="Datos del Predio" icon={MapPin} accent="border-l-green-500">
             <div className="grid gap-3 sm:grid-cols-2">
               <InfoRow label="Nombre predio" value={predio?.nombre_predio} />
               <InfoRow label="Departamento" value={predio?.departamento} />
@@ -730,7 +730,7 @@ function ServerDetailView({
 
           {/* Caracterizacion predio */}
           {caracterizacionPredio && (
-            <SectionCard title="Caracterizacion del Predio" icon={Mountain}>
+            <SectionCard title="Caracterizacion del Predio" icon={Mountain} accent="border-l-blue-500">
               <div className="grid gap-3 sm:grid-cols-2">
                 <InfoRow label="Topografía" value={caracterizacionPredio.topografia} />
                 <InfoRow label="Ruta de acceso" value={caracterizacionPredio.ruta_acceso} />
@@ -750,7 +750,7 @@ function ServerDetailView({
 
           {/* Abastecimiento Agua */}
           {abastecimientoAgua && (
-            <SectionCard title="Abastecimiento de Agua" icon={Droplets}>
+            <SectionCard title="Abastecimiento de Agua" icon={Droplets} accent="border-l-cyan-500">
               <div className="flex flex-wrap gap-2">
                 <BooleanTag label="Nacimiento / Manantial" active={abastecimientoAgua.nacimiento_manantial} />
                 <BooleanTag label="Rio / Quebrada" active={abastecimientoAgua.rio_quebrada} />
@@ -770,7 +770,7 @@ function ServerDetailView({
 
           {/* Riesgos */}
           {riesgosPredio && (
-            <SectionCard title="Riesgos del Predio" icon={AlertTriangle}>
+            <SectionCard title="Riesgos del Predio" icon={AlertTriangle} accent="border-l-red-500">
               <div className="flex flex-wrap gap-2">
                 <BooleanTag label="Inundacion" active={riesgosPredio.inundacion} />
                 <BooleanTag label="Sequia" active={riesgosPredio.sequia} />
@@ -787,7 +787,7 @@ function ServerDetailView({
 
           {/* Area Productiva */}
           {areaProductiva && (
-            <SectionCard title="Area Productiva" icon={Sprout}>
+            <SectionCard title="Area Productiva" icon={Sprout} accent="border-l-emerald-500">
               <div className="grid gap-3 sm:grid-cols-2">
                 <InfoRow label="Sistema productivo" value={areaProductiva.sistema_productivo} />
                 <InfoRow label="Caracterización del cultivo" value={areaProductiva.caracterizacion_cultivo} />
@@ -803,7 +803,7 @@ function ServerDetailView({
 
           {/* Info Financiera */}
           {infoFinanciera && (
-            <SectionCard title="Informacion Financiera" icon={DollarSign}>
+            <SectionCard title="Informacion Financiera" icon={DollarSign} accent="border-l-yellow-500">
               <div className="grid gap-3 sm:grid-cols-2">
                 <InfoRow label="Ingresos agropecuaria" value={infoFinanciera.ingresos_mensuales_agropecuaria ? `$${Number(infoFinanciera.ingresos_mensuales_agropecuaria).toLocaleString("es-CO")}` : null} />
                 <InfoRow label="Ingresos otros" value={infoFinanciera.ingresos_mensuales_otros ? `$${Number(infoFinanciera.ingresos_mensuales_otros).toLocaleString("es-CO")}` : null} />
@@ -819,7 +819,7 @@ function ServerDetailView({
         {/* Fotos y Firma */}
         {(photos.length > 0 || firma) && (
           <div className="mt-6">
-            <SectionCard title="Fotos y Firma" icon={Camera}>
+            <SectionCard title="Fotos y Firma" icon={Camera} accent="border-l-purple-500">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {photos.map((photo, idx) => (
                   <div key={idx} className="group relative">
@@ -870,7 +870,7 @@ function ServerDetailView({
 
         {/* Autorizaciones */}
         <div className="mt-6">
-          <SectionCard title="Autorizaciones" icon={PenTool}>
+          <SectionCard title="Autorizaciones" icon={PenTool} accent="border-l-orange-500">
             <div className="flex flex-wrap gap-3">
               <Badge variant="outline" className={caracterizacion?.autorizacion_datos_personales ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}>
                 {caracterizacion?.autorizacion_datos_personales ? "Autoriza" : "No autoriza"} tratamiento datos personales
@@ -889,7 +889,7 @@ function ServerDetailView({
             )}
           </SectionCard>
         </div>
-      </motion.main>
+      </motion.div>
 
       {photoModal && <PhotoModal url={photoModal} label="imagen" onClose={() => setPhotoModal(null)} />}
     </AppLayout>
