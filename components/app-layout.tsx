@@ -204,17 +204,17 @@ export function AppLayout({ children }: AppLayoutProps) {
         {/* Main content area */}
         <SidebarInset className="overflow-hidden">
           {/* Topbar mobile */}
-          <header className="shrink-0 flex h-14 items-center gap-3 border-b border-border/40 bg-background/95 backdrop-blur-md px-4 md:hidden">
-            <SidebarTrigger className="-ml-1" />
+          <header className="shrink-0 flex h-14 items-center gap-2 border-b border-border/40 bg-background/95 backdrop-blur-md px-3 md:hidden">
+            <SidebarTrigger className="h-10 w-10 shrink-0" />
             <Image
               src="/icons/icon-192x192.png"
               alt="Santander Agro360"
               width={28}
               height={28}
-              className="rounded-lg"
+              className="rounded-lg shrink-0"
             />
-            <span className="font-semibold text-sm">Agro360</span>
-            <div className="ml-auto">
+            <span className="font-semibold text-sm truncate">Agro360</span>
+            <div className="ml-auto shrink-0">
               <ThemeToggle />
             </div>
           </header>

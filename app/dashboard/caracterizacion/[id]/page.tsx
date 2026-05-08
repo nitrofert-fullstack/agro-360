@@ -535,29 +535,29 @@ function ServerDetailView({
   return (
     <AppLayout>
       {/* Barra de acciones de la página */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-4 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Volver al dashboard" onClick={() => router.push("/dashboard")}>
+          <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0" aria-label="Volver al dashboard" onClick={() => router.push("/dashboard")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0">
-            <h1 className="font-display text-lg font-bold leading-tight">Detalle Caracterización</h1>
+            <h1 className="text-base font-semibold leading-tight sm:text-lg">Detalle Caracterización</h1>
             <p className="truncate text-xs font-mono text-muted-foreground">
               {visita?.radicado_oficial || visita?.radicado_local}
             </p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Badge variant="outline" className={`${est.color} gap-1`}>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Badge variant="outline" className={`${est.color} gap-1 hidden sm:flex`}>
             <EstIcon className="h-3 w-3" />
-            <span className="hidden sm:inline">{est.label}</span>
+            {est.label}
           </Badge>
           {((profile?.rol === "agricultor" && !["CANCELADO", "RECHAZADO"].includes(caracterizacion?.estado)) || ["admin", "asesor"].includes(profile?.rol)) && (
-            <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Editar caracterización" onClick={() => router.push(`/formulario/editar/${visita?.id}`)}>
+            <Button variant="outline" size="icon" className="h-10 w-10" aria-label="Editar" onClick={() => router.push(`/formulario/editar/${visita?.id}`)}>
               <PenTool className="h-4 w-4" />
             </Button>
           )}
-          <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Descargar PDF" onClick={() => generateCaracterizacionPDF(pdfFromServerData(data))}>
+          <Button variant="outline" size="icon" className="h-10 w-10" aria-label="Descargar PDF" onClick={() => generateCaracterizacionPDF(pdfFromServerData(data))}>
             <Download className="h-4 w-4" />
           </Button>
         </div>

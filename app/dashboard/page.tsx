@@ -132,29 +132,29 @@ export default function DashboardPage() {
       <div className="flex flex-col flex-1 min-h-0 gap-5">
         <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="flex flex-col flex-1 min-h-0 gap-5">
 
-          {/* Hero header — igual al de estadísticas */}
+          {/* Hero header */}
           <motion.div variants={fadeUp}>
-            <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5">
+            <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-4 sm:p-5">
               <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
-              <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-col gap-1">
-                  <h2 className="text-xl font-semibold md:text-2xl">
+              <div className="relative flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <h2 className="text-lg font-semibold sm:text-xl md:text-2xl truncate">
                     Bienvenido, {profile?.nombre_completo?.split(' ')[0] || 'Asesor'}
                   </h2>
-                  <p className="text-sm text-muted-foreground">Gestiona tus visitas de caracterización predial</p>
+                  <p className="text-xs text-muted-foreground hidden sm:block">Gestiona tus visitas de caracterización predial</p>
                   <Badge variant="outline" className="mt-1 w-fit bg-primary/10 text-primary border-primary/20 text-xs">
                     Asesor de campo
                   </Badge>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-background/60 px-4 py-2 backdrop-blur-sm border border-border/40 text-center">
-                    <p className="text-3xl font-bold text-foreground">{serverStats?.total ?? 0}</p>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="rounded-lg bg-background/60 px-3 py-1.5 sm:px-4 sm:py-2 backdrop-blur-sm border border-border/40 text-center">
+                    <p className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">{serverStats?.total ?? 0}</p>
                     <p className="text-xs text-muted-foreground">registros</p>
                   </div>
-                  <Button variant="outline" size="sm" className="gap-2 bg-background/60 backdrop-blur-sm"
-                    onClick={() => { loadAsesorStats(); toast.info('Actualizando...') }} disabled={isLoadingStats}>
+                  <Button variant="outline" size="icon" className="h-10 w-10 bg-background/60 backdrop-blur-sm shrink-0"
+                    onClick={() => { loadAsesorStats(); toast.info('Actualizando...') }} disabled={isLoadingStats}
+                    aria-label="Actualizar">
                     {isLoadingStats ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    <span className="hidden sm:inline">Actualizar</span>
                   </Button>
                 </div>
               </div>
@@ -181,8 +181,8 @@ export default function DashboardPage() {
             ))}
           </motion.div>
 
-          {/* Acciones rápidas — cards más impactantes */}
-          <motion.div variants={staggerContainer} className="grid grid-cols-2 gap-3">
+          {/* Acciones rápidas */}
+          <motion.div variants={staggerContainer} className="grid grid-cols-1 gap-3 xs:grid-cols-2 sm:grid-cols-2">
             <motion.div variants={staggerItem}>
               <Card
                 className="cursor-pointer border-l-4 border-l-primary bg-primary/5 border-border/60 transition-all duration-200 hover:-translate-y-1 hover:bg-primary/8"
@@ -285,7 +285,7 @@ export default function DashboardPage() {
                           onClick={() => router.push(`/dashboard/caracterizacion/${item.id}`)}
                           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/dashboard/caracterizacion/${item.id}`) } }}
                         >
-                          <CardContent className="flex items-center gap-3 p-3.5">
+                          <CardContent className="flex items-center gap-3 p-4 min-h-[60px]">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <p className="truncate font-medium text-sm">{nombre}</p>
@@ -310,11 +310,11 @@ export default function DashboardPage() {
                 {totalPages > 1 && (
                   <div className="shrink-0 flex items-center justify-between border-t border-border/60 pt-3">
                     <p className="text-sm text-muted-foreground">Pág. {safePage} de {totalPages}</p>
-                    <div className="flex gap-1">
-                      <Button variant="outline" size="sm" disabled={safePage === 1} onClick={() => setRecentPage(p => p - 1)}>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="icon" className="h-10 w-10" disabled={safePage === 1} onClick={() => setRecentPage(p => p - 1)}>
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" disabled={safePage === totalPages} onClick={() => setRecentPage(p => p + 1)}>
+                      <Button variant="outline" size="icon" className="h-10 w-10" disabled={safePage === totalPages} onClick={() => setRecentPage(p => p + 1)}>
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>

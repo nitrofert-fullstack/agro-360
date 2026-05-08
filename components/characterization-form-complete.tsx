@@ -2697,33 +2697,33 @@ export function CharacterizationFormComplete({
     >
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 gap-3">
-          {/* Logo + nombre */}
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-3 sm:px-4 gap-2">
+          {/* Logo */}
           <Link href={isAuthenticated ? "/dashboard" : "/"} className="flex items-center gap-2 shrink-0">
-            <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={32} height={32} className="rounded-xl" />
-            <span className="hidden sm:block text-sm font-semibold">Agro360</span>
+            <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={30} height={30} className="rounded-xl" />
+            <span className="hidden md:block text-sm font-semibold">Agro360</span>
           </Link>
 
           {/* Paso actual — centro */}
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-1.5 text-sm min-w-0">
             <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">
               {currentStep}
             </span>
-            <span className="hidden sm:inline text-foreground font-medium">{steps[currentStep - 1].title}</span>
-            <span className="text-muted-foreground text-xs">/ {steps.length}</span>
+            <span className="text-foreground font-medium truncate max-w-[140px] sm:max-w-none">{steps[currentStep - 1].title}</span>
+            <span className="text-muted-foreground text-xs shrink-0">/ {steps.length}</span>
           </div>
 
           {/* Acciones derecha */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {!isAuthenticated && (
-              <Button variant="outline" size="sm" asChild className="hidden sm:flex gap-1.5 text-xs h-8">
+              <Button variant="outline" size="sm" asChild className="hidden sm:flex gap-1.5 text-xs h-9">
                 <Link href={`/auth/login?redirectTo=/formulario`}>
                   <User className="h-3.5 w-3.5" />
                   Iniciar sesión
                 </Link>
               </Button>
             )}
-            <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="icon" asChild className="h-10 w-10 text-muted-foreground hover:text-foreground">
               <Link href={isAuthenticated ? "/dashboard" : "/"}>
                 <Home className="h-4 w-4" />
               </Link>
@@ -2882,22 +2882,24 @@ export function CharacterizationFormComplete({
         </div>
 
         {/* Navigation */}
-        <div className="mt-4 flex items-center justify-between gap-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:flex sm:items-center sm:justify-between">
           <Button
             variant="outline"
             onClick={prevStep}
             disabled={currentStep === 1}
-            className="gap-2 min-h-[44px] px-5 md:min-h-[48px] md:px-8 md:text-base"
+            className="gap-2 min-h-[48px] text-sm sm:px-8 sm:text-base"
           >
-            <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" />
+            <ChevronLeft className="h-4 w-4" />
             Anterior
           </Button>
 
-          {currentStep < steps.length && (
-            <Button onClick={nextStep} className="gap-2 min-h-[44px] px-5 md:min-h-[48px] md:px-8 md:text-base" style={{boxShadow: 'var(--shadow-md)'}}>
+          {currentStep < steps.length ? (
+            <Button onClick={nextStep} className="gap-2 min-h-[48px] text-sm sm:px-8 sm:text-base" style={{boxShadow: 'var(--shadow-md)'}}>
               Siguiente
-              <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />
+              <ChevronRight className="h-4 w-4" />
             </Button>
+          ) : (
+            <div />
           )}
         </div>
       </main>
