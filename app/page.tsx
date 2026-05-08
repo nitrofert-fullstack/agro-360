@@ -111,9 +111,9 @@ export default function Home() {
                 </Link>
               </Button>
               <Button asChild variant="outline" size="lg" className="gap-2 min-h-[52px] px-8 text-base bg-transparent">
-                <Link href="/auth/login">
-                  <LogIn className="h-5 w-5" />
-                  Acceso Asesores
+                <Link href="/registro">
+                  <Users className="h-5 w-5" />
+                  Crear cuenta
                 </Link>
               </Button>
             </motion.div>
