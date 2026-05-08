@@ -170,8 +170,14 @@ export function AppLayout({ children }: AppLayoutProps) {
             </SidebarMenuItem>
           </SidebarMenu>
 
+          {/* ThemeToggle en sidebar */}
+          <div className="flex items-center justify-between px-2 py-1 group-data-[collapsible=icon]:justify-center">
+            <span className="text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">Tema</span>
+            <ThemeToggle />
+          </div>
+
           {profile?.rol && (
-            <div className="px-2 pt-1 group-data-[collapsible=icon]:hidden">
+            <div className="px-2 group-data-[collapsible=icon]:hidden">
               <Badge variant="outline" className="w-full justify-center text-xs bg-primary/8 text-primary border-primary/20">
                 {rolLabels[profile.rol] ?? profile.rol}
               </Badge>
@@ -198,13 +204,10 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
         </header>
 
-        {/* ThemeToggle desktop */}
-        <div className="absolute top-3 right-4 z-40 hidden md:block">
-          <ThemeToggle />
-        </div>
-
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          {children}
+          <div className="min-h-full flex flex-col">
+            {children}
+          </div>
         </main>
       </SidebarInset>
     </SidebarProvider>
