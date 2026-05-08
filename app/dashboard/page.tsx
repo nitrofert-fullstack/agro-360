@@ -129,7 +129,7 @@ export default function DashboardPage() {
 
   return (
     <AppLayout>
-      <div className="flex flex-col flex-1 min-h-0 gap-5 w-full max-w-4xl mx-auto">
+      <div className="flex flex-col flex-1 min-h-0 gap-5 w-full">
         <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="flex flex-col flex-1 min-h-0 gap-5">
 
           {/* Hero header */}
