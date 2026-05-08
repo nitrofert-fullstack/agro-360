@@ -54,7 +54,7 @@ const navByRole: Record<string, NavItem[]> = {
   asesor: [
     { href: "/dashboard", label: "Mis Registros", icon: LayoutDashboard },
     { href: "/formulario", label: "Nueva Caracterización", icon: Plus },
-    { href: "/mapa", label: "Mapa NDVI", icon: Map },
+    { href: "/mapa", label: "Mapa de Predios", icon: Map },
   ],
   admin: [
     { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart3 },

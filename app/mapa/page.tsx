@@ -134,12 +134,17 @@ export default function MapaPage() {
       <div className="relative flex-1 min-h-0 overflow-hidden rounded-xl border border-border">
         <MapViewer markers={markers} />
 
-        {/* Marker count badge */}
-        {markers.length > 0 && (
-          <motion.div variants={fadeUp} initial="hidden" animate="visible" className="absolute left-3 top-3 z-[1002] rounded-lg border border-border bg-card/95 px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur-md">
-            {markers.length} predio{markers.length !== 1 ? 's' : ''} registrado{markers.length !== 1 ? 's' : ''}
-          </motion.div>
-        )}
+        {/* Título + contador */}
+        <motion.div variants={fadeUp} initial="hidden" animate="visible" className="absolute left-3 top-3 z-[1002] flex items-center gap-2">
+          <div className="rounded-lg border border-border bg-card/95 px-3 py-1.5 text-xs font-semibold shadow-lg backdrop-blur-md">
+            Mapa de Predios
+          </div>
+          {markers.length > 0 && (
+            <div className="rounded-lg border border-border bg-card/95 px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur-md text-muted-foreground">
+              {markers.length} predio{markers.length !== 1 ? 's' : ''}
+            </div>
+          )}
+        </motion.div>
       </div>
     </AppLayout>
   )

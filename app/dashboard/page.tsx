@@ -221,8 +221,8 @@ export default function DashboardPage() {
                     <MapPin className="h-6 w-6 text-green-600" />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-sm">Mapa NDVI</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Ver vegetación satelital</p>
+                    <p className="font-semibold text-sm">Mapa de Predios</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Ver mis predios registrados</p>
                   </div>
                   <ArrowRight className="h-4 w-4 shrink-0 text-green-600 ml-auto" />
                 </CardContent>
