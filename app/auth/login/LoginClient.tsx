@@ -59,14 +59,14 @@ export default function LoginPage() {
         animate="visible"
         className="w-full max-w-md"
       >
-        <Card>
+        <Card className="border-border/60 bg-card/80 backdrop-blur-md" style={{boxShadow: 'var(--shadow-lg)'}}>
           <motion.div variants={staggerContainer} initial="hidden" animate="visible">
             <CardHeader className="text-center pb-6">
               <motion.div variants={staggerItem} className="mx-auto mb-4">
                 <Image src="/icons/icon-384x384.png" alt="Santander Agro360" width={96} height={96} className="rounded-2xl" />
               </motion.div>
               <motion.div variants={staggerItem}>
-                <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
+                <CardTitle className="font-display text-2xl font-bold">Iniciar Sesión</CardTitle>
                 <CardDescription>
                   Ingresa tus credenciales para acceder al sistema
                 </CardDescription>
@@ -139,7 +139,7 @@ export default function LoginPage() {
 
               <CardFooter className="flex flex-col gap-3">
                 <motion.div variants={staggerItem} className="w-full">
-                  <Button type="submit" className="w-full" disabled={isSubmitting || loading}>
+                  <Button type="submit" className="w-full min-h-[48px] text-base" disabled={isSubmitting || loading}>
                     {isSubmitting ? "Iniciando sesión..." : "Iniciar sesión"}
                   </Button>
                 </motion.div>
