@@ -65,17 +65,18 @@ export default function Home() {
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/5 to-transparent">
+      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/5 via-background to-transparent">
+        <div className="pointer-events-none absolute inset-0 opacity-[0.04]" style={{backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E\")", backgroundSize: "128px 128px"}} />
         <motion.div
           variants={staggerContainer}
           initial="hidden"
           animate="visible"
-          className="mx-auto max-w-6xl px-6 py-20 text-center"
+          className="relative mx-auto max-w-6xl px-6 py-24 text-center sm:py-32"
         >
           <motion.div variants={scaleIn} className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
             <MapPin className="h-8 w-8 text-primary" />
           </motion.div>
-          <motion.h2 variants={fadeUp} className="mx-auto max-w-3xl text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+          <motion.h2 variants={fadeUp} className="font-display mx-auto max-w-3xl text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
             Sistema de Caracterización Predial para Santander
           </motion.h2>
           <motion.p variants={fadeUp} className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground">
@@ -103,7 +104,7 @@ export default function Home() {
           viewport={{ once: true, amount: 0.2 }}
           className="mb-12 text-center"
         >
-          <h3 className="text-2xl font-bold text-foreground">Funcionalidades Principales</h3>
+          <h3 className="font-display text-2xl font-bold text-foreground sm:text-3xl">Funcionalidades Principales</h3>
           <p className="mt-2 text-muted-foreground">
             Herramientas diseñadas para el sector agropecuario de Santander
           </p>
@@ -125,7 +126,11 @@ export default function Home() {
             { icon: Shield, color: "red", title: "Gestión Administrativa", desc: "Panel para revisión, aprobación y seguimiento de solicitudes", body: "Los administradores pueden revisar caracterizaciones, analizar predios con herramientas NDVI y aprobar solicitudes." },
           ].map(({ icon: Icon, color, title, desc, body }) => (
             <motion.div key={title} variants={staggerItem}>
-              <Card className="h-full border-border bg-card/50 transition-all hover:bg-card hover:shadow-md hover:-translate-y-0.5">
+              <Card
+                className="h-full border-border/60 bg-card/60 transition-all duration-300 hover:bg-card hover:-translate-y-1"
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = ''}
+              >
                 <CardHeader>
                   <div className={`mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-${color}-500/10`}>
                     <Icon className={`h-6 w-6 text-${color}-500`} />
@@ -159,7 +164,7 @@ export default function Home() {
                     <Users className="h-6 w-6 text-primary-foreground" />
                   </div>
                   <div>
-                    <CardTitle>Para Agricultores</CardTitle>
+                    <CardTitle className="font-display text-xl">Para Agricultores</CardTitle>
                     <CardDescription>Registre su predio en minutos</CardDescription>
                   </div>
                 </div>
@@ -187,7 +192,7 @@ export default function Home() {
                     <Shield className="h-6 w-6 text-secondary-foreground" />
                   </div>
                   <div>
-                    <CardTitle>Para Administradores</CardTitle>
+                    <CardTitle className="font-display text-xl">Para Administradores</CardTitle>
                     <CardDescription>Gestione las solicitudes</CardDescription>
                   </div>
                 </div>
