@@ -2735,10 +2735,15 @@ export function CharacterizationFormComplete({
             <span className="text-xs text-muted-foreground whitespace-nowrap">
               {currentStep}/{steps.length}
             </span>
-            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+            <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full bg-primary rounded-full transition-all duration-300"
-                style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
+                className="h-full rounded-full"
+                style={{
+                  width: `${(currentStep / steps.length) * 100}%`,
+                  background: 'oklch(0.45 0.18 145)',
+                  boxShadow: '0 0 8px oklch(0.45 0.18 145 / 0.5)',
+                  transition: 'width 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+                }}
               />
             </div>
             <span className="text-xs font-medium text-foreground whitespace-nowrap">
@@ -2761,11 +2766,14 @@ export function CharacterizationFormComplete({
                   aria-label={`Paso ${step.id}: ${step.title}`}
                   className={`flex flex-col items-center gap-1 flex-1 min-h-[44px] py-1 rounded-lg transition-colors ${isActive ? "bg-primary/10" : ""}`}
                 >
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
-                    isActive ? "bg-primary text-primary-foreground"
-                    : isCompleted ? "bg-primary/80 text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                  }`}>
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 ${
+                      isActive ? "bg-primary text-primary-foreground"
+                      : isCompleted ? "bg-primary/80 text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                    }`}
+                    style={isActive ? {boxShadow: '0 0 0 3px oklch(0.45 0.18 145 / 0.25), 0 0 12px oklch(0.45 0.18 145 / 0.2)'} : {}}
+                  >
                     {isCompleted ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                   </div>
                   {isActive && (
@@ -2794,13 +2802,14 @@ export function CharacterizationFormComplete({
                   className={`flex flex-col items-center gap-1 min-w-[60px] p-2 rounded-lg transition-colors ${isActive ? "bg-primary/10" : isCompleted ? "bg-muted/60" : ""}`}
                 >
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                    className={`flex h-8 w-8 items-center justify-center rounded-full transition-all duration-300 ${
                       isActive
                         ? "bg-primary text-primary-foreground"
                         : isCompleted
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-muted-foreground"
                     }`}
+                    style={isActive ? {boxShadow: '0 0 0 3px oklch(0.45 0.18 145 / 0.25), 0 0 12px oklch(0.45 0.18 145 / 0.2)'} : {}}
                   >
                     {isCompleted ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                   </div>
