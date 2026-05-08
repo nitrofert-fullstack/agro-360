@@ -81,49 +81,16 @@ async function ensureStorageBuckets(adminClient: SupabaseClient): Promise<void> 
   }
 }
 
-async function verifyTurnstile(token: string): Promise<boolean> {
-  const secret = process.env.TURNSTILE_SECRET_KEY
-  if (!secret || secret === 'your-secret-key-here') {
-    if (process.env.NODE_ENV === 'production') {
-      console.error('[Turnstile] TURNSTILE_SECRET_KEY no configurada en producción')
-      return false
-    }
-    return true
-  }
-
-  const form = new URLSearchParams()
-  form.append('secret', secret)
-  form.append('response', token)
-  // No se envía remoteip: es opcional y causa falsos negativos con VPN/proxies
-
-  const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-    method: 'POST',
-    body: form,
-  })
-  const data = await res.json() as { success: boolean; 'error-codes'?: string[] }
-  if (!data.success) {
-    console.error('[Turnstile] Verificación fallida. error-codes:', data['error-codes'])
-  }
-  return data.success === true
-}
-
 /**
  * POST /api/caracterizaciones
  * Crea una caracterización completa (visita + beneficiario + predio + sub-tablas).
  * - Si el usuario está autenticado como asesor/admin: asesor_id = user.id.
- * - Si no hay sesión: requiere turnstileToken válido y asesor_id queda null.
- *
- * Body esperado (form data del paso 9):
- * {
- *   visita, beneficiario, predio, caracterizacion, aguaRiesgos,
- *   areaProductiva, infoFinanciera, archivos, autorizaciones,
- *   observaciones, turnstileToken?
- * }
+ * - Si no hay sesión: asesor_id queda null (se auto-asigna al de menor carga).
  */
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { turnstileToken, offlineSync, ...c } = body
+    const { offlineSync, ...c } = body
 
     // === Auth: sesión opcional ===
     const supabase = await createClient()
@@ -138,19 +105,6 @@ export async function POST(request: Request) {
         .single()
       if (profile?.rol === 'asesor' || profile?.rol === 'admin') {
         asesorId = user.id
-      }
-    }
-
-    // === Captcha (solo para usuarios completamente anónimos, no sync offline) ===
-    if (!user && !offlineSync) {
-      if (process.env.TURNSTILE_SECRET_KEY && process.env.TURNSTILE_SECRET_KEY !== 'your-secret-key-here') {
-        if (!turnstileToken) {
-          return NextResponse.json({ error: 'Verificación de seguridad requerida' }, { status: 400 })
-        }
-        const valid = await verifyTurnstile(turnstileToken)
-        if (!valid) {
-          return NextResponse.json({ error: 'Verificación de seguridad inválida' }, { status: 403 })
-        }
       }
     }
 

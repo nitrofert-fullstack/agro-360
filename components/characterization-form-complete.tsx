@@ -50,7 +50,6 @@ import { UserProfile } from "./user-profile"
 import { useAuth } from "@/hooks/use-auth"
 import { toast } from "sonner"
 import Link from "next/link"
-import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile"
 import { LegalDocumentModal, LEGAL_DOCUMENTS } from "./legal-document-modal"
 import { savePendingForm } from "@/lib/offline-db"
 import { useOfflineSync } from "@/hooks/use-offline-sync"
@@ -477,12 +476,6 @@ export function CharacterizationFormComplete({
     }
   }, [showErrors, errors])
 
-  // Turnstile token (solo requerido para usuarios no autenticados como asesor)
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
-  const turnstileRef = useRef<TurnstileInstance>(null)
-  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""
-  // Si el siteKey no está configurado, o el usuario está autenticado, se omite la verificación
-  const captchaValid = isAuthenticated || isAsesor || !turnstileSiteKey || !!turnstileToken
 
   // Estado de modales legales (null = ninguno abierto)
   const [legalModalOpen, setLegalModalOpen] = useState<keyof typeof LEGAL_DOCUMENTS | null>(null)
@@ -793,8 +786,7 @@ export function CharacterizationFormComplete({
       if (!validation.valid) { handleValidationError(validation); return }
 
     } else {
-      // Online, creación nueva: captcha solo para usuarios NO autenticados.
-      if (!isAuthenticated && !isAsesor && turnstileSiteKey && !turnstileToken) {
+      if (false) {  // captcha eliminado
         toast.error('Verificación de seguridad', { description: 'Completa la verificación de seguridad antes de enviar.' })
         return
       }
@@ -1019,7 +1011,6 @@ export function CharacterizationFormComplete({
       const payload = {
         ...dataToSave,
         autorizaciones: formData.autorizaciones,
-        ...(!isAuthenticated && !isAsesor && turnstileToken && { turnstileToken }),
       }
 
       let res: Response
@@ -1067,10 +1058,6 @@ export function CharacterizationFormComplete({
         description: error instanceof Error ? error.message : 'Verifica tu conexión e inténtalo de nuevo.',
         duration: 6000,
       })
-      // Resetear Turnstile: cada token es de un solo uso. Si el envío falló,
-      // el token ya fue consumido por el servidor y no puede reutilizarse.
-      turnstileRef.current?.reset()
-      setTurnstileToken(null)
     } finally {
       setIsSubmitting(false)
       submitLock.current = false
@@ -2518,31 +2505,10 @@ export function CharacterizationFormComplete({
                 </div>
               </div>
 
-              {/* Verificación de seguridad Cloudflare Turnstile (solo para usuarios no autenticados) */}
-              {!isAuthenticated && !isAsesor && !!turnstileSiteKey && isOnline && (
-                <div className="rounded-lg border border-border/50 bg-muted/30 p-4 space-y-3">
-                  <Label className="font-medium flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-primary" />
-                    Verificación de seguridad <span className="text-red-500">*</span>
-                  </Label>
-                  <Turnstile
-                    ref={turnstileRef}
-                    siteKey={turnstileSiteKey}
-                    onSuccess={(token) => setTurnstileToken(token)}
-                    onExpire={() => setTurnstileToken(null)}
-                    onError={() => setTurnstileToken(null)}
-                    options={{ theme: "auto", language: "es" }}
-                  />
-                  {!turnstileToken && (
-                    <p className="text-xs text-muted-foreground">Completa la verificación para poder enviar el formulario.</p>
-                  )}
-                </div>
-              )}
-
               {/* Botón de envío */}
               <Button
                 onClick={handleSubmit}
-                disabled={isSubmitting || !formData.autorizaciones.autorizacionDatosPersonales || !formData.autorizaciones.autorizacionAvisoPrivacidad || (isOnline && !captchaValid)}
+                disabled={isSubmitting || !formData.autorizaciones.autorizacionDatosPersonales || !formData.autorizaciones.autorizacionAvisoPrivacidad}
                 className="w-full h-12 text-base"
               >
                 {isSubmitting ? (
