@@ -2,23 +2,21 @@
 
 import { useEffect, useState, useRef } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/hooks/use-auth"
 import { createClient } from "@/lib/supabase/client"
 import { AgricultorDashboard } from "@/components/agricultor-dashboard"
+import { AppLayout } from "@/components/app-layout"
 import { toast } from "sonner"
 import { staggerContainer, staggerItem, fadeUp } from "@/lib/animations"
 import {
   FileText,
   Map,
   Plus,
-  LogOut,
   Loader2,
   Search,
   ChevronLeft,
@@ -34,7 +32,6 @@ export default function DashboardPage() {
   const isAgricultor = profile?.rol === 'agricultor'
   const statsLoadedRef = useRef(false)
   const [serverStats, setServerStats] = useState<{ total: number; registros: any[] } | null>(null)
-  const [isSigningOut, setIsSigningOut] = useState(false)
   const [isLoadingStats, setIsLoadingStats] = useState(false)
   const [recentSearch, setRecentSearch] = useState("")
   const [recentPage, setRecentPage] = useState(1)
@@ -101,13 +98,6 @@ export default function DashboardPage() {
     }
   }
 
-  const handleSignOut = async () => {
-    if (isSigningOut) return
-    setIsSigningOut(true)
-    await fetch('/auth/signout', { method: 'POST' })
-    window.location.href = '/auth/login'
-  }
-
   // Loading + redirect screen (admin/analista verán esto brevemente)
   if (loading || (!loading && (isAdmin || isAnalista))) {
     return (
@@ -119,30 +109,6 @@ export default function DashboardPage() {
       </div>
     )
   }
-
-  // Header compartido
-  const Header = () => (
-    <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
-        <div className="flex items-center gap-2 md:gap-3">
-          <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={60} height={60} className="rounded-xl" />
-        </div>
-        <nav className="flex items-center gap-1.5 md:gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSignOut}
-            disabled={isSigningOut}
-            className="gap-2 text-muted-foreground hover:text-destructive"
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">{isSigningOut ? 'Saliendo...' : 'Salir'}</span>
-          </Button>
-          <ThemeToggle />
-        </nav>
-      </div>
-    </header>
-  )
 
   // ── AGRICULTOR ──────────────────────────────────────────────────
   if (isAgricultor) {
@@ -158,16 +124,15 @@ export default function DashboardPage() {
       )
     }
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="mx-auto max-w-5xl px-4 py-6 md:px-6">
+      <AppLayout>
+        <div className="mx-auto max-w-5xl">
           <AgricultorDashboard
             userEmail={user?.email || ''}
             userName={profile.nombre_completo || 'Productor'}
             userNumDoc={profile.numero_documento}
           />
-        </main>
-      </div>
+        </div>
+      </AppLayout>
     )
   }
 
@@ -188,9 +153,8 @@ export default function DashboardPage() {
   const paginated = filtered.slice((safePage - 1) * RECENT_PER_PAGE, safePage * RECENT_PER_PAGE)
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="mx-auto max-w-5xl px-4 py-6 md:px-6">
+    <AppLayout>
+      <div className="mx-auto max-w-5xl">
         <motion.div
           variants={staggerContainer}
           initial="hidden"
@@ -409,7 +373,7 @@ export default function DashboardPage() {
             )}
           </motion.div>
         </motion.div>
-      </main>
-    </div>
+      </div>
+    </AppLayout>
   )
 }
