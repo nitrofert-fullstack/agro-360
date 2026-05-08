@@ -1100,10 +1100,7 @@ export function AdminDashboard() {
   const paginatedUsuarios = usuarios
 
   return (
-    <div className="bg-background">
-      <div className="flex min-h-0">
-        {/* Main Content */}
-        <main className="flex-1 min-w-0 min-h-0">
+    <div className="flex flex-col gap-0">
           {/* Tabs de sección — visibles solo en mobile donde el sidebar está oculto */}
           <div className="mb-4 flex flex-wrap gap-2 md:hidden">
             <Button
@@ -1150,6 +1147,10 @@ export function AdminDashboard() {
 
           {activeSection === 'caracterizaciones' && (
             <motion.div key="caracterizaciones" variants={fadeUp} initial="hidden" animate="visible"><>
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <h2 className="text-xl font-semibold">Caracterizaciones</h2>
+                <span className="text-sm text-muted-foreground">{totalCount} registro{totalCount !== 1 ? 's' : ''}</span>
+              </div>
               {/* Filters */}
               <div className="mb-6 flex flex-col gap-3">
                 <div className="flex gap-2">
@@ -1358,7 +1359,7 @@ export function AdminDashboard() {
             <div className="space-y-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="font-display text-lg font-semibold">Gestion de Usuarios</h2>
+                  <h2 className="text-xl font-semibold">Gestión de Usuarios</h2>
                   <p className="text-sm text-muted-foreground">Administra las cuentas de asesores y sus permisos de acceso</p>
                 </div>
                 <div className="flex gap-2">
@@ -1746,7 +1747,7 @@ export function AdminDashboard() {
             return (
               <div className="space-y-6">
                 <div>
-                  <h2 className="font-display text-xl font-bold flex items-center gap-2">
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
                     <Activity className="h-5 w-5 text-primary" />
                     Estadísticas del Sistema
                   </h2>
@@ -2035,7 +2036,7 @@ export function AdminDashboard() {
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold">Mapa de Predios</h2>
+                  <h2 className="text-xl font-semibold">Mapa de Predios</h2>
                   <p className="text-sm text-muted-foreground">
                     {adminMapMarkers.length > 0
                       ? `${adminMapMarkers.length} predio${adminMapMarkers.length !== 1 ? 's' : ''} registrado${adminMapMarkers.length !== 1 ? 's' : ''}`
@@ -2049,8 +2050,6 @@ export function AdminDashboard() {
             </div>
             </motion.div>
           )}
-        </main>
-      </div>
 
       {/* Detail Dialog */}
       <Dialog open={showDetail} onOpenChange={setShowDetail}>

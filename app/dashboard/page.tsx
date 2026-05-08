@@ -167,7 +167,7 @@ export default function DashboardPage() {
           {/* Bienvenida + acciones */}
           <motion.div variants={fadeUp} className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="font-display text-xl font-bold text-foreground md:text-2xl">
+              <h2 className="text-xl font-semibold text-foreground md:text-2xl">
                 Bienvenido, {profile?.nombre_completo?.split(' ')[0] || 'Asesor'}
               </h2>
               <p className="mt-0.5 text-sm text-muted-foreground">

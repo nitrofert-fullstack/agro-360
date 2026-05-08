@@ -191,7 +191,7 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
       {/* Welcome + Stats */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="font-display text-xl font-bold md:text-2xl">Bienvenido, {userName}</h2>
+          <h2 className="text-xl font-semibold md:text-2xl">Bienvenido, {userName}</h2>
           <p className="text-sm text-muted-foreground">
             Aquí puede ver la información de sus terrenos registrados
           </p>
