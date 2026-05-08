@@ -67,9 +67,9 @@ export function PredioInsights({ lat, lng, areaTotalHa, areaProductivaHa }: Pred
     : 0
 
   return (
-    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-2">
       {/* Clima */}
-      <Card>
+      <Card className="border-l-4 border-l-orange-500 bg-orange-500/5 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-sm">
             <Thermometer className="h-4 w-4 text-orange-500" />
@@ -111,7 +111,7 @@ export function PredioInsights({ lat, lng, areaTotalHa, areaProductivaHa }: Pred
       </Card>
 
       {/* NDVI */}
-      <Card>
+      <Card className="border-l-4 border-l-green-500 bg-green-500/5 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-sm">
             <Leaf className="h-4 w-4 text-green-600" />
@@ -158,7 +158,7 @@ export function PredioInsights({ lat, lng, areaTotalHa, areaProductivaHa }: Pred
 
       {/* Cobertura del predio */}
       {(areaTotalHa || areaProductivaHa) && (
-        <Card className="sm:col-span-2">
+        <Card className="sm:col-span-2 border-l-4 border-l-primary bg-primary/5 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm">
               <Leaf className="h-4 w-4 text-primary" />

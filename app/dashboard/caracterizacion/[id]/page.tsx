@@ -329,7 +329,7 @@ function StatusChangePanel({
   return (
     <div className="space-y-4">
       {/* Status buttons */}
-      <Card>
+      <Card className="border-l-4 border-l-primary bg-primary/5 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Shield className="h-5 w-5 text-primary" />
@@ -371,7 +371,7 @@ function StatusChangePanel({
 
       {/* Invitation section */}
       {(currentEstado === "APROBADO" || showInvite) && (
-        <Card className="border-green-500/20 bg-green-500/5">
+        <Card className="border-l-4 border-l-green-500 bg-green-500/5 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base text-green-700 dark:text-green-400">
               <Mail className="h-5 w-5" />
@@ -630,56 +630,69 @@ function ServerDetailView({
           </motion.div>
         </motion.div>
 
-        {/* Map - full width, bigger */}
-        {hasCoords && (
-          <Card className="mb-6 overflow-hidden">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <MapPin className="h-5 w-5 text-primary" />
-                Ubicacion del Predio
-                <span className="ml-auto text-xs font-normal text-muted-foreground">
-                  {lat!.toFixed(6)}, {lng!.toFixed(6)}
-                  {predio?.altitud_msnm && ` | ${predio.altitud_msnm} msnm`}
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 pb-0">
-              <div className="h-[500px] md:h-[600px]">
-                <MapViewer
-                  initialCenter={[lat!, lng!]}
-                  initialZoom={14}
-                  markerPosition={[lat!, lng!]}
-                  polygonCoords={parsePoligono(predio?.poligono)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Mapa + Panel lateral */}
+        {(hasCoords || canManageStatus) && (
+          <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_360px]">
+            {/* Mapa */}
+            {hasCoords && (
+              <Card className="border-l-4 border-l-green-500 bg-card/80 border-border/60 overflow-hidden" style={{boxShadow:'var(--shadow-md)'}}>
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <CardTitle className="flex items-center justify-between gap-2 text-sm">
+                    <span className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-green-600" />
+                      Ubicación del Predio
+                    </span>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {lat!.toFixed(5)}, {lng!.toFixed(5)}
+                      {predio?.altitud_msnm && ` · ${predio.altitud_msnm} msnm`}
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="h-[380px] md:h-[460px] lg:h-[500px]">
+                    <MapViewer
+                      initialCenter={[lat!, lng!]}
+                      initialZoom={14}
+                      markerPosition={[lat!, lng!]}
+                      polygonCoords={parsePoligono(predio?.poligono)}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-        {/* Insights: clima + NDVI */}
-        {hasCoords && (
-          <div className="mb-6">
-            <PredioInsights
-              lat={lat!}
-              lng={lng!}
-              areaTotalHa={predio?.area_total_hectareas}
-              areaProductivaHa={predio?.area_productiva_hectareas}
-            />
-          </div>
-        )}
-
-        {/* Status Management + QR - for asesor/admin */}
-        {canManageStatus && (
-          <div className="mb-6">
-            <StatusChangePanel
-              visitaId={visita?.id}
-              currentEstado={caracterizacion?.estado || "INICIADO"}
-              beneficiarioEmail={beneficiario?.correo || null}
-              beneficiarioNombre={nombre}
-              beneficiarioTelefono={beneficiario?.telefono || null}
-              userRol={profile?.rol}
-              onReload={onReload}
-            />
+            {/* Panel lateral: Insights + Gestión estado */}
+            {(hasCoords || canManageStatus) && (
+              <Card className="border-l-4 border-l-primary bg-card/80 border-border/60 flex flex-col" style={{boxShadow:'var(--shadow-md)'}}>
+                <CardHeader className="pb-2 pt-4 px-4 shrink-0">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-primary" />
+                    Análisis y Gestión
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {hasCoords && (
+                    <PredioInsights
+                      lat={lat!}
+                      lng={lng!}
+                      areaTotalHa={predio?.area_total_hectareas}
+                      areaProductivaHa={predio?.area_productiva_hectareas}
+                    />
+                  )}
+                  {canManageStatus && (
+                    <StatusChangePanel
+                      visitaId={visita?.id}
+                      currentEstado={caracterizacion?.estado || "INICIADO"}
+                      beneficiarioEmail={beneficiario?.correo || null}
+                      beneficiarioNombre={nombre}
+                      beneficiarioTelefono={beneficiario?.telefono || null}
+                      userRol={profile?.rol}
+                      onReload={onReload}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
