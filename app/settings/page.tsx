@@ -100,17 +100,24 @@ export default function SettingsPage() {
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
-        className="mx-auto w-full max-w-3xl overflow-y-auto"
+        className="w-full overflow-y-auto -m-4 md:-m-6 p-4 md:p-6"
       >
-        <div className="space-y-6 pb-8">
-          <div>
-            <h2 className="text-xl font-semibold">Mi Cuenta</h2>
-            <p className="text-sm text-muted-foreground">Información de perfil y seguridad</p>
-          </div>
+        <div className="max-w-3xl space-y-5 pb-8">
+
+          {/* Header gradiente — igual al resto */}
+          <motion.div variants={staggerItem}>
+            <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-4 sm:p-5">
+              <div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-primary/10 blur-3xl" />
+              <div className="relative">
+                <h2 className="text-xl font-semibold">Mi Cuenta</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">Información de perfil y seguridad</p>
+              </div>
+            </div>
+          </motion.div>
 
           {/* Perfil */}
           <motion.div variants={staggerItem}>
-            <Card>
+            <Card className="border-l-4 border-l-primary bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
               <CardHeader>
                 <CardTitle className="text-base">Perfil</CardTitle>
                 <CardDescription>Tus datos de acceso al sistema</CardDescription>
@@ -174,7 +181,7 @@ export default function SettingsPage() {
 
           {/* Cambiar contraseña */}
           <motion.div variants={staggerItem}>
-            <Card>
+            <Card className="border-l-4 border-l-blue-500 bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Lock className="h-4 w-4" />
