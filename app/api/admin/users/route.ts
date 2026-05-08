@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     if (asesoresOnly) {
       // Listado compacto de asesores/admins activos (para el dropdown de asignación)
       const asesores = await prisma.profiles.findMany({
-        where: { rol: { in: ['asesor', 'admin'] }, activo: true },
+        where: { rol: 'asesor', activo: true },
         select: { id: true, nombre_completo: true },
         orderBy: { nombre_completo: 'asc' },
         take: 200,
