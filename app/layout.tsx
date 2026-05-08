@@ -1,6 +1,6 @@
 import React from "react"
 import type { Metadata } from 'next'
-import { Fraunces, Plus_Jakarta_Sans } from 'next/font/google'
+import { Poppins, Plus_Jakarta_Sans } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { SessionValidator } from '@/components/session-validator'
@@ -11,8 +11,9 @@ import { SuppressInstallPrompt } from '@/components/suppress-install-prompt'
 import { AutoSync } from '@/components/auto-sync'
 import './globals.css'
 
-const fraunces = Fraunces({
+const poppins = Poppins({
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
   variable: '--font-display',
   display: 'swap',
 })
@@ -53,7 +54,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body className={`${fraunces.variable} ${plusJakarta.variable} font-sans antialiased`}>
+      <body className={`${poppins.variable} ${plusJakarta.variable} font-sans antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

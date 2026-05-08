@@ -22,6 +22,9 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
+  CheckCircle2,
+  Clock3,
+  TrendingUp,
 } from "lucide-react"
 
 export default function DashboardPage() {
@@ -188,19 +191,54 @@ export default function DashboardPage() {
             </div>
           </motion.div>
 
-          {/* Stats simples */}
-          <motion.div variants={staggerItem} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Card className="border-border/60 bg-card/70 backdrop-blur-sm" style={{boxShadow: 'var(--shadow-sm)'}}>
-              <CardContent className="flex items-center gap-3 p-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <FileText className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{serverStats?.total ?? 0}</p>
-                  <p className="text-xs text-muted-foreground">Caracterizaciones registradas</p>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Stats — 4 métricas clave */}
+          <motion.div variants={staggerItem} className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              {
+                label: 'Total registros',
+                value: serverStats?.total ?? 0,
+                icon: FileText,
+                color: 'text-primary',
+                bg: 'bg-primary/10',
+                border: 'border-border/60',
+              },
+              {
+                label: 'Viables',
+                value: serverStats?.registros?.filter((r: any) => r.caracterizaciones?.[0]?.estado === 'APROBADO').length ?? 0,
+                icon: CheckCircle2,
+                color: 'text-green-500',
+                bg: 'bg-green-500/10',
+                border: 'border-green-500/20',
+              },
+              {
+                label: 'En revisión',
+                value: serverStats?.registros?.filter((r: any) => ['REVISADO','EN_ESTUDIO_CREDITO'].includes(r.caracterizaciones?.[0]?.estado)).length ?? 0,
+                icon: Clock3,
+                color: 'text-blue-500',
+                bg: 'bg-blue-500/10',
+                border: 'border-blue-500/20',
+              },
+              {
+                label: 'Iniciados',
+                value: serverStats?.registros?.filter((r: any) => r.caracterizaciones?.[0]?.estado === 'INICIADO' || !r.caracterizaciones?.[0]?.estado).length ?? 0,
+                icon: TrendingUp,
+                color: 'text-yellow-500',
+                bg: 'bg-yellow-500/10',
+                border: 'border-yellow-500/20',
+              },
+            ].map(({ label, value, icon: Icon, color, bg, border }) => (
+              <Card key={label} className={`border ${border} bg-card/70 backdrop-blur-sm`} style={{boxShadow: 'var(--shadow-sm)'}}>
+                <CardContent className="flex items-center gap-3 p-4">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${bg}`}>
+                    <Icon className={`h-5 w-5 ${color}`} />
+                  </div>
+                  <div>
+                    <p className={`text-2xl font-bold ${color}`}>{value}</p>
+                    <p className="text-xs text-muted-foreground leading-tight">{label}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </motion.div>
 
           {/* Acciones rápidas */}

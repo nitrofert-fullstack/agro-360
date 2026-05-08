@@ -1100,180 +1100,42 @@ export function AdminDashboard() {
   const paginatedUsuarios = usuarios
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
-        <div className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4">
-          <h1 className="text-base font-semibold text-foreground">Panel de Administración</h1>
-          <div className="flex items-center gap-1.5 md:gap-2">
-            <Button variant="outline" size="sm" onClick={() => { if (activeSection === 'usuarios') loadUsers({ page: userPage, search: userSearch }); else loadData({ page: 1, search: searchQuery, estado: filterEstado }); loadStats(); toast.info('Actualizando datos...') }} className="h-9 gap-2 bg-transparent px-2 md:px-3">
-              <RefreshCw className="h-4 w-4" />
-              <span className="hidden md:inline">Actualizar</span>
-            </Button>
-            <div className="hidden h-6 w-px bg-border md:block" />
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={isSigningOut}
-              onClick={async () => {
-                if (isSigningOut) return
-                setIsSigningOut(true)
-                await fetch('/auth/signout', { method: 'POST' })
-                window.location.href = '/auth/login'
-              }}
-              className="h-9 gap-2 text-muted-foreground hover:text-destructive"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">{isSigningOut ? 'Saliendo...' : 'Salir'}</span>
-            </Button>
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
+    <div className="bg-background">
+      {/* Stats bar — siempre visible, grid horizontal compacto */}
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="grid grid-cols-2 gap-2 mb-4 sm:grid-cols-3 lg:grid-cols-5"
+      >
+        {[
+          { label: 'Total', value: totalCount || estadisticas.total, icon: FileText, color: 'text-primary', bg: 'bg-primary/10', border: 'border-border/60' },
+          { label: 'Iniciados', value: estadisticas.pendientes, icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' },
+          { label: 'En revisión', value: estadisticas.sincronizados, icon: Eye, color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
+          { label: 'Viables', value: estadisticas.aprobados, icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/10', border: 'border-green-500/20' },
+          { label: 'No viables', value: estadisticas.rechazados, icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/20' },
+        ].map(({ label, value, icon: Icon, color, bg, border }) => (
+          <motion.div key={label} variants={staggerItem}>
+            <Card className={`border ${border} bg-card/70 backdrop-blur-sm`} style={{boxShadow: 'var(--shadow-sm)'}}>
+              <CardContent className="flex items-center gap-3 p-3 md:p-4">
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${bg}`}>
+                  <Icon className={`h-4 w-4 ${color}`} />
+                </div>
+                <div className="min-w-0">
+                  <p className={`text-xl font-bold leading-tight ${color}`}>{value}</p>
+                  <p className="text-xs text-muted-foreground truncate">{label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
+      </motion.div>
 
       <div className="flex">
-        {/* Sidebar Stats */}
-        <aside className="hidden w-64 border-r border-border bg-card/50 p-4 lg:block">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <LayoutDashboard className="h-4 w-4" />
-              Resumen
-            </div>
-
-            <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-2">
-              <motion.div variants={staggerItem}>
-              <Card className="border-border/60 bg-card/70 backdrop-blur-sm" style={{boxShadow: 'var(--shadow-sm)'}}>
-                <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <FileText className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold">{totalCount || estadisticas.total}</p>
-                      <p className="text-xs text-muted-foreground">Total</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              </motion.div>
-
-              <Card className="border-yellow-500/20 bg-yellow-500/5">
-                <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-500/10">
-                      <Clock className="h-5 w-5 text-yellow-500" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-yellow-500">{estadisticas.pendientes}</p>
-                      <p className="text-xs text-muted-foreground">Pendientes</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <motion.div variants={staggerItem}>
-              <Card className="border-blue-500/20 bg-blue-500/5">
-                <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                      <Eye className="h-5 w-5 text-blue-500" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-blue-500">{estadisticas.sincronizados}</p>
-                      <p className="text-xs text-muted-foreground">Sincronizados</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              </motion.div>
-
-              <motion.div variants={staggerItem}>
-              <Card className="border-green-500/20 bg-green-500/5">
-                <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-green-500">{estadisticas.aprobados}</p>
-                      <p className="text-xs text-muted-foreground">Aprobados</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              </motion.div>
-
-              <motion.div variants={staggerItem}>
-              <Card className="border-red-500/20 bg-red-500/5">
-                <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10">
-                      <XCircle className="h-5 w-5 text-red-500" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-red-500">{estadisticas.rechazados}</p>
-                      <p className="text-xs text-muted-foreground">Rechazados</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              </motion.div>
-            </motion.div>
-
-            {/* Section navigation */}
-            <div className="mt-6 space-y-2">
-              <div className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <LayoutDashboard className="h-4 w-4" />
-                Secciones
-              </div>
-              <Button
-                variant={activeSection === 'caracterizaciones' ? 'default' : 'ghost'}
-                size="sm"
-                className="w-full justify-start gap-2"
-                onClick={() => router.push('/admin/caracterizaciones')}
-              >
-                <FileText className="h-4 w-4" />
-                Caracterizaciones
-              </Button>
-              {!isAnalista && (
-                <Button
-                  variant={activeSection === 'usuarios' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="w-full justify-start gap-2"
-                  onClick={() => router.push('/admin/usuarios')}
-                >
-                  <Users className="h-4 w-4" />
-                  Usuarios
-                </Button>
-              )}
-              <Button
-                variant={activeSection === 'estadisticas' ? 'default' : 'ghost'}
-                size="sm"
-                className="w-full justify-start gap-2"
-                onClick={() => router.push('/admin/estadisticas')}
-              >
-                <BarChart2 className="h-4 w-4" />
-                Estadísticas
-              </Button>
-              {!isAnalista && (
-                <Button
-                  variant={activeSection === 'mapa' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="w-full justify-start gap-2"
-                  onClick={() => router.push('/admin/mapa')}
-                >
-                  <Map className="h-4 w-4" />
-                  Mapa de Predios
-                </Button>
-              )}
-            </div>
-          </div>
-        </aside>
-
         {/* Main Content */}
-        <main className="flex-1 p-3 md:p-6">
-          {/* Mobile section tabs */}
-          <div className="mb-4 flex flex-wrap gap-2 lg:hidden">
+        <main className="flex-1 min-w-0">
+          {/* Tabs de sección — visibles solo en mobile donde el sidebar está oculto */}
+          <div className="mb-4 flex flex-wrap gap-2 md:hidden">
             <Button
               variant={activeSection === 'caracterizaciones' ? 'default' : 'outline'}
               size="sm"
