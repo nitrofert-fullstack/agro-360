@@ -551,7 +551,7 @@ function MapCard({ lat, lng, predio }: { lat: number; lng: number; predio: any }
 
       {/* Mapa limpio */}
       <CardContent className="p-0 flex-1 min-h-0">
-        <div className="h-[320px] md:h-[400px] lg:h-[440px]">
+        <div className="h-[320px] md:h-[400px] lg:h-[560px] xl:h-[640px]">
           <MapViewer
             initialCenter={[lat, lng]}
             initialZoom={14}
