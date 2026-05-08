@@ -1358,26 +1358,18 @@ export function AdminDashboard() {
                                       )}
                                     </div>
                                   </div>
-                                  <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                                  <div className="flex shrink-0 items-center gap-1.5">
                                     {c.predio?.latitud && c.predio?.longitud && (
-                                      <Button variant="outline" size="sm" onClick={() => openMapView(c)} className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:gap-1 sm:px-3">
+                                      <Button variant="outline" size="icon" onClick={() => openMapView(c)} className="h-9 w-9">
                                         <Map className="h-3.5 w-3.5" />
-                                        <span className="hidden sm:inline text-xs">Mapa</span>
                                       </Button>
                                     )}
-                                    <Button variant="default" size="sm" onClick={() => openDetail(c)} className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:gap-1 sm:px-3">
+                                    <Button variant="default" size="icon" onClick={() => openDetail(c)} className="h-9 w-9">
                                       <Eye className="h-3.5 w-3.5" />
-                                      <span className="hidden sm:inline text-xs">Ver</span>
                                     </Button>
                                     {isAdmin && (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setDeleteTarget(c)}
-                                        className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:gap-1 sm:px-3 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                      >
+                                      <Button variant="outline" size="icon" onClick={() => setDeleteTarget(c)} className="h-9 w-9 border-destructive/40 text-destructive hover:bg-destructive/10">
                                         <Trash2 className="h-3.5 w-3.5" />
-                                        <span className="hidden sm:inline text-xs">Eliminar</span>
                                       </Button>
                                     )}
                                   </div>
@@ -1618,7 +1610,7 @@ export function AdminDashboard() {
                         u.rol === 'agricultor' || u.rol === 'campesino' ? 'border-l-green-500' :
                         'border-l-blue-500'
                       }`} style={{boxShadow:'var(--shadow-sm)'}}>
-                        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-4">
+                        <CardContent className="flex flex-col gap-2 p-3 sm:p-4 sm:flex-row sm:items-center sm:gap-3">
                           {/* Avatar + info */}
                           <div className="flex min-w-0 flex-1 items-start gap-3">
                             <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${u.activo ? 'bg-primary/10' : 'bg-red-500/10'}`}>
@@ -1677,7 +1669,7 @@ export function AdminDashboard() {
                           </div>
 
                           {/* Acciones */}
-                          <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                          <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">
                             {/* Selector de rol — solo admin, no sobre sí mismo */}
                             {isAdmin && u.id !== currentUser?.id && (
                               <div className="flex items-center gap-1">
@@ -1689,7 +1681,7 @@ export function AdminDashboard() {
                                   onValueChange={(newRol) => changeUserRole(u.id, newRol)}
                                   disabled={changingRoleUserId === u.id}
                                 >
-                                  <SelectTrigger className="h-8 w-36 text-xs">
+                                  <SelectTrigger className="h-9 w-32 text-xs">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -2154,7 +2146,7 @@ export function AdminDashboard() {
               <div className="space-y-4 p-4 md:p-6">
 
                 {/* Fila 1: Beneficiario · Contacto · Registro */}
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <Card className="border-l-4 border-l-primary bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-base">
@@ -2314,7 +2306,7 @@ export function AdminDashboard() {
                   )}
 
                 {/* Fila 2: Predio + Características */}
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <Card className="border-l-4 border-l-green-500 bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-base">
