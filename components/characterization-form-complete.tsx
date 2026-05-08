@@ -2693,30 +2693,37 @@ export function CharacterizationFormComplete({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="min-h-screen bg-gradient-to-b from-background to-muted/20"
+      className="min-h-screen bg-background"
     >
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border/40 bg-background/95 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={60} height={60} className="rounded-xl" />
+      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/90 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 gap-3">
+          {/* Logo + nombre */}
+          <Link href={isAuthenticated ? "/dashboard" : "/"} className="flex items-center gap-2 shrink-0">
+            <Image src="/icons/icon-192x192.png" alt="Santander Agro360" width={32} height={32} className="rounded-xl" />
+            <span className="hidden sm:block text-sm font-semibold">Agro360</span>
+          </Link>
+
+          {/* Paso actual — centro */}
+          <div className="flex items-center gap-2 text-sm">
+            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">
+              {currentStep}
+            </span>
+            <span className="hidden sm:inline text-foreground font-medium">{steps[currentStep - 1].title}</span>
+            <span className="text-muted-foreground text-xs">/ {steps.length}</span>
           </div>
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <span className="hidden sm:inline">Paso {currentStep} de {steps.length}</span>
-            <span className="sm:hidden">{currentStep}/{steps.length}</span>
-            <span className="mx-2 hidden sm:inline">|</span>
-            <span className="hidden sm:inline">{steps[currentStep - 1].title}</span>
-          </div>
-          <div className="flex items-center gap-2">
+
+          {/* Acciones derecha */}
+          <div className="flex items-center gap-2 shrink-0">
             {!isAuthenticated && (
-              <Button variant="outline" size="sm" asChild className="hidden sm:flex gap-1.5 text-xs">
+              <Button variant="outline" size="sm" asChild className="hidden sm:flex gap-1.5 text-xs h-8">
                 <Link href={`/auth/login?redirectTo=/formulario`}>
                   <User className="h-3.5 w-3.5" />
-                  Asesor: Inicia sesión
+                  Iniciar sesión
                 </Link>
               </Button>
             )}
-            <Button variant="outline" size="icon" asChild className="h-9 w-9">
+            <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-muted-foreground hover:text-foreground">
               <Link href={isAuthenticated ? "/dashboard" : "/"}>
                 <Home className="h-4 w-4" />
               </Link>
@@ -2727,7 +2734,7 @@ export function CharacterizationFormComplete({
       </header>
 
       {/* Progress bar */}
-      <div className="sticky top-16 z-40 border-b border-border/40 bg-background/95 backdrop-blur-md">
+      <div className="sticky top-14 z-40 border-b border-border/50 bg-background/90 backdrop-blur-md">
         <div className="mx-auto max-w-5xl px-4 py-2">
 
           {/* Móvil: barra compacta (< 768px) */}
@@ -2764,7 +2771,7 @@ export function CharacterizationFormComplete({
                   onClick={() => goToStep(step.id)}
                   aria-current={isActive ? "step" : undefined}
                   aria-label={`Paso ${step.id}: ${step.title}`}
-                  className={`flex flex-col items-center gap-1 flex-1 min-h-[44px] py-1 rounded-lg transition-colors ${isActive ? "bg-primary/10" : ""}`}
+                  className={`flex flex-col items-center gap-1 flex-1 min-h-[44px] py-1 rounded-lg transition-all duration-200 ${isActive ? "bg-primary/10 border-b-2 border-b-primary" : isCompleted ? "opacity-80" : "opacity-50"}`}
                 >
                   <div
                     className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 ${
@@ -2799,7 +2806,7 @@ export function CharacterizationFormComplete({
                   onClick={() => goToStep(step.id)}
                   aria-current={isActive ? "step" : undefined}
                   aria-label={`Paso ${step.id}: ${step.title}${isCompleted ? ' (completado)' : isActive ? ' (actual)' : ''}`}
-                  className={`flex flex-col items-center gap-1 min-w-[60px] p-2 rounded-lg transition-colors ${isActive ? "bg-primary/10" : isCompleted ? "bg-muted/60" : ""}`}
+                  className={`flex flex-col items-center gap-1 min-w-[60px] p-2 rounded-lg transition-all duration-200 ${isActive ? "bg-primary/10 border-b-2 border-b-primary" : isCompleted ? "opacity-80" : "opacity-40"}`}
                 >
                   <div
                     className={`flex h-8 w-8 items-center justify-center rounded-full transition-all duration-300 ${
@@ -2824,7 +2831,7 @@ export function CharacterizationFormComplete({
       </div>
 
       {/* Content */}
-      <main className="mx-auto max-w-5xl px-4 py-6">
+      <main className="mx-auto max-w-5xl px-4 py-6 md:py-8">
         {isAsesor && (
           <div className="mb-4 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800/60 dark:bg-green-900/20 dark:text-green-300">
             <Lock className="mt-0.5 h-4 w-4 shrink-0" />
@@ -2860,32 +2867,35 @@ export function CharacterizationFormComplete({
           </div>
         )}
 
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={currentStep}
-            initial={{ opacity: 0, x: stepDirection * 32 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: stepDirection * -24 }}
-            transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-          >
-            {renderStep()}
-          </motion.div>
-        </AnimatePresence>
+        {/* Contenido del paso — card glassmorphism */}
+        <div className="rounded-xl border border-border/60 bg-card/80 backdrop-blur-sm p-5 md:p-7" style={{boxShadow: 'var(--shadow-md)'}}>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, x: stepDirection * 32 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: stepDirection * -24 }}
+              transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              {renderStep()}
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
         {/* Navigation */}
-        <div className="mt-6 flex items-center justify-between gap-4">
+        <div className="mt-4 flex items-center justify-between gap-4">
           <Button
             variant="outline"
             onClick={prevStep}
             disabled={currentStep === 1}
-            className="gap-2 h-11 px-5 md:h-12 md:px-8 md:text-base"
+            className="gap-2 min-h-[44px] px-5 md:min-h-[48px] md:px-8 md:text-base"
           >
             <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" />
             Anterior
           </Button>
 
           {currentStep < steps.length && (
-            <Button onClick={nextStep} className="gap-2 h-11 px-5 md:h-12 md:px-8 md:text-base">
+            <Button onClick={nextStep} className="gap-2 min-h-[44px] px-5 md:min-h-[48px] md:px-8 md:text-base" style={{boxShadow: 'var(--shadow-md)'}}>
               Siguiente
               <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />
             </Button>
