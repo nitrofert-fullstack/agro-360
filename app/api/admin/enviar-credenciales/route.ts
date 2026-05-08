@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
     if (existingProfile) {
       // Ya tiene cuenta → resetear contraseña y reenviar
-      await supabaseAdmin.auth.admin.updateUser(existingProfile.id, {
+      await supabaseAdmin.auth.admin.updateUserById(existingProfile.id, {
         password: tempPassword,
       })
 

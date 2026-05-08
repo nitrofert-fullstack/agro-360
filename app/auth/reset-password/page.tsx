@@ -30,31 +30,28 @@ export default function ResetPasswordPage() {
     const supabase = createClient()
     if (!supabase) { setHasSession(false); return }
 
-    const hasCode = !!new URLSearchParams(window.location.search).get('code')
+    // Implicit flow: token en hash (#access_token=...). PKCE: token en query (?code=...).
+    // detectSessionInUrl:true procesa ambos automáticamente.
+    const hasTokenInUrl =
+      !!new URLSearchParams(window.location.search).get('code') ||
+      window.location.hash.includes('access_token')
 
-    // createBrowserClient con detectSessionInUrl:true ya intercambia el ?code= automáticamente.
-    // Solo necesitamos escuchar el resultado vía onAuthStateChange.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event: AuthChangeEvent, session: Session | null) => {
         if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
           setHasSession(!!session)
-          if (window.location.search.includes('code=')) {
-            window.history.replaceState({}, '', '/auth/reset-password')
-          }
+          window.history.replaceState({}, '', '/auth/reset-password')
         } else if (event === 'SIGNED_OUT') {
           setHasSession(false)
         }
       }
     )
 
-    if (!hasCode) {
-      // Sin code en URL: verificar sesión existente (ej: usuario ya autenticado)
+    if (!hasTokenInUrl) {
       supabase.auth.getSession().then((result: { data: { session: Session | null } }) => {
         setHasSession(!!result.data.session)
       })
     }
-    // Si hay code, detectSessionInUrl lo procesa y dispara onAuthStateChange arriba.
-    // No llamar exchangeCodeForSession manualmente — el code ya fue consumido.
 
     return () => subscription.unsubscribe()
   }, [])

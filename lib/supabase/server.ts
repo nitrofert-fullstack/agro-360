@@ -16,6 +16,9 @@ export async function createClient() {
     url,
     key,
     {
+      auth: {
+        flowType: 'implicit',
+      },
       cookies: {
         getAll() {
           return cookieStore.getAll()

@@ -282,6 +282,7 @@ export function AdminDashboard() {
         : 'caracterizaciones'
   const [caracterizaciones, setCaracterizaciones] = useState<CaracterizacionDB[]>([])
   const [estadisticas, setEstadisticas] = useState({ total: 0, pendientes: 0, sincronizados: 0, aprobados: 0, rechazados: 0 })
+  const [isSigningOut, setIsSigningOut] = useState(false)
   const [adminMapMarkers, setAdminMapMarkers] = useState<MapMarker[]>([])
   const [selectedCaracterizacion, setSelectedCaracterizacion] = useState<CaracterizacionDB | null>(null)
   const [showDetail, setShowDetail] = useState(false)
@@ -1099,15 +1100,36 @@ export function AdminDashboard() {
   const paginatedUsuarios = usuarios
 
   return (
-    <div className="bg-background">
-      {/* Barra de acciones del panel */}
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <h1 className="font-display text-xl font-bold">Panel de Administración</h1>
-        <Button variant="outline" size="sm" onClick={() => { if (activeSection === 'usuarios') loadUsers({ page: userPage, search: userSearch }); else loadData({ page: 1, search: searchQuery, estado: filterEstado }); loadStats(); toast.info('Actualizando datos...') }} className="h-9 gap-2 bg-transparent px-3">
-          <RefreshCw className="h-4 w-4" />
-          <span className="hidden md:inline">Actualizar</span>
-        </Button>
-      </div>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
+        <div className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4">
+          <h1 className="text-base font-semibold text-foreground">Panel de Administración</h1>
+          <div className="flex items-center gap-1.5 md:gap-2">
+            <Button variant="outline" size="sm" onClick={() => { if (activeSection === 'usuarios') loadUsers({ page: userPage, search: userSearch }); else loadData({ page: 1, search: searchQuery, estado: filterEstado }); loadStats(); toast.info('Actualizando datos...') }} className="h-9 gap-2 bg-transparent px-2 md:px-3">
+              <RefreshCw className="h-4 w-4" />
+              <span className="hidden md:inline">Actualizar</span>
+            </Button>
+            <div className="hidden h-6 w-px bg-border md:block" />
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={isSigningOut}
+              onClick={async () => {
+                if (isSigningOut) return
+                setIsSigningOut(true)
+                await fetch('/auth/signout', { method: 'POST' })
+                window.location.href = '/auth/login'
+              }}
+              className="h-9 gap-2 text-muted-foreground hover:text-destructive"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">{isSigningOut ? 'Saliendo...' : 'Salir'}</span>
+            </Button>
+            <ThemeToggle />
+          </div>
+        </div>
+      </header>
 
       <div className="flex">
         {/* Sidebar Stats */}

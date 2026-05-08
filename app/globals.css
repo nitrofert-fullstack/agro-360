@@ -156,6 +156,11 @@
     background-size: 128px 128px;
   }
 
+  /* Headings usan Fraunces globalmente */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display), Georgia, serif;
+  }
+
   /* Focus ring mejorado */
   *:focus-visible {
     outline: 2px solid oklch(0.45 0.18 145 / 0.7);
