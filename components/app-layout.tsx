@@ -131,7 +131,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
           {/* Nav items */}
           <SidebarContent className="pt-2">
-            <SidebarMenu>
+            <SidebarMenu className="group-data-[collapsible=icon]:[&>li]:flex group-data-[collapsible=icon]:[&>li]:justify-center">
               {navItems.map((item) => {
                 const Icon = item.icon
                 const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"))
@@ -152,7 +152,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           {/* Footer */}
           <SidebarFooter className="p-3 space-y-1">
             <Separator className="mb-1" />
-            <SidebarMenu>
+            <SidebarMenu className="group-data-[collapsible=icon]:[&>li]:flex group-data-[collapsible=icon]:[&>li]:justify-center">
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Mi Cuenta" isActive={pathname === "/settings" || pathname === "/profile"}>
                   <Link href="/settings">

@@ -126,15 +126,6 @@ export default function RegistroPage() {
               <form onSubmit={handleSubmit}>
                 <CardContent className="space-y-4">
 
-                  <motion.div variants={staggerItem}>
-                    <Alert className="border-primary/20 bg-primary/5">
-                      <Info className="h-4 w-4 text-primary" />
-                      <AlertDescription className="text-sm">
-                        Solo para <strong>agricultores y productores</strong>. Los asesores son invitados por un administrador.
-                      </AlertDescription>
-                    </Alert>
-                  </motion.div>
-
                   {error && (
                     <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
                       <Alert variant="destructive">
