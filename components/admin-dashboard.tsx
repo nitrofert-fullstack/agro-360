@@ -216,12 +216,9 @@ function AsesorSelector({ visitaId, currentAsesorNombre, onChanged }: {
 
   React.useEffect(() => {
     setIsLoading(true)
-    fetch('/api/admin/users?limit=100')
+    fetch('/api/admin/users?asesores_only=true')
       .then(r => r.json())
-      .then(d => {
-        const asesoresOnly = (d.users || []).filter((u: any) => u.rol === 'asesor' && u.activo)
-        setAsesores(asesoresOnly)
-      })
+      .then(d => { if (d.asesores) setAsesores(d.asesores) })
       .catch(() => {})
       .finally(() => setIsLoading(false))
   }, [])
@@ -274,18 +271,18 @@ type EstadoKey =
   | "en_revision" | "error_sincronizacion"
   | "iniciado" | "revisado" | "en_estudio_credito" | "cancelado"
 
-const estadoConfig: Record<EstadoKey, { label: string; color: string; borderColor: string; icon: typeof Clock }> = {
-  iniciado:              { label: "Iniciado",      color: "bg-slate-500/10 text-slate-500 border-slate-500/20",   borderColor: "border-l-slate-400",  icon: Clock },
-  revisado:              { label: "En Revisión",   color: "bg-blue-500/10 text-blue-500 border-blue-500/20",      borderColor: "border-l-blue-500",   icon: Eye },
-  en_estudio_credito:    { label: "En Estudio",    color: "bg-purple-500/10 text-purple-500 border-purple-500/20",borderColor: "border-l-purple-500", icon: Eye },
-  aprobado:              { label: "Viable",        color: "bg-green-500/10 text-green-500 border-green-500/20",   borderColor: "border-l-green-500",  icon: CheckCircle },
-  cancelado:             { label: "No Viable",     color: "bg-red-500/10 text-red-500 border-red-500/20",         borderColor: "border-l-red-500",    icon: XCircle },
-  pendiente:             { label: "Pendiente",     color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",borderColor: "border-l-yellow-500", icon: Clock },
-  pendiente_sincronizacion: { label: "Pend. Sync", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",borderColor: "border-l-yellow-500", icon: Clock },
-  sincronizado:          { label: "Sincronizado",  color: "bg-blue-500/10 text-blue-500 border-blue-500/20",      borderColor: "border-l-blue-500",   icon: Eye },
-  en_revision:           { label: "En Revisión",   color: "bg-blue-500/10 text-blue-500 border-blue-500/20",      borderColor: "border-l-blue-500",   icon: Eye },
-  rechazado:             { label: "No Viable",     color: "bg-red-500/10 text-red-500 border-red-500/20",         borderColor: "border-l-red-500",    icon: XCircle },
-  error_sincronizacion:  { label: "Error",         color: "bg-red-500/10 text-red-500 border-red-500/20",         borderColor: "border-l-red-500",    icon: XCircle },
+const estadoConfig: Record<EstadoKey, { label: string; color: string; borderColor: string; cardBg: string; icon: typeof Clock }> = {
+  iniciado:              { label: "Iniciado",      color: "bg-slate-500/10 text-slate-500 border-slate-500/20",    borderColor: "border-l-slate-400",  cardBg: "bg-gradient-to-r from-slate-500/5 to-transparent",   icon: Clock },
+  revisado:              { label: "En Revisión",   color: "bg-blue-500/10 text-blue-500 border-blue-500/20",       borderColor: "border-l-blue-500",   cardBg: "bg-gradient-to-r from-blue-500/8 to-transparent",    icon: Eye },
+  en_estudio_credito:    { label: "En Estudio",    color: "bg-purple-500/10 text-purple-500 border-purple-500/20", borderColor: "border-l-purple-500", cardBg: "bg-gradient-to-r from-purple-500/8 to-transparent",  icon: Eye },
+  aprobado:              { label: "Viable",        color: "bg-green-500/10 text-green-500 border-green-500/20",    borderColor: "border-l-green-500",  cardBg: "bg-gradient-to-r from-green-500/8 to-transparent",   icon: CheckCircle },
+  cancelado:             { label: "No Viable",     color: "bg-red-500/10 text-red-500 border-red-500/20",          borderColor: "border-l-red-500",    cardBg: "bg-gradient-to-r from-red-500/6 to-transparent",     icon: XCircle },
+  pendiente:             { label: "Pendiente",     color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", borderColor: "border-l-yellow-500", cardBg: "bg-gradient-to-r from-yellow-500/8 to-transparent",  icon: Clock },
+  pendiente_sincronizacion: { label: "Pend. Sync", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", borderColor: "border-l-yellow-500", cardBg: "bg-gradient-to-r from-yellow-500/8 to-transparent",  icon: Clock },
+  sincronizado:          { label: "Sincronizado",  color: "bg-blue-500/10 text-blue-500 border-blue-500/20",       borderColor: "border-l-blue-500",   cardBg: "bg-gradient-to-r from-blue-500/8 to-transparent",    icon: Eye },
+  en_revision:           { label: "En Revisión",   color: "bg-blue-500/10 text-blue-500 border-blue-500/20",       borderColor: "border-l-blue-500",   cardBg: "bg-gradient-to-r from-blue-500/8 to-transparent",    icon: Eye },
+  rechazado:             { label: "No Viable",     color: "bg-red-500/10 text-red-500 border-red-500/20",          borderColor: "border-l-red-500",    cardBg: "bg-gradient-to-r from-red-500/6 to-transparent",     icon: XCircle },
+  error_sincronizacion:  { label: "Error",         color: "bg-red-500/10 text-red-500 border-red-500/20",          borderColor: "border-l-red-500",    cardBg: "bg-gradient-to-r from-red-500/6 to-transparent",     icon: XCircle },
 }
 
 interface UserProfile {
@@ -1226,7 +1223,7 @@ export function AdminDashboard() {
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                      placeholder="Buscar nombre, predio, municipio..."
+                      placeholder="Buscar nombre, predio, municipio, asesor..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9 w-full"
@@ -1317,7 +1314,7 @@ export function AdminDashboard() {
                               paddingBottom: '12px',
                             }}
                           >
-                            <Card className={`border-l-4 ${config.borderColor ?? 'border-l-slate-400'} bg-card/80 border-border/60 transition-all duration-150 hover:-translate-y-0.5`} style={{boxShadow:'var(--shadow-sm)'}} onMouseEnter={e=>(e.currentTarget as HTMLElement).style.boxShadow='var(--shadow-md)'} onMouseLeave={e=>(e.currentTarget as HTMLElement).style.boxShadow='var(--shadow-sm)'}>
+                            <Card className={`border-l-4 ${config.borderColor ?? 'border-l-slate-400'} ${config.cardBg ?? ''} border-border/60 transition-all duration-150 hover:-translate-y-0.5`} style={{boxShadow:'var(--shadow-sm)'}} onMouseEnter={e=>(e.currentTarget as HTMLElement).style.boxShadow='var(--shadow-md)'} onMouseLeave={e=>(e.currentTarget as HTMLElement).style.boxShadow='var(--shadow-sm)'}>
                               <CardContent className="p-3 sm:p-4">
                                 <div className="flex items-start gap-3">
                                   <div className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
@@ -1603,12 +1600,12 @@ export function AdminDashboard() {
                   {paginatedUsuarios.map((u) => {
                     const invitation = getInvitationForEmail(u.email)
                     return (
-                      <Card key={u.id} className={`border-l-4 bg-card/80 border-border/60 transition-all duration-150 hover:-translate-y-0.5 ${
-                        !u.activo ? 'border-l-red-500 opacity-70' :
-                        u.rol === 'admin' ? 'border-l-orange-500' :
-                        u.rol === 'analista' ? 'border-l-purple-500' :
-                        u.rol === 'agricultor' || u.rol === 'campesino' ? 'border-l-green-500' :
-                        'border-l-blue-500'
+                      <Card key={u.id} className={`border-l-4 border-border/60 transition-all duration-150 hover:-translate-y-0.5 ${
+                        !u.activo ? 'border-l-red-500 bg-gradient-to-r from-red-500/5 to-transparent opacity-75' :
+                        u.rol === 'admin' ? 'border-l-orange-500 bg-gradient-to-r from-orange-500/8 to-transparent' :
+                        u.rol === 'analista' ? 'border-l-purple-500 bg-gradient-to-r from-purple-500/8 to-transparent' :
+                        u.rol === 'agricultor' || u.rol === 'campesino' ? 'border-l-green-500 bg-gradient-to-r from-green-500/8 to-transparent' :
+                        'border-l-blue-500 bg-gradient-to-r from-blue-500/8 to-transparent'
                       }`} style={{boxShadow:'var(--shadow-sm)'}}>
                         <CardContent className="flex flex-col gap-2 p-3 sm:p-4 sm:flex-row sm:items-center sm:gap-3">
                           {/* Avatar + info */}

@@ -45,12 +45,13 @@ export async function GET(request: Request) {
     // ── Búsqueda por texto ──────────────────────────────────────────────────
     let searchBenefIds: string[] | undefined
     let searchPredioIds: string[] | undefined
+    let searchVisitaIds: string[] | undefined
 
     if (search) {
       const safe = search.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9 \-]/g, '').trim()
       if (!safe) return NextResponse.json({ data: [], total: 0, page, limit })
 
-      const [benefs, predios] = await Promise.all([
+      const [benefs, predios, visitasAsesor] = await Promise.all([
         prisma.beneficiarios.findMany({
           where: {
             OR: [
@@ -71,12 +72,19 @@ export async function GET(request: Request) {
           },
           select: { id: true },
         }),
+        // Buscar por nombre del asesor (nombre_tecnico en visitas)
+        prisma.visitas.findMany({
+          where: { nombre_tecnico: { contains: safe, mode: 'insensitive' } },
+          select: { id: true },
+        }),
       ])
 
       searchBenefIds  = benefs.map(b => b.id)
       searchPredioIds = predios.map(p => p.id)
+      searchVisitaIds = visitasAsesor.map(v => v.id)
 
-      if (searchBenefIds.length === 0 && searchPredioIds.length === 0) {
+      // Si hay resultados de asesor, los añadimos a los OR
+      if (searchBenefIds.length === 0 && searchPredioIds.length === 0 && (searchVisitaIds?.length ?? 0) === 0) {
         return NextResponse.json({ data: [], total: 0, page, limit })
       }
     }
@@ -105,8 +113,9 @@ export async function GET(request: Request) {
 
     if (searchBenefIds !== undefined && searchPredioIds !== undefined) {
       const orClauses: Prisma.caracterizacionesWhereInput[] = []
-      if (searchBenefIds.length  > 0) orClauses.push({ id_beneficiario: { in: searchBenefIds  } })
+      if (searchBenefIds.length  > 0) orClauses.push({ id_beneficiario: { in: searchBenefIds } })
       if (searchPredioIds.length > 0) orClauses.push({ id_predio:       { in: searchPredioIds } })
+      if (searchVisitaIds && searchVisitaIds.length > 0) orClauses.push({ id_visita: { in: searchVisitaIds } })
       if (orClauses.length > 0) where.OR = orClauses
     }
 
