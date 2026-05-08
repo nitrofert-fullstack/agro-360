@@ -200,7 +200,7 @@ export default function DashboardPage() {
           {/* Bienvenida + acciones */}
           <motion.div variants={fadeUp} className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-foreground md:text-2xl">
+              <h2 className="font-display text-xl font-bold text-foreground md:text-2xl">
                 Bienvenido, {profile?.nombre_completo?.split(' ')[0] || 'Asesor'}
               </h2>
               <p className="mt-0.5 text-sm text-muted-foreground">
@@ -226,7 +226,7 @@ export default function DashboardPage() {
 
           {/* Stats simples */}
           <motion.div variants={staggerItem} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Card className="border-border">
+            <Card className="border-border/60 bg-card/70 backdrop-blur-sm" style={{boxShadow: 'var(--shadow-sm)'}}>
               <CardContent className="flex items-center gap-3 p-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                   <FileText className="h-5 w-5 text-primary" />
@@ -243,14 +243,14 @@ export default function DashboardPage() {
           <motion.div variants={staggerContainer} className="grid grid-cols-2 gap-3">
             <motion.div variants={staggerItem}>
               <Card
-                className="cursor-pointer transition-all hover:bg-muted/50 hover:shadow-md hover:-translate-y-0.5"
+                className="cursor-pointer transition-all duration-200 hover:bg-muted/50 hover:-translate-y-1"
                 role="button"
                 tabIndex={0}
                 aria-label="Nueva Caracterización — Registrar productor"
                 onClick={() => router.push('/formulario')}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push('/formulario') } }}
               >
-                <CardContent className="flex items-center gap-3 p-4">
+                <CardContent className="flex items-center gap-3 p-4 min-h-[64px]">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
                     <Plus className="h-5 w-5 text-primary" />
                   </div>
@@ -264,7 +264,7 @@ export default function DashboardPage() {
 
             <motion.div variants={staggerItem}>
               <Card
-                className="cursor-pointer transition-all hover:bg-muted/50 hover:shadow-md hover:-translate-y-0.5"
+                className="cursor-pointer transition-all duration-200 hover:bg-muted/50 hover:-translate-y-1"
                 role="button"
                 tabIndex={0}
                 aria-label="Mapa — Ver vegetación"
@@ -340,7 +340,10 @@ export default function DashboardPage() {
                     return (
                       <motion.div key={item.id} variants={staggerItem}>
                         <Card
-                          className="cursor-pointer transition-all hover:bg-muted/30 hover:shadow-sm hover:-translate-y-px"
+                          className="cursor-pointer transition-all duration-200 hover:bg-muted/30 hover:-translate-y-0.5"
+                          style={{boxShadow: 'var(--shadow-sm)'}}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)'}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-sm)'}
                           role="button"
                           tabIndex={0}
                           aria-label={`Ver detalle de ${nombre}`}
