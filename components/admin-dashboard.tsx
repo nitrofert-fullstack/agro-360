@@ -2041,16 +2041,18 @@ export function AdminDashboard() {
       {/* Detail Dialog */}
       <Dialog open={showDetail} onOpenChange={setShowDetail}>
         <DialogContent className="flex flex-col h-[100dvh] max-h-[100dvh] w-screen max-w-none gap-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none md:h-[90vh] md:max-h-[90vh] md:w-[95vw] md:max-w-[1400px] md:rounded-lg md:border">
-          <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              Detalle de Caracterización
-            </DialogTitle>
-            {(selectedCaracterizacion?.radicado_oficial || selectedCaracterizacion?.radicado_local) && (
-              <DialogDescription className="font-mono text-xs">
-                {selectedCaracterizacion.radicado_oficial || selectedCaracterizacion.radicado_local}
-              </DialogDescription>
-            )}
+          <DialogHeader className="shrink-0 border-b border-border/50 bg-primary/5 px-6 py-4">
+            <div className="flex items-center justify-between gap-4">
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <FileText className="h-4 w-4 text-primary" />
+                Detalle de Caracterización
+              </DialogTitle>
+              {(selectedCaracterizacion?.radicado_oficial || selectedCaracterizacion?.radicado_local) && (
+                <DialogDescription className="font-mono text-xs shrink-0">
+                  {selectedCaracterizacion.radicado_oficial || selectedCaracterizacion.radicado_local}
+                </DialogDescription>
+              )}
+            </div>
           </DialogHeader>
 
           {selectedCaracterizacion && (
@@ -2059,7 +2061,7 @@ export function AdminDashboard() {
 
                 {/* Fila 1: Beneficiario · Contacto · Registro */}
                 <div className="grid gap-4 md:grid-cols-3">
-                  <Card>
+                  <Card className="border-l-4 border-l-primary bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-base">
                         <User className="h-4 w-4 text-primary" />
@@ -2098,10 +2100,10 @@ export function AdminDashboard() {
                     </CardContent>
                   </Card>
 
-                  <Card>
+                  <Card className="border-l-4 border-l-blue-500 bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-base">
-                        <Phone className="h-4 w-4 text-primary" />
+                        <Phone className="h-4 w-4 text-blue-500" />
                         Contacto
                       </CardTitle>
                     </CardHeader>
@@ -2125,10 +2127,10 @@ export function AdminDashboard() {
                     </CardContent>
                   </Card>
 
-                  <Card>
+                  <Card className="border-l-4 border-l-orange-500 bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-base">
-                        <Calendar className="h-4 w-4 text-primary" />
+                        <Calendar className="h-4 w-4 text-orange-500" />
                         Registro
                       </CardTitle>
                     </CardHeader>
@@ -2162,9 +2164,9 @@ export function AdminDashboard() {
                   selectedCaracterizacion.foto_doc_frontal_url ||
                   selectedCaracterizacion.foto_doc_trasera_url ||
                   selectedCaracterizacion.firma_productor_url) && (
-                    <Card>
+                    <Card className="border-l-4 border-l-purple-500 bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-base">Evidencia Fotográfica</CardTitle>
+                        <CardTitle className="flex items-center gap-2 text-base"><Eye className="h-4 w-4 text-purple-500" />Evidencia Fotográfica</CardTitle>
                       </CardHeader>
                       <CardContent className="flex flex-wrap gap-3">
                         {[
@@ -2209,10 +2211,10 @@ export function AdminDashboard() {
 
                 {/* Fila 2: Predio + Características */}
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Card>
+                  <Card className="border-l-4 border-l-green-500 bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-base">
-                        <MapPin className="h-4 w-4 text-primary" />
+                        <MapPin className="h-4 w-4 text-green-600" />
                         Datos del Predio
                       </CardTitle>
                     </CardHeader>
@@ -2252,10 +2254,10 @@ export function AdminDashboard() {
                     </CardContent>
                   </Card>
 
-                  <Card>
+                  <Card className="border-l-4 border-l-blue-500 bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-base">
-                        <Mountain className="h-4 w-4 text-primary" />
+                        <Mountain className="h-4 w-4 text-blue-500" />
                         Características del Predio
                       </CardTitle>
                     </CardHeader>
@@ -2317,10 +2319,10 @@ export function AdminDashboard() {
                     </CardContent>
                   </Card>
 
-                  <Card>
+                  <Card className="border-l-4 border-l-yellow-500 bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-base">
-                        <Wallet className="h-4 w-4 text-primary" />
+                        <Wallet className="h-4 w-4 text-yellow-500" />
                         Información Financiera
                       </CardTitle>
                     </CardHeader>
@@ -2373,9 +2375,9 @@ export function AdminDashboard() {
                   )}
 
                   {/* Exportar PDF */}
-                  <Card>
+                  <Card className="border-l-4 border-l-cyan-500 bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Exportar Ficha</CardTitle>
+                      <CardTitle className="flex items-center gap-2 text-base"><Printer className="h-4 w-4 text-cyan-500" />Exportar Ficha</CardTitle>
                       <CardDescription>Genera una ficha PDF con todos los datos del registro</CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -2545,9 +2547,9 @@ export function AdminDashboard() {
                 })()}
 
                 {/* Cambiar Estado */}
-                <Card>
+                <Card className="border-l-4 border-l-primary bg-primary/5 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
                   <CardHeader>
-                    <CardTitle className="text-base">Cambiar Estado</CardTitle>
+                    <CardTitle className="flex items-center gap-2 text-base"><Shield className="h-4 w-4 text-primary" />Cambiar Estado</CardTitle>
                     <CardDescription>Actualice el estado de la caracterización</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -2584,7 +2586,7 @@ export function AdminDashboard() {
                 </Card>
 
                 {/* Observaciones */}
-                <Card>
+                <Card className="border-l-4 border-l-slate-400 bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
                   <CardHeader>
                     <CardTitle className="text-base">Observaciones</CardTitle>
                     <CardDescription>Agregue notas o comentarios sobre la caracterización</CardDescription>
