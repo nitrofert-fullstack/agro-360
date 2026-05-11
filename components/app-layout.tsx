@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { useMemo } from "react"
 import {
   LayoutDashboard,
   FileText,
@@ -93,12 +92,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
 
-  // Leer cookie para mantener estado del sidebar entre navegaciones
-  const defaultSidebarOpen = useMemo(() => {
-    if (typeof document === "undefined") return true
-    const cookie = document.cookie.split(";").find(c => c.trim().startsWith("sidebar_state="))
-    return cookie ? cookie.split("=")[1].trim() !== "false" : true
-  }, [])
+  // Sidebar abre por defecto — el SidebarProvider maneja su propio estado persistido
+  // No leer cookie aquí para evitar hydration mismatch server/client
+  const defaultSidebarOpen = true
 
   const rol = profile?.rol ?? "asesor"
   const navItems = navByRole[rol] ?? navByRole.asesor

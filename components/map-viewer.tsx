@@ -1369,18 +1369,21 @@ export function MapViewer({
           {/* ── Section: Predio seleccionado + NDVI ── */}
           {selectedPredio && canSee(role, 'predio-info') && (
             <div className="border-b border-border">
-              {/* Section header */}
-              <button
-                onClick={() => setShowNdviPanel(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-secondary/50 transition-colors"
-              >
-                <div className="min-w-0">
+              {/* Section header — div, no button, para evitar button anidado */}
+              <div className="w-full flex items-center justify-between px-4 py-3 hover:bg-secondary/50 transition-colors">
+                <div
+                  className="flex-1 min-w-0 cursor-pointer text-left"
+                  onClick={() => setShowNdviPanel(v => !v)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setShowNdviPanel(v => !v) }}
+                >
                   <p className="text-xs font-semibold text-foreground">Predio seleccionado</p>
                   <p className="text-[10px] text-muted-foreground truncate">{selectedPredio.name}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button
-                    onClick={(e) => { e.stopPropagation(); closeNdviPanel() }}
+                    onClick={closeNdviPanel}
                     className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-secondary hover:text-foreground"
                     aria-label="Cerrar predio"
                   >
@@ -1388,11 +1391,15 @@ export function MapViewer({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
-                  <svg className={`h-4 w-4 text-muted-foreground transition-transform ${showNdviPanel ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg
+                    className={`h-4 w-4 text-muted-foreground transition-transform cursor-pointer ${showNdviPanel ? '' : '-rotate-90'}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    onClick={() => setShowNdviPanel(v => !v)}
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
-              </button>
+              </div>
 
               {showNdviPanel && (
                 <div className="px-3 pb-3 space-y-3">
