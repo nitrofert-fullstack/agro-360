@@ -894,7 +894,8 @@ export function MapViewer({
 
       ndviTileLayerRef.current = Lf.tileLayer(tileUrl, {
         opacity: 0.85,
-        maxZoom: 18,
+        maxNativeZoom: 14,  // Sentinel-2 nativo ~10m/px, tiles hasta z14
+        maxZoom: 20,        // Leaflet upscalea z14 para zoom mayor → visible de cerca
         attribution: `Sentinel-2 · ${fecha}`,
       }).addTo(map)
 
