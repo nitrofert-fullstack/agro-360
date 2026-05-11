@@ -291,6 +291,7 @@ export function MapViewer({
   // Panel de predio seleccionado
   const [selectedPredio, setSelectedPredio] = useState<SelectedPredio | null>(null)
   const [showNdviPanel, setShowNdviPanel] = useState(false)
+  const [ndviSource, setNdviSource] = useState<'nasa' | 'agro'>('nasa')
 
   // NDVI MODIS (carga automática por coordenadas — misma API que el detalle)
   const [modisNdvi, setModisNdvi] = useState<ModisNdvi | null>(null)
@@ -1499,58 +1500,179 @@ export function MapViewer({
               </div>
             </div>
 
+            {/* ── Selector de fuente NDVI ── */}
+            <div className="flex border-b border-border">
+              <button
+                onClick={() => setNdviSource('nasa')}
+                className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                  ndviSource === 'nasa'
+                    ? 'border-b-2 border-primary text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                NASA MODIS
+              </button>
+              <button
+                onClick={() => setNdviSource('agro')}
+                className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                  ndviSource === 'agro'
+                    ? 'border-b-2 border-primary text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Agromonitoring
+              </button>
+            </div>
+
             <div className="space-y-3 p-3">
 
-              {/* ── NDVI MODIS (automático) ── */}
-              <div className="rounded-lg border border-border bg-secondary/30 p-3">
-                <p className="mb-2 text-[10px] font-medium text-muted-foreground">ÍNDICE NDVI · NASA MODIS</p>
+              {/* ── Tab NASA MODIS ── */}
+              {ndviSource === 'nasa' && (
+                <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                  <p className="mb-2 text-[10px] font-medium text-muted-foreground">ÍNDICE NDVI · NASA MODIS (16 días)</p>
 
-                {modisNdviLoading && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                    </svg>
-                    <span className="text-xs">Cargando NDVI...</span>
-                  </div>
-                )}
+                  {modisNdviLoading && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                      <span className="text-xs">Cargando NDVI...</span>
+                    </div>
+                  )}
 
-                {modisNdviError && !modisNdviLoading && (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <svg className="h-4 w-4 text-yellow-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                    </svg>
-                    No disponible
-                  </div>
-                )}
+                  {modisNdviError && !modisNdviLoading && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <svg className="h-4 w-4 text-yellow-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                      </svg>
+                      No disponible para esta ubicación
+                    </div>
+                  )}
 
-                {modisNdvi && !modisNdviLoading && (
-                  <div className="space-y-2">
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <p className="text-2xl font-bold" style={{ color: modisNdvi.color }}>
-                          {modisNdvi.ndvi.toFixed(3)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{modisNdvi.interpretacion}</p>
+                  {modisNdvi && !modisNdviLoading && (
+                    <div className="space-y-2">
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <p className="text-2xl font-bold" style={{ color: modisNdvi.color }}>
+                            {modisNdvi.ndvi.toFixed(3)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{modisNdvi.interpretacion}</p>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">{modisNdvi.fecha}</p>
                       </div>
-                      <p className="text-[10px] text-muted-foreground">{modisNdvi.fecha}</p>
+                      <div className="relative h-3 overflow-hidden rounded-full bg-secondary">
+                        <div
+                          className="absolute inset-y-0 left-0 rounded-full transition-all"
+                          style={{
+                            width: `${Math.max(0, Math.min(100, ((modisNdvi.ndvi + 1) / 2) * 100))}%`,
+                            backgroundColor: modisNdvi.color,
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[9px] text-muted-foreground">
+                        <span>-1 (Agua)</span>
+                        <span>+1 (Denso)</span>
+                      </div>
                     </div>
-                    <div className="relative h-3 overflow-hidden rounded-full bg-secondary">
-                      <div
-                        className="absolute inset-y-0 left-0 rounded-full"
-                        style={{
-                          width: `${Math.max(0, Math.min(100, ((modisNdvi.ndvi + 1) / 2) * 100))}%`,
-                          backgroundColor: modisNdvi.color,
-                        }}
-                      />
+                  )}
+
+                  {!modisNdvi && !modisNdviLoading && !modisNdviError && (
+                    <p className="text-xs text-muted-foreground">Selecciona un predio para ver el NDVI</p>
+                  )}
+                </div>
+              )}
+
+              {/* ── Tab Agromonitoring ── */}
+              {ndviSource === 'agro' && (
+                <div className="space-y-3">
+                  {/* Selector de fechas */}
+                  <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2">
+                    <p className="text-[10px] font-medium text-muted-foreground">HISTORIAL NDVI · Agromonitoring / Sentinel-2</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-muted-foreground">Desde</label>
+                        <input
+                          type="date"
+                          value={ndviStart}
+                          onChange={e => setNdviStart(e.target.value)}
+                          className="mt-0.5 w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-muted-foreground">Hasta</label>
+                        <input
+                          type="date"
+                          value={ndviEnd}
+                          onChange={e => setNdviEnd(e.target.value)}
+                          className="mt-0.5 w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
+                        />
+                      </div>
                     </div>
-                    <div className="flex justify-between text-[9px] text-muted-foreground">
-                      <span>-1 (Agua)</span>
-                      <span>+1 (Denso)</span>
-                    </div>
+                    <button
+                      onClick={consultarNDVI}
+                      disabled={ndviLoading || !ndviStart || !ndviEnd}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                    >
+                      {ndviLoading ? (
+                        <>
+                          <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                          </svg>
+                          Consultando...
+                        </>
+                      ) : 'Consultar NDVI'}
+                    </button>
                   </div>
-                )}
-              </div>
+
+                  {/* Error */}
+                  {ndviError && !ndviLoading && (
+                    <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
+                      <p className="text-xs text-yellow-700 dark:text-yellow-400">
+                        {ndviError.includes('503') || ndviError.includes('API key') || ndviError.includes('configurada')
+                          ? 'Agromonitoring no está configurado. Contacte al administrador para activar esta función.'
+                          : ndviError}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Resultados */}
+                  {!ndviLoading && ndviData.length > 0 && (
+                    <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2">
+                      <p className="text-[10px] font-medium text-muted-foreground">{ndviData.length} registros · NDVI medio</p>
+                      <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                        {ndviData.map((r) => {
+                          const mean = r.data.mean
+                          const color = ndviColor(mean)
+                          const pct = Math.max(0, Math.min(100, ((mean + 1) / 2) * 100))
+                          const fecha = new Date(r.dt * 1000).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' })
+                          return (
+                            <div key={r.dt} className="space-y-0.5">
+                              <div className="flex items-center justify-between text-[10px]">
+                                <span className="text-muted-foreground">{fecha}</span>
+                                <span className="font-medium" style={{ color }}>{mean.toFixed(3)}</span>
+                              </div>
+                              <div className="relative h-2 overflow-hidden rounded-full bg-secondary">
+                                <div
+                                  className="absolute inset-y-0 left-0 rounded-full"
+                                  style={{ width: `${pct}%`, backgroundColor: color }}
+                                />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {!ndviLoading && !ndviError && ndviData.length === 0 && (
+                    <p className="text-center text-xs text-muted-foreground py-2">
+                      Selecciona un rango de fechas y pulsa Consultar
+                    </p>
+                  )}
+                </div>
+              )}
 
             </div>
           </div>
