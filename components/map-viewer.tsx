@@ -1066,11 +1066,9 @@ export function MapViewer({
         pane.style.pointerEvents = 'none'
       }
 
-      // tms:true → Agromonitoring usa TMS (y invertido), Leaflet usa XYZ por defecto
       ndviTileLayerRef.current = Lf.tileLayer(tileUrl, {
         pane: 'sentinelPane',
         opacity: 0.9,
-        tms: true,
         maxNativeZoom: 14,
         maxZoom: 20,
         attribution: `${tipo} · ${fecha}`,
@@ -1100,7 +1098,6 @@ export function MapViewer({
     ndviTileLayerRef.current = Lf.tileLayer(availableBands[band], {
       pane: 'sentinelPane',
       opacity: 0.9,
-      tms: true,
       maxNativeZoom: 14,
       maxZoom: 20,
       attribution: imageryMeta ? `${imageryMeta.tipo} · ${imageryMeta.fecha}` : '',
