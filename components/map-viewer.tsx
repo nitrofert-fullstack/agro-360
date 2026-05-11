@@ -504,7 +504,7 @@ export function MapViewer({
     },
   }
 
-  const calculateStats = ((layer: L.Circle | L.Rectangle | L.Polygon) => {
+  const calculateStats = (layer: L.Circle | L.Rectangle | L.Polygon) => {
     let area = 0
     let perimeter = 0
     let bounds: L.LatLngBounds
@@ -564,7 +564,7 @@ export function MapViewer({
     return { area, perimeter, center, bounds, type: shapeType }
   }
 
-  const finishDrawing = (() => {
+  const finishDrawing = () => {
     const map = mapInstanceRef.current
     const drawnItems = drawnItemsRef.current
     const currentLayer = currentDrawLayerRef.current
@@ -1186,7 +1186,7 @@ export function MapViewer({
     setOpacity(layers[layer].opacity)
   }
 
-  const clearDrawings = (() => {
+  const clearDrawings = () => {
     const map = mapInstanceRef.current
     if (drawnItemsRef.current) {
       drawnItemsRef.current.clearLayers()
@@ -1292,7 +1292,7 @@ export function MapViewer({
     : ['base', 'satelital', 'nasa']
 
   // Helper to close the NDVI panel and reset state
-  const closeNdviPanel = (() => {
+  const closeNdviPanel = () => {
     setShowNdviPanel(false)
     setSelectedPredio(null)
     setModisNdvi(null)
