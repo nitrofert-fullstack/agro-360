@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react"
+import { useEffect, useRef, useState } from "react"
 import { PanelLeft } from "lucide-react"
 import L from "leaflet"
 
@@ -342,8 +342,7 @@ export function MapViewer({
     return date.toISOString().split("T")[0]
   }
 
-  // Memoized: getGibsDate() only depends on the current date (computed once per mount)
-  const layers = useMemo(() => ({
+  const layers: Record<LayerType, LayerConfig> = {
     // ── Base maps ──────────────────────────────────────────────────────────
     osm: {
       name: "OpenStreetMap",
@@ -503,10 +502,9 @@ export function MapViewer({
       opacity: 0.7,
       category: 'clima',
     },
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), []) // [] — getGibsDate() depends only on the current date, stable for the component lifetime
+  }
 
-  const calculateStats = useCallback((layer: L.Circle | L.Rectangle | L.Polygon): AreaStats => {
+  const calculateStats = ((layer: L.Circle | L.Rectangle | L.Polygon) => {
     let area = 0
     let perimeter = 0
     let bounds: L.LatLngBounds
@@ -564,9 +562,9 @@ export function MapViewer({
     }
 
     return { area, perimeter, center, bounds, type: shapeType }
-  }, [])
+  }
 
-  const finishDrawing = useCallback(() => {
+  const finishDrawing = (() => {
     const map = mapInstanceRef.current
     const drawnItems = drawnItemsRef.current
     const currentLayer = currentDrawLayerRef.current
@@ -585,7 +583,7 @@ export function MapViewer({
     setPolygonPoints([])
     currentDrawLayerRef.current = null
     drawStartRef.current = null
-  }, [calculateStats])
+  }
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return
@@ -759,14 +757,11 @@ export function MapViewer({
         mapInstanceRef.current = null
       }
     }
-  }, [])
+  }
 
   // Stable key derived from markers content — avoids re-running the heavy effect when the
   // parent re-renders with a new array reference but the same marker data.
-  const markersKey = useMemo(
-    () => markers ? markers.map(m => `${m.id ?? ''}:${m.position[0]}:${m.position[1]}`).join('|') : '',
-    [markers]
-  )
+  const markersKey = markers ? markers.map(m => `${m.id ?? ''}:${m.position[0]}:${m.position[1]}`).join('|') : ''
 
   // Reactive effect: re-render markers/polygons whenever data loads or map becomes ready
   // Uses markersKey (stable string) instead of the markers array reference to avoid
@@ -1191,7 +1186,7 @@ export function MapViewer({
     setOpacity(layers[layer].opacity)
   }
 
-  const clearDrawings = useCallback(() => {
+  const clearDrawings = (() => {
     const map = mapInstanceRef.current
     if (drawnItemsRef.current) {
       drawnItemsRef.current.clearLayers()
@@ -1206,7 +1201,7 @@ export function MapViewer({
     setPolygonPoints([])
     setDrawMode("none")
     setIsDrawing(false)
-  }, [])
+  }
 
   const formatArea = (area: number): string => {
     if (area > 1000000) return `${(area / 1000000).toFixed(2)} km2`
@@ -1297,7 +1292,7 @@ export function MapViewer({
     : ['base', 'satelital', 'nasa']
 
   // Helper to close the NDVI panel and reset state
-  const closeNdviPanel = useCallback(() => {
+  const closeNdviPanel = (() => {
     setShowNdviPanel(false)
     setSelectedPredio(null)
     setModisNdvi(null)
@@ -1313,7 +1308,7 @@ export function MapViewer({
       mapInstanceRef.current.removeLayer(ndviTileLayerRef.current)
       ndviTileLayerRef.current = null
     }
-  }, [])
+  }
 
   // ── Minimal mode: just the map, no sidebar ──
   if (minimal) {
