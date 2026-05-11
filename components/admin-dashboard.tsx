@@ -280,8 +280,8 @@ const estadoConfig: Record<EstadoKey, { label: string; color: string; borderColo
   pendiente:             { label: "Pendiente",     color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", borderColor: "border-l-yellow-500", cardBg: "bg-gradient-to-r from-yellow-500/8 to-transparent",  icon: Clock },
   pendiente_sincronizacion: { label: "Pend. Sync", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", borderColor: "border-l-yellow-500", cardBg: "bg-gradient-to-r from-yellow-500/8 to-transparent",  icon: Clock },
   sincronizado:          { label: "Sincronizado",  color: "bg-blue-500/10 text-blue-500 border-blue-500/20",       borderColor: "border-l-blue-500",   cardBg: "bg-gradient-to-r from-blue-500/8 to-transparent",    icon: Eye },
-  en_revision:           { label: "En Revisión",   color: "bg-blue-500/10 text-blue-500 border-blue-500/20",       borderColor: "border-l-blue-500",   cardBg: "bg-gradient-to-r from-blue-500/8 to-transparent",    icon: Eye },
-  rechazado:             { label: "No Viable",     color: "bg-red-500/10 text-red-500 border-red-500/20",          borderColor: "border-l-red-500",    cardBg: "bg-gradient-to-r from-red-500/6 to-transparent",     icon: XCircle },
+  en_revision:           { label: "Revisado (leg.)", color: "bg-blue-500/10 text-blue-500 border-blue-500/20",       borderColor: "border-l-blue-500",   cardBg: "bg-gradient-to-r from-blue-500/8 to-transparent",    icon: Eye },
+  rechazado:             { label: "Rechazado",      color: "bg-red-500/10 text-red-500 border-red-500/20",          borderColor: "border-l-red-500",    cardBg: "bg-gradient-to-r from-red-500/6 to-transparent",     icon: XCircle },
   error_sincronizacion:  { label: "Error",         color: "bg-red-500/10 text-red-500 border-red-500/20",          borderColor: "border-l-red-500",    cardBg: "bg-gradient-to-r from-red-500/6 to-transparent",     icon: XCircle },
 }
 

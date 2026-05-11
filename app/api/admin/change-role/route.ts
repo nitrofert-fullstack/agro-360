@@ -5,6 +5,12 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(request: Request) {
   try {
+    const origin = request.headers.get('origin')
+    const allowedOrigin = process.env.NEXT_PUBLIC_APP_URL
+    if (origin && allowedOrigin && !origin.startsWith('http://localhost') && origin !== allowedOrigin) {
+      return NextResponse.json({ error: 'Origen no permitido' }, { status: 403 })
+    }
+
     const supabase = await createClient()
 
     const { data: { user }, error: authError } = await supabase.auth.getUser()

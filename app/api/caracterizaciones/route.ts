@@ -390,7 +390,7 @@ export async function POST(request: Request) {
       .from('visitas')
       .insert({
         fecha_visita: c.visita?.fechaVisita || new Date().toISOString().split('T')[0],
-        nombre_tecnico: asesorAutoNombre || c.visita?.nombreTecnico || '',
+        nombre_tecnico: asesorAutoNombre || c.visita?.nombreTecnico || null,
         codigo_formulario: c.visita?.codigoFormulario || null,
         version_formulario: c.visita?.versionFormulario || '1.0',
         fecha_emision_formulario: c.visita?.fechaEmisionFormulario || null,

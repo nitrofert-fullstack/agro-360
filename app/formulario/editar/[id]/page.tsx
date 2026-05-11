@@ -10,7 +10,7 @@ export default function EditarFormularioPage() {
     const params = useParams()
     const router = useRouter()
     const { id } = params as { id: string }
-    const { isAuthenticated, loading: authLoading } = useAuth()
+    const { isAuthenticated, loading: authLoading, user, profile } = useAuth()
 
     const [initialData, setInitialData] = useState<any>(null)
     const [isLoading, setIsLoading] = useState(true)
@@ -27,10 +27,31 @@ export default function EditarFormularioPage() {
             try {
                 const res = await fetch(`/api/caracterizacion/${encodeURIComponent(id)}`)
                 if (!res.ok) {
+                    if (res.status === 404) { router.replace("/dashboard"); return }
                     throw new Error("No se pudo cargar el formulario")
                 }
 
                 const serverData = await res.json()
+
+                // Verificar propiedad: admin/asesor tienen acceso total;
+                // campesino/agricultor solo si el beneficiario les pertenece
+                const rol = profile?.rol
+                const isPrivileged = rol === "admin" || rol === "asesor" || rol === "analista"
+
+                if (!isPrivileged) {
+                    const benefEmail = serverData.beneficiario?.correo
+                    const benefNumDoc = serverData.beneficiario?.numero_documento
+                    const userEmail = user?.email
+                    const userNumDoc = profile?.numero_documento
+
+                    const ownerByEmail = benefEmail && userEmail && benefEmail === userEmail
+                    const ownerByDoc = benefNumDoc && userNumDoc && benefNumDoc === userNumDoc
+
+                    if (!ownerByEmail && !ownerByDoc) {
+                        router.replace("/unauthorized")
+                        return
+                    }
+                }
 
                 // Mapear de ServerData a FormData (el formato usado por el componente)
                 const mappedData = {

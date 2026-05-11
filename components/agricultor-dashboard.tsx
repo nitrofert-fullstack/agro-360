@@ -47,8 +47,8 @@ const estadoConfig: Record<string, { label: string; badge: string; cardBorder: s
   APROBADO:           { label: "Viable",             badge: "bg-green-500/10 text-green-600 border-green-500/20", cardBorder: "border-l-green-500" },
   CANCELADO:          { label: "No Viable",          badge: "bg-red-500/10 text-red-600 border-red-500/20",       cardBorder: "border-l-red-500" },
   SINCRONIZADO:       { label: "Registrado",         badge: "bg-slate-500/10 text-slate-600 border-slate-500/20", cardBorder: "border-l-slate-400" },
-  EN_REVISION:        { label: "En Revisión",        badge: "bg-blue-500/10 text-blue-600 border-blue-500/20",    cardBorder: "border-l-blue-500" },
-  RECHAZADO:          { label: "No Viable",          badge: "bg-red-500/10 text-red-600 border-red-500/20",       cardBorder: "border-l-red-500" },
+  EN_REVISION:        { label: "Revisado (leg.)",     badge: "bg-blue-500/10 text-blue-600 border-blue-500/20",    cardBorder: "border-l-blue-500" },
+  RECHAZADO:          { label: "Rechazado",           badge: "bg-red-500/10 text-red-600 border-red-500/20",       cardBorder: "border-l-red-500" },
 }
 
 function fmtFecha(raw: unknown, fallback = 'N/A'): string {
