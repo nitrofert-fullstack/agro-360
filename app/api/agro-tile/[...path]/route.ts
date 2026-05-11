@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const AGRO_BASE = 'https://api.agromonitoring.com/agro/1.0'
+// Base sin prefijo — la URL original de Agromonitoring ya incluye el path completo
+// (ej: tile/1.0/{z}/{x}/{y}/{hash}/{polyid})
+const AGRO_BASE = 'https://api.agromonitoring.com'
 
 // Catch-all proxy for Agromonitoring tile requests.
-// URL pattern: /api/agro-tile/tile/1.{z}/{x}/{y}/0/{hash}/{polyid}
-// Proxies to:  https://api.agromonitoring.com/agro/1.0/tile/1.12/1234/5678/0/{hash}/{polyid}?appid=KEY
+// URL original: http://api.agromonitoring.com/tile/1.0/{z}/{x}/{y}/{hash}/{polyid}
+// Proxy URL:    /api/agro-tile/tile/1.0/{z}/{x}/{y}/{hash}/{polyid}
+// Proxies to:   https://api.agromonitoring.com/tile/1.0/12/603/987/{hash}/{polyid}?appid=KEY
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }

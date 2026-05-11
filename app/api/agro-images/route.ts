@@ -51,17 +51,17 @@ export async function GET(req: NextRequest) {
         const tile: Record<string, string> = {}
         for (const [band, rawUrl] of Object.entries(img.tile as Record<string, string>)) {
           try {
-            // Agromonitoring devuelve URLs con {z}/{x}/{y} literales
-            // Las parseamos con un placeholder temporal para no romper la URL
-            const tempUrl = (rawUrl as string).replace(/\{z\}\/\{x\}\/\{y\}/g, '0/0/0')
+            // Agromonitoring devuelve URLs con {z}/{x}/{y} literales.
+            // Usamos __TILE__ como placeholder para no corromper números de versión (ej: 1.0).
+            // URL original: http://api.agromonitoring.com/tile/1.0/{z}/{x}/{y}/{hash}/{polyid}
+            const PLACEHOLDER = '__TILE__'
+            const tempUrl = (rawUrl as string).replace(/\{z\}\/\{x\}\/\{y\}/g, PLACEHOLDER)
             const u = new URL(tempUrl)
-            // Extraer path relativo quitando /agro/1.0 (con o sin trailing slash)
-            // y la barra inicial. El proxy agro-tile ya añade /agro/1.0 como base.
+            // Solo quitar la barra inicial — el path incluye "tile/1.0/..." que el proxy necesita
             const agPath = u.pathname
-              .replace(/^\/agro\/1\.0\/?/, '')
               .replace(/^\//, '')
-              .replace('0/0/0', '{z}/{x}/{y}')
-            console.log('[agro-images] tile rewrite:', rawUrl, '→', `/api/agro-tile/${agPath}`)
+              .replace(PLACEHOLDER, '{z}/{x}/{y}')
+            console.log('[agro-images] tile rewrite:', rawUrl.replace(/appid=[^&]+/, 'appid=KEY'), '→', `/api/agro-tile/${agPath}`)
             const params = new URLSearchParams(u.search)
             params.delete('appid')
             const qs = params.toString()
