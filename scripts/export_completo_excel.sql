@@ -1,6 +1,7 @@
 -- =============================================================
 -- EXPORT COMPLETO BASE DE DATOS - AgroSantander360
 -- Una fila por predio, con TODA la información relacionada
+-- Basado en schema Prisma verificado
 -- =============================================================
 --
 -- Cómo exportar a Excel desde Supabase:
@@ -9,41 +10,46 @@
 --   3. Click en "Download CSV"
 --   4. Abre el CSV en Excel: Datos → Desde texto/CSV
 --
--- Para filtrar por beneficiario específico, agrega al final:
+-- Filtros opcionales (añadir antes del ORDER BY):
 --   WHERE b.numero_documento = '123456789'
--- Para filtrar por municipio:
---   WHERE pr.municipio = 'Barrancabermeja'
--- Para filtrar por asesor:
---   WHERE p.nombre_completo ILIKE '%nombre%'
--- Para filtrar por estado:
---   WHERE v.estado = 'APROBADO'
+--   WHERE pr.municipio = 'El Peñón'
+--   WHERE c.estado = 'APROBADO'
+--   WHERE v.fecha_visita BETWEEN '2026-01-01' AND '2026-12-31'
+--   WHERE p.nombre_completo ILIKE '%nombre_asesor%'
 -- =============================================================
 
 SELECT
-  -- ── IDENTIFICACIÓN DEL REGISTRO ──────────────────────────
+  -- ── IDENTIFICACIÓN ───────────────────────────────────────
   c.id                                          AS caracterizacion_id,
   v.radicado_local,
   v.radicado_oficial,
   c.estado                                      AS estado_visita,
   v.fecha_visita,
   v.version_formulario,
+  v.fecha_emision_formulario,
+  v.codigo_formulario,
 
   -- ── ASESOR ───────────────────────────────────────────────
   p.nombre_completo                             AS asesor_nombre,
   p.email                                       AS asesor_email,
-  v.nombre_tecnico                              AS nombre_tecnico_formulario,
   p.rol                                         AS asesor_rol,
+  p.telefono                                    AS asesor_telefono,
+  v.nombre_tecnico                              AS nombre_tecnico_formulario,
 
-  -- ── BENEFICIARIO - DATOS PERSONALES ──────────────────────
+  -- ── BENEFICIARIO ─────────────────────────────────────────
   b.nombres,
   b.apellidos,
   b.nombres || ' ' || b.apellidos               AS nombre_completo,
   b.tipo_documento,
   b.numero_documento,
   b.edad,
+  b.fecha_nacimiento,
+  b.genero,
+  b.personas_a_cargo,
   b.telefono,
   b.correo,
   b.ocupacion_principal,
+  b.asociacion,
 
   -- ── CONTACTO SECUNDARIO ───────────────────────────────────
   b.nombre_contacto_secundario,
@@ -67,8 +73,6 @@ SELECT
   pr.altitud_msnm,
   pr.vive_en_predio,
   pr.tiene_vivienda,
-
-  -- ── PREDIO - ÁREAS ───────────────────────────────────────
   pr.area_total_hectareas,
   pr.area_productiva_hectareas,
   pr.cultivos_existentes,
@@ -85,7 +89,7 @@ SELECT
   cp.cobertura_pastos,
   cp.cobertura_rastrojo,
 
-  -- ── ABASTECIMIENTO DE AGUA (booleanos individuales) ───────
+  -- ── AGUA (booleanos individuales) ─────────────────────────
   aa.nacimiento_manantial               AS agua_nacimiento,
   aa.rio_quebrada                       AS agua_rio_quebrada,
   aa.pozo                               AS agua_pozo,
@@ -94,7 +98,6 @@ SELECT
   aa.jaguey_reservorio                  AS agua_jaguey,
   aa.agua_lluvia                        AS agua_lluvia,
   aa.otra_fuente                        AS agua_otra_fuente,
-  -- Resumen texto
   NULLIF(CONCAT_WS(', ',
     CASE WHEN aa.nacimiento_manantial  THEN 'Nacimiento' END,
     CASE WHEN aa.rio_quebrada          THEN 'Río/Quebrada' END,
@@ -106,7 +109,7 @@ SELECT
     aa.otra_fuente
   ), '')                                AS fuentes_agua_resumen,
 
-  -- ── RIESGOS DEL PREDIO ───────────────────────────────────
+  -- ── RIESGOS ───────────────────────────────────────────────
   rp.inundacion                         AS riesgo_inundacion,
   rp.sequia                             AS riesgo_sequia,
   rp.viento                             AS riesgo_viento,
@@ -122,16 +125,19 @@ SELECT
 
   -- ── ÁREA PRODUCTIVA ──────────────────────────────────────
   ap.sistema_productivo,
+  ap.sistema_productivo_interes,
   ap.caracterizacion_cultivo,
   ap.cantidad_produccion,
   ap.estado_cultivo,
+  ap.hectareas_siembra_nueva,
+  ap.hectareas_renovacion,
   ap.tiene_infraestructura_procesamiento,
   ap.estructuras,
   ap.interesado_programa,
   ap.donde_comercializa,
   ap.ingreso_mensual_ventas,
 
-  -- ── INFORMACIÓN FINANCIERA ────────────────────────────────
+  -- ── FINANCIERO ────────────────────────────────────────────
   inf.ingresos_mensuales_agropecuaria,
   inf.ingresos_mensuales_otros,
   COALESCE(inf.ingresos_mensuales_agropecuaria, 0)
@@ -146,21 +152,22 @@ SELECT
   COALESCE(inf.activos_totales, 0)
     - COALESCE(inf.pasivos_totales, 0)             AS patrimonio_neto,
 
-  -- ── AUTORIZACIONES Y OBSERVACIONES ───────────────────────
+  -- ── AUTORIZACIONES ───────────────────────────────────────
   c.autorizacion_datos_personales,
   c.autorizacion_consulta_crediticia,
+  c.autorizacion_aviso_privacidad,
+  c.autorizacion_uso_imagen,
   c.observaciones,
 
   -- ── FOTOS (URLs) ─────────────────────────────────────────
-  b.foto_url                            AS foto_beneficiario,
-  c.foto_beneficiario_url               AS foto_beneficiario_caracterizacion,
+  c.foto_beneficiario_url,
   c.foto_1_url                          AS foto_predio_1,
   c.foto_2_url                          AS foto_predio_2,
   c.firma_productor_url,
   c.foto_doc_frontal_url,
   c.foto_doc_trasera_url,
 
-  -- ── FECHAS DE REGISTRO ────────────────────────────────────
+  -- ── FECHAS ───────────────────────────────────────────────
   c.created_at                          AS fecha_registro_sistema,
   c.updated_at                          AS fecha_ultima_actualizacion,
   v.created_at                          AS fecha_creacion_visita
@@ -169,21 +176,14 @@ FROM caracterizaciones c
 JOIN beneficiarios b          ON b.id  = c.id_beneficiario
 JOIN visitas v                ON v.id  = c.id_visita
 JOIN predios pr               ON pr.id = c.id_predio
-LEFT JOIN profiles p          ON p.id  = v.asesor_id
+LEFT JOIN profiles p          ON p.id  = v.asesor_id::uuid
 LEFT JOIN caracterizacion_predio cp  ON cp.id_predio = pr.id
 LEFT JOIN abastecimiento_agua aa     ON aa.id_predio  = pr.id
 LEFT JOIN riesgos_predio rp          ON rp.id_predio  = pr.id
 LEFT JOIN area_productiva ap         ON ap.id_predio  = pr.id
 LEFT JOIN informacion_financiera inf ON inf.id_beneficiario = b.id
 
--- ── FILTROS OPCIONALES (descomenta el que necesites) ──────
--- WHERE b.numero_documento = '12345678'
--- WHERE pr.municipio = 'El Peñón'
--- WHERE v.estado = 'APROBADO'
--- WHERE v.fecha_visita BETWEEN '2026-01-01' AND '2026-12-31'
--- WHERE p.nombre_completo ILIKE '%nombre_asesor%'
-
 ORDER BY
-  b.apellidos ASC,
-  b.nombres   ASC,
+  b.apellidos  ASC,
+  b.nombres    ASC,
   v.fecha_visita DESC;
