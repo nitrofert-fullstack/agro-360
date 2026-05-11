@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Las URLs de tiles de Agromonitoring van a api.agromonitoring.com sin prefijo /agro/1.0
-// Ej: tile/1.{z}/{x}/{y}/0/{hash}/{polyid} → https://api.agromonitoring.com/tile/1.12/1234/5678/...
-const AGRO_BASE = 'https://api.agromonitoring.com'
+const AGRO_BASE = 'https://api.agromonitoring.com/agro/1.0'
 
 // Catch-all proxy for Agromonitoring tile requests.
 // URL pattern: /api/agro-tile/tile/1.{z}/{x}/{y}/0/{hash}/{polyid}
-// Proxies to:  https://api.agromonitoring.com/tile/1.12/1234/5678/0/{hash}/{polyid}?appid=KEY
+// Proxies to:  https://api.agromonitoring.com/agro/1.0/tile/1.12/1234/5678/0/{hash}/{polyid}?appid=KEY
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
@@ -25,6 +23,7 @@ export async function GET(
   forwardParams.set('appid', API_KEY)
 
   const url = `${AGRO_BASE}/${path}?${forwardParams.toString()}`
+  console.log('[agro-tile] →', url.replace(process.env.AGROMONITORING_API_KEY || '', 'KEY'))
 
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) })

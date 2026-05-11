@@ -55,12 +55,13 @@ export async function GET(req: NextRequest) {
             // Las parseamos con un placeholder temporal para no romper la URL
             const tempUrl = (rawUrl as string).replace(/\{z\}\/\{x\}\/\{y\}/g, '0/0/0')
             const u = new URL(tempUrl)
-            // Extraer path relativo: solo quitar la barra inicial.
-            // El agro-tile proxy usa https://api.agromonitoring.com como base,
-            // así que el path completo (ej: agro/1.0/tile/1.{z}/...) se preserva intacto.
+            // Extraer path relativo quitando /agro/1.0 (con o sin trailing slash)
+            // y la barra inicial. El proxy agro-tile ya añade /agro/1.0 como base.
             const agPath = u.pathname
+              .replace(/^\/agro\/1\.0\/?/, '')
               .replace(/^\//, '')
               .replace('0/0/0', '{z}/{x}/{y}')
+            console.log('[agro-images] tile rewrite:', rawUrl, '→', `/api/agro-tile/${agPath}`)
             const params = new URLSearchParams(u.search)
             params.delete('appid')
             const qs = params.toString()

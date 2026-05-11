@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
           || request.headers.get('x-real-ip')
           || 'unknown'
 
-  if (!rateLimit(`weather-tile:${ip}`, 60, 60_000)) {
+  if (!rateLimit(`weather-tile:${ip}`, 500, 60_000)) {
     return NextResponse.json({ error: 'Demasiadas solicitudes. Intente en un momento.' }, { status: 429 })
   }
 
