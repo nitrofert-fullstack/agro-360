@@ -305,7 +305,8 @@ export function MapViewer({
   const [agroPolyId, setAgroPolyId] = useState<string | null>(null)
   const [ndviStart, setNdviStart] = useState('')
   const [ndviEnd, setNdviEnd] = useState('')
-  const [ndviPreset, setNdviPreset] = useState<number>(6) // meses seleccionados
+  const [ndviPreset, setNdviPreset] = useState<number>(6)
+  const [ndviImageryStatus, setNdviImageryStatus] = useState<'idle' | 'loading' | 'loaded' | 'no-images' | 'error'>('idle')
 
   const drawStartRef = useRef<L.LatLng | null>(null)
 
@@ -856,17 +857,24 @@ export function MapViewer({
     const Lf  = leafletRef.current
     if (!map || !Lf) return
 
-    // Quitar capa de tiles anterior si existe
     if (ndviTileLayerRef.current) {
       map.removeLayer(ndviTileLayerRef.current)
       ndviTileLayerRef.current = null
     }
 
+    setNdviImageryStatus('loading')
+
     try {
       const res = await fetch(`/api/agro-images?polyid=${polyId}&start=${start}&end=${end}`)
-      if (!res.ok) return
+      if (!res.ok) {
+        setNdviImageryStatus('error')
+        return
+      }
       const images: any[] = await res.json()
-      if (!Array.isArray(images) || !images.length) return
+      if (!Array.isArray(images) || !images.length) {
+        setNdviImageryStatus('no-images')
+        return
+      }
 
       // Elegir la imagen con menos nubes y más reciente
       const best = [...images]
@@ -875,16 +883,28 @@ export function MapViewer({
           return Math.abs(cloudDiff) > 20 ? cloudDiff : b.dt - a.dt
         })[0]
 
-      const tileUrl = best?.tile?.ndvi || best?.tile?.falsecolor
-      if (!tileUrl) return
+      const tileUrl = best?.tile?.ndvi || best?.tile?.falsecolor || best?.tile?.truecolor
+      if (!tileUrl) {
+        setNdviImageryStatus('no-images')
+        return
+      }
+
+      const fecha = best.dt ? new Date(best.dt * 1000).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : ''
+      const nubes = best.cl != null ? `${Math.round(best.cl)}% nubes` : ''
 
       ndviTileLayerRef.current = Lf.tileLayer(tileUrl, {
-        opacity: 0.8,
+        opacity: 0.85,
         maxZoom: 18,
-        attribution: 'Agromonitoring Sentinel-2',
+        attribution: `Sentinel-2 · ${fecha}`,
       }).addTo(map)
-    } catch {
-      // La capa de imagen es opcional — si falla, ignoramos
+
+      setNdviImageryStatus('loaded')
+
+      // Guardar metadata de la imagen para mostrar en panel
+      ;(ndviTileLayerRef.current as any)._meta = { fecha, nubes }
+    } catch (err) {
+      console.error('[agro-imagery]', err)
+      setNdviImageryStatus('error')
     }
   }
 
@@ -892,6 +912,7 @@ export function MapViewer({
     if (!selectedPredio) return
     setNdviLoading(true)
     setNdviError(null)
+    setNdviImageryStatus('idle')
     try {
       let polyId = agroPolyId
 
@@ -1685,8 +1706,31 @@ export function MapViewer({
 
                   {!ndviLoading && !ndviError && ndviData.length === 0 && (
                     <p className="text-center text-xs text-muted-foreground py-2">
-                      Selecciona un rango de fechas y pulsa Consultar
+                      Selecciona un período y pulsa "Ver historial NDVI"
                     </p>
+                  )}
+
+                  {/* Estado de capa de imagen satelital */}
+                  {ndviImageryStatus !== 'idle' && (
+                    <div className={`rounded-lg border p-2.5 text-[10px] flex items-center gap-2 ${
+                      ndviImageryStatus === 'loading'   ? 'border-border bg-secondary/30 text-muted-foreground' :
+                      ndviImageryStatus === 'loaded'    ? 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400' :
+                      ndviImageryStatus === 'no-images' ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400' :
+                                                          'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400'
+                    }`}>
+                      {ndviImageryStatus === 'loading' && (
+                        <svg className="h-3 w-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                        </svg>
+                      )}
+                      <span>
+                        {ndviImageryStatus === 'loading'   && 'Cargando imagen satelital en el mapa...'}
+                        {ndviImageryStatus === 'loaded'    && '✓ Imagen Sentinel-2 visible en el mapa'}
+                        {ndviImageryStatus === 'no-images' && 'Sin imágenes disponibles para este período. Prueba con "1 año" o "2 años".'}
+                        {ndviImageryStatus === 'error'     && 'Error al cargar imagen satelital. Intenta de nuevo.'}
+                      </span>
+                    </div>
                   )}
                 </div>
               )}

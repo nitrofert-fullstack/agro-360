@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
   const res  = await fetch(
     `${AGRO_BASE}/image/search?start=${start}&end=${end}&polyid=${polyid}&appid=${API_KEY}`,
-    { signal: AbortSignal.timeout(8000) }
+    { signal: AbortSignal.timeout(20000) }
   )
   const data = await res.json()
 
