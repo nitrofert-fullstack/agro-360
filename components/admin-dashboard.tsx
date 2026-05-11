@@ -381,6 +381,7 @@ export function AdminDashboard() {
   const [isAssigningAsesor, setIsAssigningAsesor] = useState(false)
   // Cambio de rol
   const [changingRoleUserId, setChangingRoleUserId] = useState<string | null>(null)
+  const [roleChangeConfirm, setRoleChangeConfirm] = useState<{ userId: string; nombre: string; rolActual: string; nuevoRol: string } | null>(null)
   // Búsqueda y paginación de usuarios (server-side)
   const [userSearch, setUserSearch] = useState("")
   const [userPage, setUserPage] = useState(1)
@@ -657,7 +658,7 @@ export function AdminDashboard() {
     }
   }
 
-  const changeUserRole = async (userId: string, newRole: string) => {
+  const executeRoleChange = async (userId: string, newRole: string) => {
     setChangingRoleUserId(userId)
     try {
       const res = await fetch('/api/admin/change-role', {
@@ -674,6 +675,10 @@ export function AdminDashboard() {
     } finally {
       setChangingRoleUserId(null)
     }
+  }
+
+  const changeUserRole = (userId: string, newRole: string, nombre: string, rolActual: string) => {
+    setRoleChangeConfirm({ userId, nombre, rolActual, nuevoRol: newRole })
   }
 
   // Guard: redirigir si la sesión expiró o se restauró desde bfcache sin auth
@@ -826,9 +831,8 @@ export function AdminDashboard() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Error al eliminar')
-      setCaracterizaciones(prev => prev.filter(c => c.id !== deleteTarget.id))
-      setTotalCount(prev => prev - 1)
       toast.success('Caracterización eliminada correctamente')
+      await loadData({ page: 1, search: searchQuery, estado: filterEstado, append: false })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al eliminar')
     } finally {
@@ -1662,7 +1666,7 @@ export function AdminDashboard() {
                                 )}
                                 <Select
                                   value={u.rol}
-                                  onValueChange={(newRol) => changeUserRole(u.id, newRol)}
+                                  onValueChange={(newRol) => changeUserRole(u.id, newRol, u.nombre_completo || u.email || 'este usuario', u.rol)}
                                   disabled={changingRoleUserId === u.id}
                                 >
                                   <SelectTrigger className="h-9 w-32 text-xs">
@@ -2821,6 +2825,41 @@ export function AdminDashboard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* AlertDialog confirmar cambio de rol */}
+      <AlertDialog open={!!roleChangeConfirm} onOpenChange={(open) => { if (!open) setRoleChangeConfirm(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar cambio de rol</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  ¿Cambiar el rol de{' '}
+                  <strong className="text-foreground">{roleChangeConfirm?.nombre}</strong>{' '}
+                  de{' '}
+                  <strong className="text-foreground">{roleChangeConfirm?.rolActual}</strong>{' '}
+                  a{' '}
+                  <strong className="text-foreground">{roleChangeConfirm?.nuevoRol}</strong>?
+                </p>
+                <p>Esta acción puede afectar el acceso del usuario a las funciones del sistema.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setRoleChangeConfirm(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (roleChangeConfirm) {
+                  executeRoleChange(roleChangeConfirm.userId, roleChangeConfirm.nuevoRol)
+                  setRoleChangeConfirm(null)
+                }
+              }}
+            >
+              Confirmar cambio
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* AlertDialog confirmar eliminación de caracterización */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !isDeleting) setDeleteTarget(null) }}>

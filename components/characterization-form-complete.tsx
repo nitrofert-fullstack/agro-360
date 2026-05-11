@@ -675,7 +675,9 @@ export function CharacterizationFormComplete({
         break
 
       case 8: // Fotos y Firma
-        if (!formData.archivos.firmaProductorUrl) stepErrors['archivos.firmaProductorUrl'] = 'La firma del productor es requerida'
+        // En modo edición la firma ya está guardada en BD; solo se valida en formulario nuevo
+        if (!formData.archivos.firmaProductorUrl && !isEdit)
+          stepErrors['archivos.firmaProductorUrl'] = 'La firma del productor es requerida'
         break
 
       case 9: // Autorizacion
@@ -763,39 +765,42 @@ export function CharacterizationFormComplete({
 
   // Enviar formulario
   const handleSubmit = async () => {
+    // ── Lock de doble-submit: adquirir ANTES de cualquier validación ──────────
     if (submitLock.current) return
+    submitLock.current = true
 
-    // ── Fase 1: Validaciones por modo (síncronas, sin bloquear el botón) ──────
-    // Las validaciones no adquieren el lock. Si fallan, el usuario puede corregir
-    // y reintentar sin que el botón quede bloqueado.
+    // ── Fase 1: Validaciones por modo (síncronas) ────────────────────────────
+    // Si fallan, liberamos el lock para que el usuario pueda corregir y reintentar.
 
     if (isEdit && visitaId) {
       // Edición: solo validar pasos 1-8 (datos del formulario).
       // El paso 9 (autorizaciones) ya está guardado en la BD y no se re-valida.
       const validation = validateAllSteps(8)
-      if (!validation.valid) { handleValidationError(validation); return }
+      if (!validation.valid) { submitLock.current = false; handleValidationError(validation); return }
 
     } else if (!isOnline) {
       // Sin conexión: solo asesores pueden guardar localmente.
       if (!isAsesor) {
+        submitLock.current = false
         toast.error('Sin conexión', { description: 'Se requiere conexión a internet para enviar el formulario.' })
         return
       }
       // Validar pasos 1-9 (sin captcha — no aplica offline).
       const validation = validateAllSteps()
-      if (!validation.valid) { handleValidationError(validation); return }
+      if (!validation.valid) { submitLock.current = false; handleValidationError(validation); return }
 
     } else {
       if (false) {  // captcha eliminado
+        submitLock.current = false
         toast.error('Verificación de seguridad', { description: 'Completa la verificación de seguridad antes de enviar.' })
         return
       }
       const validation = validateAllSteps()
-      if (!validation.valid) { handleValidationError(validation); return }
+      if (!validation.valid) { submitLock.current = false; handleValidationError(validation); return }
     }
 
-    // ── Fase 2: Envío (adquirir lock y marcar como enviando) ─────────────────
-    submitLock.current = true
+    // ── Fase 2: Envío (marcar UI como enviando — lock ya está activo) ─────────
+    submitLock.current = true  // ya estaba true; explícito para claridad
     setIsSubmitting(true)
     try {
       // Estructura que coincide con las tablas de la BD

@@ -67,7 +67,30 @@ export async function DELETE(request: Request) {
       }
     }
 
-    // ── Eliminar beneficiario (cascada a: predios → sub-tablas, informacion_financiera, caracterizaciones) ──
+    // ── Verificar si el beneficiario tiene otras caracterizaciones (en otras visitas) ──
+    const totalCaracterizacionesBeneficiario = await prisma.caracterizaciones.count({
+      where: { id_beneficiario: carac.id_beneficiario },
+    })
+
+    if (totalCaracterizacionesBeneficiario > 1) {
+      // El beneficiario tiene historial en otras visitas → solo eliminar esta caracterización/visita
+      await prisma.caracterizaciones.delete({ where: { id: caracterizacionId } })
+
+      // Eliminar la visita si no tiene más beneficiarios vinculados
+      const otrosBeneficiariosEnVisita = await prisma.beneficiarios.count({
+        where: { id_visita: carac.id_visita },
+      })
+      if (otrosBeneficiariosEnVisita === 0) {
+        await prisma.visitas.delete({ where: { id: carac.id_visita } })
+      }
+
+      return NextResponse.json({
+        success: true,
+        mensaje: 'Caracterización eliminada. El beneficiario se conservó porque tiene otras visitas registradas.',
+      })
+    }
+
+    // ── Beneficiario solo tiene esta caracterización → eliminar con cascada ──
     await prisma.beneficiarios.delete({
       where: { id: carac.id_beneficiario },
     })
@@ -80,7 +103,10 @@ export async function DELETE(request: Request) {
       await prisma.visitas.delete({ where: { id: carac.id_visita } })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({
+      success: true,
+      mensaje: 'Caracterización y datos del beneficiario eliminados correctamente.',
+    })
   } catch (err) {
     console.error('[DeleteCaracterizacion] Error:', err)
     return NextResponse.json(

@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const page    = Math.max(1, parseInt(searchParams.get('page')  || '1'))
     const limit   = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '20')), 100)
-    const search  = (searchParams.get('search') || '').trim()
+    const search  = (searchParams.get('search') || '').trim().slice(0, 100)
     const asesoresOnly = searchParams.get('asesores_only') === 'true'
     const skip    = (page - 1) * limit
 

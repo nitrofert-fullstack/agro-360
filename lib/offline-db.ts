@@ -29,7 +29,16 @@ export function getOfflineDB(): OfflineDB {
 export async function savePendingForm(payload: Record<string, unknown>): Promise<string> {
   const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
   const db = getOfflineDB()
-  await db.pendingForms.add({ localId, payload, createdAt: Date.now(), retries: 0 })
+  try {
+    await db.pendingForms.add({ localId, payload, createdAt: Date.now(), retries: 0 })
+  } catch (err) {
+    const name = (err as DOMException | Error)?.name ?? ''
+    const message = (err as Error)?.message ?? ''
+    if (name === 'QuotaExceededError' || message.toLowerCase().includes('quota')) {
+      throw new Error('Storage del dispositivo lleno. Libere espacio e intente de nuevo.')
+    }
+    throw err
+  }
   return localId
 }
 
@@ -45,10 +54,19 @@ export async function deletePendingForm(id: number): Promise<void> {
 
 export async function incrementRetry(id: number): Promise<void> {
   const db = getOfflineDB()
-  await db.pendingForms
-    .where('id')
-    .equals(id)
-    .modify((form) => { form.retries += 1 })
+  try {
+    await db.pendingForms
+      .where('id')
+      .equals(id)
+      .modify((form) => { form.retries += 1 })
+  } catch (err) {
+    const name = (err as DOMException | Error)?.name ?? ''
+    const message = (err as Error)?.message ?? ''
+    if (name === 'QuotaExceededError' || message.toLowerCase().includes('quota')) {
+      throw new Error('Storage del dispositivo lleno. Libere espacio e intente de nuevo.')
+    }
+    throw err
+  }
 }
 
 export async function countPendingForms(): Promise<number> {

@@ -64,6 +64,7 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
   const router = useRouter()
   const [predios, setPredios] = useState<PredioCompleto[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<"list" | "map">("list")
 
   useEffect(() => { loadPredios() }, [userEmail, userNumDoc])
@@ -102,7 +103,7 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
       }).filter((r: PredioCompleto) => r.predio && r.visita)
 
       setPredios(result)
-    } catch (err) { console.error("Error cargando predios:", err) }
+    } catch (err) { console.error("Error cargando predios:", err); setError('Error al cargar los datos. Intente de nuevo.') }
     finally { setIsLoading(false) }
   }
 
@@ -124,6 +125,21 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
       <div className="flex flex-col items-center gap-3">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <p className="text-sm text-muted-foreground">Cargando sus terrenos...</p>
+      </div>
+    </div>
+  )
+
+  if (error) return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <XCircle className="h-10 w-10 text-red-500" />
+        <p className="text-sm text-red-600 font-medium">{error}</p>
+        <button
+          className="text-xs text-muted-foreground underline underline-offset-2"
+          onClick={() => { setError(null); setIsLoading(true); loadPredios() }}
+        >
+          Reintentar
+        </button>
       </div>
     </div>
   )

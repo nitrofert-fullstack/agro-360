@@ -216,7 +216,7 @@ function StatusChangePanel({
   beneficiarioNombre: string
   beneficiarioTelefono: string | null
   userRol: string | undefined
-  onReload: () => void
+  onReload: () => Promise<void>
 }) {
   const [isUpdating, setIsUpdating] = useState(false)
   const [observaciones, setObservaciones] = useState("")
@@ -257,7 +257,7 @@ function StatusChangePanel({
         setShowInvite(true)
       }
 
-      onReload()
+      await onReload()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al actualizar estado")
     } finally {
@@ -293,7 +293,7 @@ function StatusChangePanel({
         toast.success("Invitacion creada")
       }
 
-      onReload()
+      await onReload()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al enviar invitacion")
     } finally {
@@ -593,7 +593,7 @@ function ServerDetailView({
   photoModal: string | null
   setPhotoModal: (url: string | null) => void
   profile: any
-  onReload: () => void
+  onReload: () => Promise<void>
 }) {
   const router = useRouter()
   const { visita, caracterizacion, beneficiario, predio, caracterizacionPredio, abastecimientoAgua, riesgosPredio, areaProductiva, infoFinanciera } = data
