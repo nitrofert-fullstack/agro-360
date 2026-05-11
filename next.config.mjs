@@ -27,6 +27,15 @@ const withPWA = withPWAInit({
         handler: 'NetworkOnly',
       },
       {
+        // Cachear tiles de mapa (agro-tile y weather-tile) — va ANTES de la regla genérica /api/.*
+        urlPattern: /\/api\/(agro-tile|weather-tile).*/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'map-tiles',
+          expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 }, // 1h
+        },
+      },
+      {
         // Cachear otros endpoints de solo lectura
         urlPattern: /\/api\/.*/i,
         handler: 'NetworkFirst',
@@ -38,12 +47,17 @@ const withPWA = withPWAInit({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  compress: true,
   typescript: {
     ignoreBuildErrors: true,
   },
   turbopack: {},
   images: {
-    unoptimized: true,
+    formats: ['image/avif', 'image/webp'],
+    remotePatterns: [
+      { protocol: 'https', hostname: 'api.agromonitoring.com' },
+      { protocol: 'https', hostname: 'gibs.earthdata.nasa.gov' },
+    ],
   },
   async headers() {
     return [
@@ -55,6 +69,18 @@ const nextConfig = {
             value: 'no-store, no-cache, must-revalidate, max-age=0',
           },
         ],
+      },
+      {
+        source: '/_next/static/(.*)',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+      {
+        source: '/api/agro-tile/(.*)',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=3600, s-maxage=3600' }],
+      },
+      {
+        source: '/api/weather-tile',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=600, s-maxage=600' }],
       },
     ]
   },

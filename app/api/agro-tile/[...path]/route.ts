@@ -26,7 +26,6 @@ export async function GET(
   forwardParams.set('appid', API_KEY)
 
   const url = `${AGRO_BASE}/${path}?${forwardParams.toString()}`
-  console.log('[agro-tile] →', url.replace(process.env.AGROMONITORING_API_KEY || '', 'KEY'))
 
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) })

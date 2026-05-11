@@ -61,7 +61,6 @@ export async function GET(req: NextRequest) {
             const agPath = u.pathname
               .replace(/^\//, '')
               .replace(PLACEHOLDER, '{z}/{x}/{y}')
-            console.log('[agro-images] tile rewrite:', rawUrl.replace(/appid=[^&]+/, 'appid=KEY'), '→', `/api/agro-tile/${agPath}`)
             const params = new URLSearchParams(u.search)
             params.delete('appid')
             const qs = params.toString()

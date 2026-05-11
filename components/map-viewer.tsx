@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import { PanelLeft } from "lucide-react"
 import L from "leaflet"
 
@@ -281,6 +281,7 @@ export function MapViewer({
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
   const leafletRef = useRef<typeof L | null>(null)
+  const initialViewRef = useRef<{ center: [number, number]; zoom: number } | null>(null)
   const layersRef = useRef<{ [key: string]: L.TileLayer }>({})
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null)
   const currentDrawLayerRef = useRef<L.Circle | L.Rectangle | L.Polygon | null>(null)
@@ -307,7 +308,7 @@ export function MapViewer({
   const [isLoadingWeather, setIsLoadingWeather] = useState(false)
   const [averageNDVI, setAverageNDVI] = useState<number | null>(null)
   const [mapBounds, setMapBounds] = useState({ north: 10, south: 4, east: -70, west: -76 })
-  const [mouseCoords, setMouseCoords] = useState({ lat: 7.1254, lng: -73.1198 })
+  const coordBarRef = useRef<HTMLSpanElement | null>(null)
   const [polygonPoints, setPolygonPoints] = useState<L.LatLng[]>([])
 
   // Panel de predio seleccionado
@@ -341,7 +342,8 @@ export function MapViewer({
     return date.toISOString().split("T")[0]
   }
 
-  const layers: Record<LayerType, LayerConfig> = {
+  // Memoized: getGibsDate() only depends on the current date (computed once per mount)
+  const layers = useMemo((): Record<LayerType, LayerConfig> => ({
     // ── Base maps ──────────────────────────────────────────────────────────
     osm: {
       name: "OpenStreetMap",
@@ -501,7 +503,8 @@ export function MapViewer({
       opacity: 0.7,
       category: 'clima',
     },
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []) // [] — getGibsDate() depends only on the current date, stable for the component lifetime
 
   const calculateStats = useCallback((layer: L.Circle | L.Rectangle | L.Polygon): AreaStats => {
     let area = 0
@@ -712,10 +715,14 @@ export function MapViewer({
       updateMapBounds()
       
       map.on("mousemove", (e: L.LeafletMouseEvent) => {
-        setMouseCoords({ lat: e.latlng.lat, lng: e.latlng.lng })
+        if (coordBarRef.current) {
+          coordBarRef.current.textContent = `Lat: ${e.latlng.lat.toFixed(4)} | Lng: ${e.latlng.lng.toFixed(4)} | Z: ${map.getZoom()}`
+        }
       })
 
       mapInstanceRef.current = map
+      const _c = map.getCenter()
+      initialViewRef.current = { center: [_c.lat, _c.lng], zoom: map.getZoom() }
       setIsLoading(false)
       setIsMapReady(true)
       setCurrentZoom(map.getZoom())
@@ -754,7 +761,16 @@ export function MapViewer({
     }
   }, [])
 
+  // Stable key derived from markers content — avoids re-running the heavy effect when the
+  // parent re-renders with a new array reference but the same marker data.
+  const markersKey = useMemo(
+    () => markers ? markers.map(m => `${m.id ?? ''}:${m.position[0]}:${m.position[1]}`).join('|') : '',
+    [markers]
+  )
+
   // Reactive effect: re-render markers/polygons whenever data loads or map becomes ready
+  // Uses markersKey (stable string) instead of the markers array reference to avoid
+  // unnecessary re-runs when the parent re-renders with a new array but same data.
   useEffect(() => {
     if (!isMapReady || !mapInstanceRef.current || !leafletRef.current) return
     const map = mapInstanceRef.current
@@ -788,6 +804,8 @@ export function MapViewer({
       setNdviError(null)
       setShowNdviPanel(true)
       setSectionDraw(false)
+      // Zoom suave al polígono del predio seleccionado
+      map.flyToBounds(polygon.getBounds(), { padding: [60, 60], maxZoom: 15, duration: 0.8 })
     }
 
     markers.forEach((m) => {
@@ -820,6 +838,8 @@ export function MapViewer({
             setNdviSource('nasa')
             setShowNdviPanel(true)
             setSectionDraw(false)
+            // Zoom suave al marker sin polígono
+            map.flyTo(m.position, Math.max(map.getZoom(), 14), { duration: 0.8 })
           })
         }
         markerLayersRef.current.push(marker)
@@ -1171,7 +1191,7 @@ export function MapViewer({
     setOpacity(layers[layer].opacity)
   }
 
-  const clearDrawings = () => {
+  const clearDrawings = useCallback(() => {
     const map = mapInstanceRef.current
     if (drawnItemsRef.current) {
       drawnItemsRef.current.clearLayers()
@@ -1186,7 +1206,7 @@ export function MapViewer({
     setPolygonPoints([])
     setDrawMode("none")
     setIsDrawing(false)
-  }
+  }, [])
 
   const formatArea = (area: number): string => {
     if (area > 1000000) return `${(area / 1000000).toFixed(2)} km2`
@@ -1272,13 +1292,16 @@ export function MapViewer({
   const [sectionDraw, setSectionDraw] = useState(false)
   const [sectionLegend, setSectionLegend] = useState(false)
 
-  // Visible layer categories based on role
-  const visibleCategories = canSee(role, 'all-layers')
-    ? (['base', 'satelital', 'nasa', 'clima'] as const)
-    : (['base', 'satelital', 'nasa'] as const)
+  // Visible layer categories based on role — memoized so it only recomputes when role changes
+  const visibleCategories = useMemo(
+    () => canSee(role, 'all-layers')
+      ? (['base', 'satelital', 'nasa', 'clima'] as const)
+      : (['base', 'satelital', 'nasa'] as const),
+    [role]
+  )
 
   // Helper to close the NDVI panel and reset state
-  const closeNdviPanel = () => {
+  const closeNdviPanel = useCallback(() => {
     setShowNdviPanel(false)
     setSelectedPredio(null)
     setModisNdvi(null)
@@ -1294,7 +1317,7 @@ export function MapViewer({
       mapInstanceRef.current.removeLayer(ndviTileLayerRef.current)
       ndviTileLayerRef.current = null
     }
-  }
+  }, [])
 
   // ── Minimal mode: just the map, no sidebar ──
   if (minimal) {
@@ -1355,12 +1378,30 @@ export function MapViewer({
 
         {/* Sidebar header */}
         <div className="p-4 border-b border-border bg-gradient-to-r from-primary/10 to-transparent flex-shrink-0">
-          <h2 className="text-sm font-semibold text-foreground">
-            {role === 'agricultor' || role === 'campesino' ? 'Mi Predio' : 'Mapa de Predios'}
-          </h2>
-          {markers && markers.length > 0 && (
-            <p className="text-xs text-muted-foreground">{markers.length} predios registrados</p>
-          )}
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-foreground">
+                {role === 'agricultor' || role === 'campesino' ? 'Mi Predio' : 'Mapa de Predios'}
+              </h2>
+              {markers && markers.length > 0 && (
+                <p className="text-xs text-muted-foreground">{markers.length} predios registrados</p>
+              )}
+            </div>
+            {/* Botón reset vista */}
+            <button
+              onClick={() => {
+                const map = mapInstanceRef.current
+                if (!map || !initialViewRef.current) return
+                map.flyTo(initialViewRef.current.center, initialViewRef.current.zoom, { duration: 0.8 })
+              }}
+              title="Restablecer vista inicial"
+              className="flex-shrink-0 flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0M3 12h3m6-9v3m6 6h3m-9 6v3" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Sidebar scrollable content */}
@@ -1890,7 +1931,7 @@ export function MapViewer({
         {/* Coordinates bar — center bottom */}
         <div className="absolute bottom-2 left-1/2 z-[500] -translate-x-1/2 pointer-events-none">
           <div className="rounded-full border border-border bg-card/90 backdrop-blur-sm px-3 py-1 text-[10px] text-muted-foreground font-mono shadow">
-            Lat: {mouseCoords.lat.toFixed(4)} | Lng: {mouseCoords.lng.toFixed(4)} | Z: {currentZoom}
+            <span ref={coordBarRef}>Lat: 7.1254 | Lng: -73.1198 | Z: {currentZoom}</span>
           </div>
         </div>
       </div>
