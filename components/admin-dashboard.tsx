@@ -2110,7 +2110,7 @@ export function AdminDashboard() {
                 </div>
               </div>
               <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-border">
-                <MapViewer markers={adminMapMarkers} />
+                <MapViewer markers={adminMapMarkers} role="admin" />
               </div>
             </motion.div>
           )}
@@ -2776,6 +2776,8 @@ export function AdminDashboard() {
           <div className="h-[calc(100dvh-60px)] w-full md:h-[calc(90vh-60px)]">
             {selectedCaracterizacion?.predio?.latitud && selectedCaracterizacion?.predio?.longitud && showMap && (
               <MapViewer
+                role="admin"
+                minimal
                 initialCenter={[selectedCaracterizacion.predio.latitud, selectedCaracterizacion.predio.longitud]}
                 initialZoom={14}
                 markerPosition={[selectedCaracterizacion.predio.latitud, selectedCaracterizacion.predio.longitud]}

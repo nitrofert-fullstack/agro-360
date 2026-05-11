@@ -240,10 +240,19 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
                 <CardContent className="p-0 flex-1 min-h-0">
                   <div className="h-[400px] md:h-[500px]">
                     <MapViewer
+                      role="agricultor"
                       initialCenter={mapCenter}
                       initialZoom={prediosConCoords.length === 1 ? 14 : 10}
-                      markerPosition={markerPosition}
-                      minimal={true}
+                      markerPosition={prediosConCoords.length === 1 ? markerPosition : undefined}
+                      markers={prediosConCoords.map(p => ({
+                        id: p.id,
+                        name: p.predio.nombre_predio || 'Mi predio',
+                        position: [parseFloat(p.predio.latitud!), parseFloat(p.predio.longitud!)] as [number, number],
+                        popupContent: `<strong>${p.predio.nombre_predio || 'Mi predio'}</strong><br/>${p.predio.municipio || ''}${p.predio.vereda ? ` · ${p.predio.vereda}` : ''}`,
+                        polygonCoords: p.predio.cultivos_existentes
+                          ? undefined
+                          : undefined,
+                      }))}
                     />
                   </div>
                 </CardContent>

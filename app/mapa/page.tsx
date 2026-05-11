@@ -2,14 +2,11 @@
 
 import { useEffect, useState } from "react"
 import dynamic from "next/dynamic"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { motion } from "framer-motion"
 import { Loader2 } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { AppLayout } from "@/components/app-layout"
 import type { MapMarker } from "@/components/map-viewer"
-import { fadeUp } from "@/lib/animations"
 
 const MapViewer = dynamic(
   () => import("@/components/map-viewer").then((mod) => mod.MapViewer),
@@ -28,7 +25,7 @@ const MapViewer = dynamic(
 
 export default function MapaPage() {
   const router = useRouter()
-  const { user, loading: authLoading, isAuthenticated } = useAuth()
+  const { user, profile, loading: authLoading, isAuthenticated } = useAuth()
   const [mounted, setMounted] = useState(false)
   const [markers, setMarkers] = useState<MapMarker[]>([])
 
@@ -137,19 +134,7 @@ export default function MapaPage() {
   return (
     <AppLayout>
       <div className="relative flex-1 min-h-0 overflow-hidden rounded-xl border border-border">
-        <MapViewer markers={markers} />
-
-        {/* Título + contador */}
-        <motion.div variants={fadeUp} initial="hidden" animate="visible" className="absolute left-3 top-3 z-[1002] flex items-center gap-2">
-          <div className="rounded-lg border border-border bg-card/95 px-3 py-1.5 text-xs font-semibold shadow-lg backdrop-blur-md">
-            Mapa de Predios
-          </div>
-          {markers.length > 0 && (
-            <div className="rounded-lg border border-border bg-card/95 px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur-md text-muted-foreground">
-              {markers.length} predio{markers.length !== 1 ? 's' : ''}
-            </div>
-          )}
-        </motion.div>
+        <MapViewer markers={markers} role={profile?.rol as any} />
       </div>
     </AppLayout>
   )

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
+import { PanelLeft } from "lucide-react"
 import L from "leaflet"
 
 type LayerType = "ndvi" | "satellite" | "temperature" | "precipitation"
@@ -84,6 +85,20 @@ interface MapViewerProps {
   markers?: MapMarker[]
   minimal?: boolean       // oculta todos los paneles flotantes — solo mapa limpio
   controlledLayer?: LayerType  // capa controlada desde fuera (para minimal)
+  role?: 'admin' | 'asesor' | 'analista' | 'agricultor' | 'campesino'
+}
+
+function canSee(role: string | undefined, feature: 'ndvi-nasa' | 'ndvi-agro' | 'draw' | 'all-layers' | 'weather' | 'predio-info'): boolean {
+  if (!role || role === 'admin') return true
+  const matrix: Record<string, string[]> = {
+    'ndvi-nasa':   ['agricultor', 'campesino', 'admin'],
+    'ndvi-agro':   ['admin'],
+    'draw':        ['asesor', 'analista', 'admin'],
+    'all-layers':  ['asesor', 'analista', 'admin'],
+    'weather':     ['agricultor', 'campesino', 'admin'],
+    'predio-info': ['asesor', 'analista', 'admin', 'agricultor', 'campesino'],
+  }
+  return matrix[feature]?.includes(role) ?? false
 }
 
 // Santander bounds - these will be created dynamically after Leaflet loads
@@ -260,6 +275,7 @@ export function MapViewer({
   markers,
   minimal = false,
   controlledLayer,
+  role,
 }: MapViewerProps = {}) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
@@ -767,7 +783,7 @@ export function MapViewer({
       setAgroPolyId(null)
       setNdviError(null)
       setShowNdviPanel(true)
-      setShowDrawTools(false)
+      setSectionDraw(false)
     }
 
     markers.forEach((m) => {
@@ -799,7 +815,7 @@ export function MapViewer({
             setNdviError(null)
             setNdviSource('nasa')
             setShowNdviPanel(true)
-            setShowDrawTools(false)
+            setSectionDraw(false)
           })
         }
         markerLayersRef.current.push(marker)
@@ -1213,15 +1229,60 @@ export function MapViewer({
 
   const isNDVIZoomExceeded = activeLayer === "ndvi" && currentZoom > 9
 
-  // State for collapsible panels
-  const [showLayerPanel, setShowLayerPanel] = useState(true)
-  const [showDrawTools, setShowDrawTools] = useState(false)
-  const [showLegend, setShowLegend] = useState(false)
+  // Sidebar state (new layout)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
+  // Collapsible sidebar sections
+  const [sectionLayers, setSectionLayers] = useState(true)
+  const [sectionDraw, setSectionDraw] = useState(false)
+  const [sectionLegend, setSectionLegend] = useState(false)
+
+  // Visible layer categories based on role
+  const visibleCategories = canSee(role, 'all-layers')
+    ? (['base', 'satelital', 'nasa', 'clima'] as const)
+    : (['base', 'satelital', 'nasa'] as const)
+
+  // Helper to close the NDVI panel and reset state
+  const closeNdviPanel = () => {
+    setShowNdviPanel(false)
+    setSelectedPredio(null)
+    setModisNdvi(null)
+    setModisNdviError(null)
+    setNdviData([])
+    setAgroPolyId(null)
+    setNdviError(null)
+    if (selectedPolygonLayerRef.current) {
+      selectedPolygonLayerRef.current.setStyle({ color: "#3b82f6", fillColor: "#3b82f6", fillOpacity: 0.2, weight: 2 })
+      selectedPolygonLayerRef.current = null
+    }
+    if (ndviTileLayerRef.current && mapInstanceRef.current) {
+      mapInstanceRef.current.removeLayer(ndviTileLayerRef.current)
+      ndviTileLayerRef.current = null
+    }
+  }
+
+  // ── Minimal mode: just the map, no sidebar ──
+  if (minimal) {
+    return (
+      <div className="relative h-full w-full">
+        <div ref={mapRef} className="h-full w-full" />
+        {isLoading && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              <span className="text-sm text-muted-foreground">Cargando mapa...</span>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Full mode: sidebar + map ──
   return (
-    <div className="relative h-full w-full">
-      <div ref={mapRef} className="h-full w-full" />
+    <div className="relative flex h-full w-full overflow-hidden">
 
+      {/* Loading overlay */}
       {isLoading && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3">
@@ -1231,775 +1292,475 @@ export function MapViewer({
         </div>
       )}
 
-      {isNDVIZoomExceeded && (
-        <div className="absolute left-1/2 top-16 z-[1000] -translate-x-1/2 md:top-20">
-          <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 px-3 py-1.5 backdrop-blur-md md:px-4 md:py-2">
-            <p className="text-xs text-yellow-400 md:text-sm">
-              Zoom maximo para NDVI: nivel 9 (actual: {currentZoom})
-            </p>
-          </div>
-        </div>
+      {/* Mobile sidebar toggle button */}
+      <button
+        onClick={() => setSidebarOpen(v => !v)}
+        className="md:hidden absolute top-3 left-3 z-[1002] bg-card border border-border rounded-lg p-2 shadow-md text-muted-foreground hover:text-foreground transition-colors"
+        aria-label={sidebarOpen ? 'Cerrar panel' : 'Abrir panel'}
+      >
+        <PanelLeft className="h-4 w-4" />
+      </button>
+
+      {/* Mobile overlay behind sidebar */}
+      {sidebarOpen && (
+        <div
+          className="md:hidden absolute inset-0 z-[1000] bg-black/30"
+          onClick={() => setSidebarOpen(false)}
+        />
       )}
 
-      {/* Drawing mode indicator */}
-      {drawMode !== "none" && (
-        <div className="absolute left-1/2 top-3 z-[1000] -translate-x-1/2 px-4">
-          <div className="rounded-lg border border-primary/50 bg-primary/10 px-3 py-1.5 backdrop-blur-md md:px-4 md:py-2">
-            <p className="text-center text-xs text-primary md:text-sm">
-              {drawMode === "polygon" 
-                ? `Poligono (${polygonPoints.length} pts) - Doble clic para terminar`
-                : `${drawMode === "circle" ? "Circulo" : "Rectangulo"} - Arrastra para dibujar`
-              }
-            </p>
-          </div>
+      {/* ── Sidebar ── */}
+      <aside className={`
+        absolute md:relative inset-y-0 left-0 z-[1001]
+        w-72 lg:w-80 flex-shrink-0 flex flex-col
+        border-r border-border bg-card shadow-lg md:shadow-none
+        transition-transform duration-200
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
+
+        {/* Sidebar header */}
+        <div className="p-4 border-b border-border bg-gradient-to-r from-primary/10 to-transparent flex-shrink-0">
+          <h2 className="text-sm font-semibold text-foreground">
+            {role === 'agricultor' || role === 'campesino' ? 'Mi Predio' : 'Mapa de Predios'}
+          </h2>
+          {markers && markers.length > 0 && (
+            <p className="text-xs text-muted-foreground">{markers.length} predios registrados</p>
+          )}
         </div>
-      )}
 
-      {/* Mobile Quick Actions Bar - Top right */}
-      {!minimal && <div className="absolute right-3 top-3 z-[1000] flex gap-2 md:hidden">
-        <button
-          onClick={() => { setShowLayerPanel(!showLayerPanel); setShowDrawTools(false); setShowLegend(false); }}
-          className={`flex h-10 w-10 items-center justify-center rounded-lg border shadow-lg backdrop-blur-md transition-all ${
-            showLayerPanel ? "border-primary bg-primary/20 text-primary" : "border-border bg-card/95 text-muted-foreground"
-          }`}
-          aria-label="Capas"
-        >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
-        </button>
-        <button
-          onClick={() => { setShowDrawTools(!showDrawTools); setShowLayerPanel(false); setShowLegend(false); }}
-          className={`flex h-10 w-10 items-center justify-center rounded-lg border shadow-lg backdrop-blur-md transition-all ${
-            showDrawTools ? "border-primary bg-primary/20 text-primary" : "border-border bg-card/95 text-muted-foreground"
-          }`}
-          aria-label="Dibujar"
-        >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-          </svg>
-        </button>
-        <button
-          onClick={() => { setShowLegend(!showLegend); setShowLayerPanel(false); setShowDrawTools(false); }}
-          className={`flex h-10 w-10 items-center justify-center rounded-lg border shadow-lg backdrop-blur-md transition-all ${
-            showLegend ? "border-primary bg-primary/20 text-primary" : "border-border bg-card/95 text-muted-foreground"
-          }`}
-          aria-label="Leyenda"
-        >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-        </button>
-        {selectedPredio && (
-          <button
-            onClick={() => { setShowNdviPanel(!showNdviPanel); setShowLayerPanel(false); setShowDrawTools(false); setShowLegend(false); }}
-            className={`flex h-10 w-10 items-center justify-center rounded-lg border shadow-lg backdrop-blur-md transition-all ${
-              showNdviPanel ? "border-primary bg-primary/20 text-primary" : "border-border bg-card/95 text-muted-foreground"
-            }`}
-            aria-label="NDVI Predio"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          </button>
-        )}
-      </div>}
+        {/* Sidebar scrollable content */}
+        <div className="flex-1 overflow-y-auto">
 
-      {!minimal && <>{/* Layer Controls - Desktop: fixed right, Mobile: bottom sheet */}
-      <div className={`absolute z-[1000] transition-all duration-300 ${
-        showLayerPanel 
-          ? "bottom-0 left-0 right-0 md:bottom-auto md:left-auto md:right-4 md:top-4 md:w-64 lg:w-72" 
-          : "pointer-events-none -bottom-full opacity-0 md:pointer-events-auto md:bottom-auto md:right-4 md:top-4 md:w-64 md:opacity-100 lg:w-72"
-      }`}>
-        <div className="rounded-t-2xl border border-border bg-card/98 shadow-xl backdrop-blur-md md:rounded-lg flex flex-col" style={{ maxHeight: '70vh' }}>
-          {/* Mobile drag handle */}
-          <div className="flex items-center justify-center py-2 md:hidden flex-shrink-0">
-            <div className="h-1 w-12 rounded-full bg-muted-foreground/30" />
-          </div>
-
-          <div className="border-b border-border p-3 md:p-4 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Capas del Mapa</h2>
-                <p className="text-xs text-muted-foreground">Selecciona una capa</p>
-              </div>
+          {/* ── Section: Predio seleccionado + NDVI ── */}
+          {selectedPredio && canSee(role, 'predio-info') && (
+            <div className="border-b border-border">
+              {/* Section header */}
               <button
-                onClick={() => setShowLayerPanel(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary md:hidden"
+                onClick={() => setShowNdviPanel(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-secondary/50 transition-colors"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Scrollable layer list grouped by category */}
-          <div className="overflow-y-auto flex-1 p-3 space-y-3">
-            {([
-              { key: 'base',     label: '🗺️ Base' },
-              { key: 'satelital', label: '🛰️ Satelital' },
-              { key: 'nasa',     label: '🌿 NASA' },
-              { key: 'clima',    label: '🌤️ Clima' },
-            ] as { key: LayerConfig['category']; label: string }[]).map(({ key: cat, label }) => {
-              const catLayers = (Object.keys(layers) as LayerType[]).filter(k => layers[k].category === cat)
-              if (!catLayers.length) return null
-              return (
-                <div key={cat}>
-                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">{label}</p>
-                  <div className="space-y-1">
-                    {catLayers.map((key) => (
-                      <button
-                        key={key}
-                        onClick={() => handleLayerChange(key)}
-                        className={`w-full rounded-lg border px-3 py-2 text-left transition-all duration-150 ${
-                          activeLayer === key
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border bg-secondary/40 text-foreground hover:border-primary/40 hover:bg-secondary"
-                        }`}
-                      >
-                        <span className="block text-xs font-medium leading-tight">{layers[key].name}</span>
-                        <span className="block text-[10px] leading-tight text-muted-foreground mt-0.5 line-clamp-1">{layers[key].description}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="border-t border-border p-3 md:p-4 flex-shrink-0">
-            <div className="mb-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-foreground">{layers[activeLayer].name}</span>
-                <span className="rounded bg-primary/20 px-2 py-0.5 text-[10px] font-medium text-primary">ACTIVO</span>
-              </div>
-              <p className="mt-1 hidden text-[11px] text-muted-foreground md:block">{layers[activeLayer].description}</p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Opacidad</span>
-                <span className="text-xs font-medium text-foreground">{Math.round(opacity * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={opacity}
-                onChange={(e) => setOpacity(parseFloat(e.target.value))}
-                className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-secondary accent-primary"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* NDVI Meter - Right side below layers */}
-      {areaStats && (
-        <div className="absolute bottom-4 right-4 z-[1000] hidden md:block w-56 lg:w-64">
-          <div className="rounded-lg border border-border bg-card/98 p-4 shadow-xl backdrop-blur-md">
-            <h3 className="mb-3 text-xs font-semibold text-foreground">Índice NDVI</h3>
-            
-            {/* NDVI Progress Bar */}
-            <div className="mb-3">
-              <div className="relative h-8 overflow-hidden rounded-lg bg-secondary">
-                <div
-                  className="absolute inset-y-0 left-0 transition-all duration-300"
-                  style={{
-                    width: `${Math.max(0, (averageNDVI === null ? 0 : averageNDVI + 0.2) / 1.2) * 100}%`,
-                    backgroundColor: getNDVIColor(averageNDVI)
-                  }}
-                />
-                <div className="relative flex h-full items-center justify-center">
-                  <span className="text-xs font-semibold text-foreground drop-shadow">
-                    {averageNDVI !== null ? averageNDVI.toFixed(3) : "-"}
-                  </span>
-                </div>
-              </div>
-            </div>
-            
-            {/* NDVI Label and Range */}
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">{getNDVILabel(averageNDVI)}</span>
-              <span className="text-[10px] text-muted-foreground">
-                {averageNDVI !== null ? `${(averageNDVI - 0.2).toFixed(2)} - ${(averageNDVI + 0.2).toFixed(2)}` : "-"}
-              </span>
-            </div>
-            
-            {/* NDVI Scale Reference */}
-            <div className="grid grid-cols-3 gap-1 border-t border-border pt-2">
-              <div className="flex flex-col items-center">
-                <div className="mb-1 h-2 w-full rounded" style={{ backgroundColor: "#1e8c46" }} />
-                <span className="text-[9px] text-muted-foreground">Alta</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="mb-1 h-2 w-full rounded" style={{ backgroundColor: "#c8b432" }} />
-                <span className="text-[9px] text-muted-foreground">Media</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="mb-1 h-2 w-full rounded" style={{ backgroundColor: "#b43232" }} />
-                <span className="text-[9px] text-muted-foreground">Baja</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Draw Tools - Desktop: left side (oculto cuando NDVI panel está activo), Mobile: bottom sheet */}
-      <div className={`absolute z-[1001] transition-all duration-300 ${
-        showDrawTools
-          ? "bottom-0 left-0 right-0 md:bottom-auto md:left-4 md:right-auto md:top-4"
-          : showNdviPanel
-            ? "pointer-events-none -bottom-full opacity-0 md:pointer-events-none md:opacity-0 md:bottom-auto md:left-4 md:top-4"
-            : "pointer-events-none -bottom-full opacity-0 md:pointer-events-auto md:bottom-auto md:left-4 md:opacity-100 md:top-4"
-      }`}>
-        <div className="max-h-[40vh] overflow-y-auto rounded-t-2xl border border-border bg-card/98 shadow-xl backdrop-blur-md md:max-h-none md:w-56 md:rounded-lg lg:w-64">
-          {/* Mobile drag handle */}
-          <div className="flex items-center justify-center py-2 md:hidden">
-            <div className="h-1 w-12 rounded-full bg-muted-foreground/30" />
-          </div>
-          
-          <div className="border-b border-border p-3 md:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Herramientas</h2>
-                <p className="text-xs text-muted-foreground">Delimita una zona</p>
-              </div>
-              <button 
-                onClick={() => setShowDrawTools(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary md:hidden"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          
-          <div className="p-3">
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              <button
-                onClick={() => setDrawMode(drawMode === "circle" ? "none" : "circle")}
-                className={`group flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all duration-200 ${
-                  drawMode === "circle"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-secondary/50 text-muted-foreground hover:border-primary/50 hover:bg-secondary"
-                }`}
-                title="Dibuja un círculo arrastrando"
-              >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <circle cx="12" cy="12" r="9" strokeWidth={1.5} />
-                </svg>
-                <span className="text-[10px] font-medium">Círculo</span>
-              </button>
-              <button
-                onClick={() => setDrawMode(drawMode === "rectangle" ? "none" : "rectangle")}
-                className={`group flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all duration-200 ${
-                  drawMode === "rectangle"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-secondary/50 text-muted-foreground hover:border-primary/50 hover:bg-secondary"
-                }`}
-                title="Dibuja un rectángulo arrastrando"
-              >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <rect x="4" y="5" width="16" height="14" rx="1" strokeWidth={1.5} />
-                </svg>
-                <span className="text-[10px] font-medium">Rectángulo</span>
-              </button>
-              <button
-                onClick={() => setDrawMode(drawMode === "polygon" ? "none" : "polygon")}
-                className={`group flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all duration-200 ${
-                  drawMode === "polygon"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-secondary/50 text-muted-foreground hover:border-primary/50 hover:bg-secondary"
-                }`}
-                title="Haz clic para cada punto, doble clic para terminar"
-              >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <polygon points="12,2 22,20 2,20" strokeWidth={1.5} />
-                </svg>
-                <span className="text-[10px] font-medium">Polígono</span>
-              </button>
-            </div>
-            
-            {/* Instructive guide based on current draw mode */}
-            {drawMode !== "none" && (
-              <div className="mb-4 rounded-lg bg-primary/5 border border-primary/20 p-3">
-                <p className="text-xs font-medium text-foreground mb-1.5">
-                  {drawMode === "circle" && "Modo Círculo"}
-                  {drawMode === "rectangle" && "Modo Rectángulo"}
-                  {drawMode === "polygon" && "Modo Polígono"}
-                </p>
-                <ul className="text-xs text-muted-foreground space-y-1">
-                  {drawMode === "circle" && (
-                    <>
-                      <li>• Haz clic en el punto inicial</li>
-                      <li>• Arrastra para definir radio</li>
-                      <li>• Suelta para crear</li>
-                    </>
-                  )}
-                  {drawMode === "rectangle" && (
-                    <>
-                      <li>• Haz clic en la esquina inicial</li>
-                      <li>• Arrastra a la esquina opuesta</li>
-                      <li>• Suelta para crear</li>
-                    </>
-                  )}
-                  {drawMode === "polygon" && (
-                    <>
-                      <li>• Haz clic para cada punto</li>
-                      <li>• Doble clic para terminar</li>
-                      <li>• Mín. 3 puntos requeridos</li>
-                    </>
-                  )}
-                </ul>
-              </div>
-            )}
-            
-            {(areaStats || drawMode !== "none") && (
-              <button
-                onClick={clearDrawings}
-                className="w-full rounded-lg border border-destructive/30 bg-destructive/10 py-2.5 text-xs font-medium text-destructive transition-all hover:bg-destructive/20"
-              >
-                Limpiar dibujos
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Area Stats - Popup/Popover centered on polygon center */}
-      {areaStats && (
-        <div 
-          className="absolute z-[1002] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-          style={{
-            left: `${(areaStats.center.lng - mapBounds.west) / (mapBounds.east - mapBounds.west) * 100}%`,
-            top: `${(mapBounds.north - areaStats.center.lat) / (mapBounds.north - mapBounds.south) * 100}%`
-          }}
-        >
-          {/* Arrow pointer */}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 -translate-y-1 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-card/98" />
-          
-          {/* Popup content */}
-          <div className="pointer-events-auto w-72 rounded-lg border border-primary/30 bg-card/98 shadow-xl backdrop-blur-md overflow-hidden">
-            <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-primary/10 to-primary/5 p-3">
-              <h3 className="text-sm font-semibold text-foreground">Estadísticas</h3>
-              <button
-                onClick={() => setAreaStats(null)}
-                className="rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <div className="max-h-96 overflow-y-auto p-3 space-y-2.5">
-              {/* Basic Stats */}
-              <div className="space-y-1.5 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Tipo:</span>
-                  <span className="rounded bg-primary/20 px-2 py-0.5 font-medium text-primary">{areaStats.type}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Área:</span>
-                  <span className="font-semibold text-foreground">{formatArea(areaStats.area)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Perímetro:</span>
-                  <span className="font-semibold text-foreground">{formatDistance(areaStats.perimeter)}</span>
-                </div>
-              </div>
-              
-              {/* Weather Data Section */}
-              {weatherData && (
-                <div className="border-t border-border pt-2">
-                  <h4 className="mb-1.5 text-xs font-semibold text-foreground">Clima</h4>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="flex flex-col">
-                      <span className="text-muted-foreground">Temp:</span>
-                      <span className="font-semibold text-foreground">{weatherData.temperature}°C</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-muted-foreground">Sens Térm:</span>
-                      <span className="font-semibold text-foreground">{weatherData.feelsLike}°C</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-muted-foreground">Humedad:</span>
-                      <span className="font-semibold text-foreground">{weatherData.humidity}%</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-muted-foreground">Viento:</span>
-                      <span className="font-semibold text-foreground">{weatherData.windSpeed}m/s</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Calculate Button */}
-              <button
-                onClick={handleCalculateStats}
-                disabled={isLoadingWeather}
-                className="w-full mt-2 rounded border border-primary/30 bg-primary/10 py-1.5 text-xs font-medium text-primary transition-all hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoadingWeather ? 'Cargando...' : weatherData ? 'Actualizar' : 'Obtener Clima'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── NDVI Predio Panel (Agromonitoring) ── */}
-      {selectedPredio && (
-        <div className={`absolute z-[1001] transition-all duration-300 ${
-          showNdviPanel
-            ? "bottom-0 left-0 right-0 md:bottom-auto md:left-4 md:right-auto md:top-4"
-            : "pointer-events-none -bottom-full opacity-0 md:pointer-events-none md:opacity-0 md:bottom-auto md:left-4 md:top-4"
-        }`}>
-          <div className="max-h-[70vh] overflow-y-auto rounded-t-2xl border border-border bg-card/98 shadow-xl backdrop-blur-md md:max-h-[calc(100vh-5rem)] md:w-64 md:rounded-lg lg:w-72">
-            {/* Mobile drag handle */}
-            <div className="flex items-center justify-center py-2 md:hidden">
-              <div className="h-1 w-12 rounded-full bg-muted-foreground/30" />
-            </div>
-
-            {/* Header */}
-            <div className="border-b border-border p-3 md:p-4">
-              <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <h2 className="text-sm font-semibold text-foreground">NDVI · Predio</h2>
-                  <p className="truncate text-xs text-muted-foreground">{selectedPredio.name}</p>
+                  <p className="text-xs font-semibold text-foreground">Predio seleccionado</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{selectedPredio.name}</p>
                 </div>
-                <button
-                  onClick={() => {
-                    setShowNdviPanel(false)
-                    setSelectedPredio(null)
-                    setModisNdvi(null)
-                    setModisNdviError(null)
-                    setNdviData([])
-                    setAgroPolyId(null)
-                    setNdviError(null)
-                    if (selectedPolygonLayerRef.current) {
-                      selectedPolygonLayerRef.current.setStyle({ color: "#3b82f6", fillColor: "#3b82f6", fillOpacity: 0.2, weight: 2 })
-                      selectedPolygonLayerRef.current = null
-                    }
-                    if (ndviTileLayerRef.current && mapInstanceRef.current) {
-                      mapInstanceRef.current.removeLayer(ndviTileLayerRef.current)
-                      ndviTileLayerRef.current = null
-                    }
-                  }}
-                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); closeNdviPanel() }}
+                    className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    aria-label="Cerrar predio"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                  <svg className={`h-4 w-4 text-muted-foreground transition-transform ${showNdviPanel ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* ── Selector de fuente NDVI ── */}
-            <div className="flex border-b border-border">
-              <button
-                onClick={() => setNdviSource('nasa')}
-                className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-                  ndviSource === 'nasa'
-                    ? 'border-b-2 border-primary text-primary'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                NASA MODIS
-              </button>
-              <button
-                onClick={() => selectedPredio?.coords.length ? setNdviSource('agro') : undefined}
-                disabled={!selectedPredio?.coords.length}
-                className={`flex-1 px-3 py-2 text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                  ndviSource === 'agro'
-                    ? 'border-b-2 border-primary text-primary'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-                title={!selectedPredio?.coords.length ? 'Requiere polígono dibujado en el predio' : undefined}
-              >
-                Agromonitoring
-              </button>
-            </div>
-
-            <div className="space-y-3 p-3">
-
-              {/* ── Tab NASA MODIS ── */}
-              {ndviSource === 'nasa' && (
-                <div className="rounded-lg border border-border bg-secondary/30 p-3">
-                  <p className="mb-2 text-[10px] font-medium text-muted-foreground">ÍNDICE NDVI · NASA MODIS (16 días)</p>
-
-                  {modisNdviLoading && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                      </svg>
-                      <span className="text-xs">Cargando NDVI...</span>
-                    </div>
-                  )}
-
-                  {modisNdviError && !modisNdviLoading && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <svg className="h-4 w-4 text-yellow-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                      </svg>
-                      No disponible para esta ubicación
-                    </div>
-                  )}
-
-                  {modisNdvi && !modisNdviLoading && (
-                    <div className="space-y-2">
-                      <div className="flex items-end justify-between">
-                        <div>
-                          <p className="text-2xl font-bold" style={{ color: modisNdvi.color }}>
-                            {modisNdvi.ndvi.toFixed(3)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{modisNdvi.interpretacion}</p>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">{modisNdvi.fecha}</p>
-                      </div>
-                      <div className="relative h-3 overflow-hidden rounded-full bg-secondary">
-                        <div
-                          className="absolute inset-y-0 left-0 rounded-full transition-all"
-                          style={{
-                            width: `${Math.max(0, Math.min(100, ((modisNdvi.ndvi + 1) / 2) * 100))}%`,
-                            backgroundColor: modisNdvi.color,
-                          }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-[9px] text-muted-foreground">
-                        <span>-1 (Agua)</span>
-                        <span>+1 (Denso)</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {!modisNdvi && !modisNdviLoading && !modisNdviError && (
-                    <p className="text-xs text-muted-foreground">Selecciona un predio para ver el NDVI</p>
-                  )}
                 </div>
-              )}
+              </button>
 
-              {/* ── Tab Agromonitoring ── */}
-              {ndviSource === 'agro' && (
-                <div className="space-y-3">
-                  {/* Selector de período */}
-                  <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2.5">
-                    <p className="text-[10px] font-medium text-muted-foreground">HISTORIAL NDVI · Agromonitoring / Sentinel-2</p>
-                    <p className="text-[10px] text-muted-foreground">¿Cuánto tiempo atrás quieres ver?</p>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {([
-                        { label: '3 meses', value: 3 },
-                        { label: '6 meses', value: 6 },
-                        { label: '1 año',   value: 12 },
-                        { label: '2 años',  value: 24 },
-                      ] as { label: string; value: number }[]).map(({ label, value }) => (
-                        <button
-                          key={value}
-                          onClick={() => setNdviPreset(value)}
-                          className={`rounded px-2 py-1.5 text-[10px] font-medium transition-colors ${
-                            ndviPreset === value
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-background border border-border text-muted-foreground hover:text-foreground hover:border-primary/50'
-                          }`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground/70">
-                      {ndviStart} → {ndviEnd}
-                    </p>
-                    <button
-                      onClick={consultarNDVI}
-                      disabled={ndviLoading}
-                      className="flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
-                    >
-                      {ndviLoading ? (
-                        <>
-                          <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+              {showNdviPanel && (
+                <div className="px-3 pb-3 space-y-3">
+
+                  {/* ── NDVI NASA ── */}
+                  {canSee(role, 'ndvi-nasa') && (
+                    <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                      <p className="mb-2 text-[10px] font-medium text-muted-foreground">ÍNDICE NDVI · NASA MODIS (16 días)</p>
+                      {modisNdviLoading && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                           </svg>
-                          Consultando...
-                        </>
-                      ) : 'Ver historial NDVI'}
+                          <span className="text-xs">Cargando NDVI...</span>
+                        </div>
+                      )}
+                      {modisNdviError && !modisNdviLoading && (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <svg className="h-4 w-4 text-yellow-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                          </svg>
+                          No disponible para esta ubicación
+                        </div>
+                      )}
+                      {modisNdvi && !modisNdviLoading && (
+                        <div className="space-y-2">
+                          <div className="flex items-end justify-between">
+                            <div>
+                              <p className="text-2xl font-bold" style={{ color: modisNdvi.color }}>{modisNdvi.ndvi.toFixed(3)}</p>
+                              <p className="text-xs text-muted-foreground">{modisNdvi.interpretacion}</p>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground">{modisNdvi.fecha}</p>
+                          </div>
+                          <div className="relative h-3 overflow-hidden rounded-full bg-secondary">
+                            <div className="absolute inset-y-0 left-0 rounded-full transition-all" style={{ width: `${Math.max(0, Math.min(100, ((modisNdvi.ndvi + 1) / 2) * 100))}%`, backgroundColor: modisNdvi.color }} />
+                          </div>
+                          <div className="flex justify-between text-[9px] text-muted-foreground">
+                            <span>-1 (Agua)</span><span>+1 (Denso)</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── NDVI Agromonitoring ── */}
+                  {canSee(role, 'ndvi-agro') && (
+                    <div className="space-y-2">
+                      <div className="flex border border-border rounded-lg overflow-hidden">
+                        <button
+                          onClick={() => setNdviSource('nasa')}
+                          className={`flex-1 px-3 py-1.5 text-[10px] font-medium transition-colors ${ndviSource === 'nasa' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'}`}
+                        >NASA MODIS</button>
+                        <button
+                          onClick={() => selectedPredio?.coords.length ? setNdviSource('agro') : undefined}
+                          disabled={!selectedPredio?.coords.length}
+                          className={`flex-1 px-3 py-1.5 text-[10px] font-medium transition-colors disabled:opacity-40 ${ndviSource === 'agro' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'}`}
+                        >Agromonitoring</button>
+                      </div>
+
+                      {ndviSource === 'agro' && (
+                        <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2.5">
+                          <p className="text-[10px] font-medium text-muted-foreground">HISTORIAL NDVI · Sentinel-2</p>
+                          <div className="grid grid-cols-4 gap-1">
+                            {([{label:'3m',value:3},{label:'6m',value:6},{label:'1a',value:12},{label:'2a',value:24}] as {label:string;value:number}[]).map(({label,value}) => (
+                              <button key={value} onClick={() => setNdviPreset(value)}
+                                className={`rounded px-1.5 py-1 text-[10px] font-medium transition-colors ${ndviPreset === value ? 'bg-primary text-primary-foreground' : 'bg-background border border-border text-muted-foreground hover:border-primary/50'}`}
+                              >{label}</button>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground/70">{ndviStart} → {ndviEnd}</p>
+                          <button onClick={consultarNDVI} disabled={ndviLoading}
+                            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                          >
+                            {ndviLoading ? (
+                              <><svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Consultando...</>
+                            ) : 'Ver historial NDVI'}
+                          </button>
+                          {ndviError && !ndviLoading && (
+                            <p className="text-[10px] text-yellow-700 dark:text-yellow-400">
+                              {ndviError.includes('503') || ndviError.includes('API key') || ndviError.includes('configurada')
+                                ? 'Agromonitoring no configurado. Contacte al admin.'
+                                : ndviError}
+                            </p>
+                          )}
+                          {!ndviLoading && ndviData.length > 0 && (
+                            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                              {ndviData.map((r) => {
+                                const mean = r.data.mean
+                                const color = ndviColor(mean)
+                                const pct = Math.max(0, Math.min(100, ((mean + 1) / 2) * 100))
+                                const fecha = new Date(r.dt * 1000).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' })
+                                return (
+                                  <div key={r.dt} className="space-y-0.5">
+                                    <div className="flex items-center justify-between text-[10px]">
+                                      <span className="text-muted-foreground">{fecha}</span>
+                                      <span className="font-medium" style={{ color }}>{mean.toFixed(3)}</span>
+                                    </div>
+                                    <div className="relative h-2 overflow-hidden rounded-full bg-secondary">
+                                      <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                          {ndviImageryStatus !== 'idle' && (
+                            <div className={`rounded border p-2 text-[10px] flex items-center gap-2 ${
+                              ndviImageryStatus === 'loading' ? 'border-border bg-secondary/30 text-muted-foreground' :
+                              ndviImageryStatus === 'loaded' ? 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400' :
+                              ndviImageryStatus === 'no-images' ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400' :
+                              'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400'
+                            }`}>
+                              {ndviImageryStatus === 'loading' && <svg className="h-3 w-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>}
+                              <span>
+                                {ndviImageryStatus === 'loading' && 'Cargando imagen satelital...'}
+                                {ndviImageryStatus === 'loaded' && '✓ Imagen Sentinel-2 visible en el mapa'}
+                                {ndviImageryStatus === 'no-images' && 'Sin imágenes en este período. Prueba 1-2 años.'}
+                                {ndviImageryStatus === 'error' && 'Error al cargar imagen. Intenta de nuevo.'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── Clima del predio ── */}
+                  {canSee(role, 'weather') && areaStats && (
+                    <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2">
+                      <p className="text-[10px] font-medium text-muted-foreground">CLIMA · Zona dibujada</p>
+                      {weatherData && (
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div><span className="text-muted-foreground">Temp:</span> <span className="font-semibold">{weatherData.temperature}°C</span></div>
+                          <div><span className="text-muted-foreground">Sens:</span> <span className="font-semibold">{weatherData.feelsLike}°C</span></div>
+                          <div><span className="text-muted-foreground">Humedad:</span> <span className="font-semibold">{weatherData.humidity}%</span></div>
+                          <div><span className="text-muted-foreground">Viento:</span> <span className="font-semibold">{weatherData.windSpeed}m/s</span></div>
+                        </div>
+                      )}
+                      <button onClick={handleCalculateStats} disabled={isLoadingWeather}
+                        className="w-full rounded border border-primary/30 bg-primary/10 py-1.5 text-xs font-medium text-primary transition-all hover:bg-primary/20 disabled:opacity-50"
+                      >{isLoadingWeather ? 'Cargando...' : weatherData ? 'Actualizar clima' : 'Obtener clima'}</button>
+                    </div>
+                  )}
+
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Section: Capas ── */}
+          <div className="border-b border-border">
+            <button
+              onClick={() => setSectionLayers(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-secondary/50 transition-colors"
+            >
+              <p className="text-xs font-semibold text-foreground">Capas del mapa</p>
+              <svg className={`h-4 w-4 text-muted-foreground transition-transform ${sectionLayers ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {sectionLayers && (
+              <div className="px-3 pb-3 space-y-3">
+                {([
+                  { key: 'base',     label: 'Base' },
+                  { key: 'satelital', label: 'Satelital' },
+                  { key: 'nasa',     label: 'NASA' },
+                  { key: 'clima',    label: 'Clima' },
+                ] as { key: LayerConfig['category']; label: string }[])
+                  .filter(({ key }) => visibleCategories.includes(key as any))
+                  .map(({ key: cat, label }) => {
+                    const catLayers = (Object.keys(layers) as LayerType[]).filter(k => layers[k].category === cat)
+                    if (!catLayers.length) return null
+                    return (
+                      <div key={cat}>
+                        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">{label}</p>
+                        <div className="space-y-1">
+                          {catLayers.map((key) => (
+                            <button
+                              key={key}
+                              onClick={() => handleLayerChange(key)}
+                              className={`w-full rounded-lg border px-3 py-2 text-left transition-all duration-150 ${
+                                activeLayer === key
+                                  ? "border-primary bg-primary/10 text-primary"
+                                  : "border-border bg-secondary/40 text-foreground hover:border-primary/40 hover:bg-secondary"
+                              }`}
+                            >
+                              <span className="block text-xs font-medium leading-tight">{layers[key].name}</span>
+                              <span className="block text-[10px] leading-tight text-muted-foreground mt-0.5 line-clamp-1">{layers[key].description}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                {/* Opacity slider */}
+                <div className="pt-1 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-muted-foreground">Opacidad — {layers[activeLayer].name}</span>
+                    <span className="text-[10px] font-medium text-foreground">{Math.round(opacity * 100)}%</span>
+                  </div>
+                  <input
+                    type="range" min="0" max="1" step="0.1" value={opacity}
+                    onChange={(e) => setOpacity(parseFloat(e.target.value))}
+                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-secondary accent-primary"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Section: Leyenda ── */}
+          {(activeLayer === "ndvi" || activeLayer === "temperature" || activeLayer === "precipitation") && (
+            <div className="border-b border-border">
+              <button
+                onClick={() => setSectionLegend(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-secondary/50 transition-colors"
+              >
+                <p className="text-xs font-semibold text-foreground">
+                  Leyenda — {activeLayer === "ndvi" ? "NDVI" : activeLayer === "temperature" ? "Temperatura" : "Precipitación"}
+                </p>
+                <svg className={`h-4 w-4 text-muted-foreground transition-transform ${sectionLegend ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {sectionLegend && (
+                <div className="px-3 pb-3">
+                  <div className="space-y-1.5">
+                    {activeLayer === "ndvi" && [
+                      { color: "#1e8c46", label: "Vegetación densa", value: "0.6-1.0" },
+                      { color: "#3cb464", label: "Vegetación moderada", value: "0.45-0.6" },
+                      { color: "#8cc850", label: "Vegetación buena", value: "0.3-0.45" },
+                      { color: "#c8b432", label: "Vegetación escasa", value: "0.15-0.3" },
+                      { color: "#dc7832", label: "Muy poca vegetación", value: "0-0.15" },
+                      { color: "#b43232", label: "Sin vegetación", value: "-0.2-0" },
+                      { color: "#1e64b4", label: "Agua", value: "<-0.2" },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center gap-2">
+                        <div className="h-3 w-5 flex-shrink-0 rounded" style={{ backgroundColor: item.color }} />
+                        <span className="truncate text-[10px] text-muted-foreground">{item.label}</span>
+                        <span className="ml-auto text-[9px] text-muted-foreground/60">{item.value}</span>
+                      </div>
+                    ))}
+                    {activeLayer === "temperature" && [
+                      { color: "#ff0000", label: "Muy caliente", value: ">35°C" },
+                      { color: "#ff6600", label: "Caliente", value: "30-35°C" },
+                      { color: "#ffcc00", label: "Templado", value: "20-30°C" },
+                      { color: "#00cc00", label: "Fresco", value: "10-20°C" },
+                      { color: "#0066ff", label: "Frío", value: "0-10°C" },
+                      { color: "#9900ff", label: "Muy frío", value: "<0°C" },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center gap-2">
+                        <div className="h-3 w-5 flex-shrink-0 rounded" style={{ backgroundColor: item.color }} />
+                        <span className="truncate text-[10px] text-muted-foreground">{item.label}</span>
+                        <span className="ml-auto text-[9px] text-muted-foreground/60">{item.value}</span>
+                      </div>
+                    ))}
+                    {activeLayer === "precipitation" && [
+                      { color: "#ff00ff", label: "Muy intensa", value: ">50mm/h" },
+                      { color: "#ff0000", label: "Intensa", value: "25-50mm/h" },
+                      { color: "#ff6600", label: "Moderada", value: "10-25mm/h" },
+                      { color: "#ffcc00", label: "Ligera", value: "2.5-10mm/h" },
+                      { color: "#00cc00", label: "Muy ligera", value: "<2.5mm/h" },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center gap-2">
+                        <div className="h-3 w-5 flex-shrink-0 rounded" style={{ backgroundColor: item.color }} />
+                        <span className="truncate text-[10px] text-muted-foreground">{item.label}</span>
+                        <span className="ml-auto text-[9px] text-muted-foreground/60">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Section: Herramientas de dibujo ── */}
+          {canSee(role, 'draw') && (
+            <div className="border-b border-border">
+              <button
+                onClick={() => setSectionDraw(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-secondary/50 transition-colors"
+              >
+                <p className="text-xs font-semibold text-foreground">Herramientas de dibujo</p>
+                <svg className={`h-4 w-4 text-muted-foreground transition-transform ${sectionDraw ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {sectionDraw && (
+                <div className="px-3 pb-3 space-y-3">
+                  <div className="grid grid-cols-3 gap-2">
+                    <button onClick={() => setDrawMode(drawMode === "circle" ? "none" : "circle")}
+                      className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all duration-200 ${drawMode === "circle" ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary/50 text-muted-foreground hover:border-primary/50 hover:bg-secondary"}`}
+                    >
+                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="9" strokeWidth={1.5} /></svg>
+                      <span className="text-[10px] font-medium">Círculo</span>
+                    </button>
+                    <button onClick={() => setDrawMode(drawMode === "rectangle" ? "none" : "rectangle")}
+                      className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all duration-200 ${drawMode === "rectangle" ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary/50 text-muted-foreground hover:border-primary/50 hover:bg-secondary"}`}
+                    >
+                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="4" y="5" width="16" height="14" rx="1" strokeWidth={1.5} /></svg>
+                      <span className="text-[10px] font-medium">Rectángulo</span>
+                    </button>
+                    <button onClick={() => setDrawMode(drawMode === "polygon" ? "none" : "polygon")}
+                      className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all duration-200 ${drawMode === "polygon" ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary/50 text-muted-foreground hover:border-primary/50 hover:bg-secondary"}`}
+                    >
+                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><polygon points="12,2 22,20 2,20" strokeWidth={1.5} /></svg>
+                      <span className="text-[10px] font-medium">Polígono</span>
                     </button>
                   </div>
 
-                  {/* Error */}
-                  {ndviError && !ndviLoading && (
-                    <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
-                      <p className="text-xs text-yellow-700 dark:text-yellow-400">
-                        {ndviError.includes('503') || ndviError.includes('API key') || ndviError.includes('configurada')
-                          ? 'Agromonitoring no está configurado. Contacte al administrador para activar esta función.'
-                          : ndviError}
+                  {drawMode !== "none" && (
+                    <div className="rounded-lg bg-primary/5 border border-primary/20 p-3">
+                      <p className="text-xs font-medium text-foreground mb-1.5">
+                        {drawMode === "circle" && "Modo Círculo"}
+                        {drawMode === "rectangle" && "Modo Rectángulo"}
+                        {drawMode === "polygon" && "Modo Polígono"}
                       </p>
+                      <ul className="text-xs text-muted-foreground space-y-1">
+                        {drawMode === "circle" && (<><li>• Haz clic en el punto inicial</li><li>• Arrastra para definir radio</li><li>• Suelta para crear</li></>)}
+                        {drawMode === "rectangle" && (<><li>• Haz clic en la esquina inicial</li><li>• Arrastra a la esquina opuesta</li><li>• Suelta para crear</li></>)}
+                        {drawMode === "polygon" && (<><li>• Haz clic para cada punto</li><li>• Doble clic para terminar</li><li>• Mín. 3 puntos requeridos</li></>)}
+                      </ul>
                     </div>
                   )}
 
-                  {/* Resultados */}
-                  {!ndviLoading && ndviData.length > 0 && (
+                  {(areaStats || drawMode !== "none") && (
+                    <button onClick={clearDrawings}
+                      className="w-full rounded-lg border border-destructive/30 bg-destructive/10 py-2.5 text-xs font-medium text-destructive transition-all hover:bg-destructive/20"
+                    >Limpiar dibujos</button>
+                  )}
+
+                  {/* Area stats inline */}
+                  {areaStats && (
                     <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2">
-                      <p className="text-[10px] font-medium text-muted-foreground">{ndviData.length} registros · NDVI medio</p>
-                      <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-                        {ndviData.map((r) => {
-                          const mean = r.data.mean
-                          const color = ndviColor(mean)
-                          const pct = Math.max(0, Math.min(100, ((mean + 1) / 2) * 100))
-                          const fecha = new Date(r.dt * 1000).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' })
-                          return (
-                            <div key={r.dt} className="space-y-0.5">
-                              <div className="flex items-center justify-between text-[10px]">
-                                <span className="text-muted-foreground">{fecha}</span>
-                                <span className="font-medium" style={{ color }}>{mean.toFixed(3)}</span>
-                              </div>
-                              <div className="relative h-2 overflow-hidden rounded-full bg-secondary">
-                                <div
-                                  className="absolute inset-y-0 left-0 rounded-full"
-                                  style={{ width: `${pct}%`, backgroundColor: color }}
-                                />
-                              </div>
-                            </div>
-                          )
-                        })}
+                      <p className="text-[10px] font-medium text-muted-foreground">ESTADÍSTICAS · {areaStats.type}</p>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between"><span className="text-muted-foreground">Área:</span><span className="font-semibold">{formatArea(areaStats.area)}</span></div>
+                        <div className="flex justify-between"><span className="text-muted-foreground">Perímetro:</span><span className="font-semibold">{formatDistance(areaStats.perimeter)}</span></div>
                       </div>
-                    </div>
-                  )}
-
-                  {!ndviLoading && !ndviError && ndviData.length === 0 && (
-                    <p className="text-center text-xs text-muted-foreground py-2">
-                      Selecciona un período y pulsa "Ver historial NDVI"
-                    </p>
-                  )}
-
-                  {/* Estado de capa de imagen satelital */}
-                  {ndviImageryStatus !== 'idle' && (
-                    <div className={`rounded-lg border p-2.5 text-[10px] flex items-center gap-2 ${
-                      ndviImageryStatus === 'loading'   ? 'border-border bg-secondary/30 text-muted-foreground' :
-                      ndviImageryStatus === 'loaded'    ? 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400' :
-                      ndviImageryStatus === 'no-images' ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400' :
-                                                          'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400'
-                    }`}>
-                      {ndviImageryStatus === 'loading' && (
-                        <svg className="h-3 w-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                        </svg>
+                      {canSee(role, 'weather') && (
+                        <>
+                          {weatherData && (
+                            <div className="grid grid-cols-2 gap-1.5 text-xs border-t border-border pt-2">
+                              <div><span className="text-muted-foreground">Temp:</span> <span className="font-semibold">{weatherData.temperature}°C</span></div>
+                              <div><span className="text-muted-foreground">Humedad:</span> <span className="font-semibold">{weatherData.humidity}%</span></div>
+                              <div><span className="text-muted-foreground">Sens:</span> <span className="font-semibold">{weatherData.feelsLike}°C</span></div>
+                              <div><span className="text-muted-foreground">Viento:</span> <span className="font-semibold">{weatherData.windSpeed}m/s</span></div>
+                            </div>
+                          )}
+                          <button onClick={handleCalculateStats} disabled={isLoadingWeather}
+                            className="w-full rounded border border-primary/30 bg-primary/10 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
+                          >{isLoadingWeather ? 'Cargando...' : weatherData ? 'Actualizar clima' : 'Obtener clima'}</button>
+                        </>
                       )}
-                      <span>
-                        {ndviImageryStatus === 'loading'   && 'Cargando imagen satelital en el mapa...'}
-                        {ndviImageryStatus === 'loaded'    && '✓ Imagen Sentinel-2 visible en el mapa'}
-                        {ndviImageryStatus === 'no-images' && 'Sin imágenes disponibles para este período. Prueba con "1 año" o "2 años".'}
-                        {ndviImageryStatus === 'error'     && 'Error al cargar imagen satelital. Intenta de nuevo.'}
-                      </span>
                     </div>
                   )}
                 </div>
               )}
+            </div>
+          )}
 
+        </div>
+      </aside>
+
+      {/* ── Mapa ── */}
+      <div className="flex-1 relative min-w-0">
+        <div ref={mapRef} className="absolute inset-0" />
+
+        {/* Drawing mode indicator */}
+        {drawMode !== "none" && (
+          <div className="absolute left-1/2 top-3 z-[500] -translate-x-1/2 px-4">
+            <div className="rounded-lg border border-primary/50 bg-primary/10 px-3 py-1.5 backdrop-blur-md">
+              <p className="text-center text-xs text-primary">
+                {drawMode === "polygon"
+                  ? `Polígono (${polygonPoints.length} pts) — Doble clic para terminar`
+                  : `${drawMode === "circle" ? "Círculo" : "Rectángulo"} — Arrastra para dibujar`}
+              </p>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Legend - Desktop: left side below NDVI meter, Mobile: bottom sheet */}
-      {(activeLayer === "ndvi" || activeLayer === "temperature" || activeLayer === "precipitation") && (
-        <div className={`absolute z-[1000] transition-all duration-300 ${
-          showLegend 
-            ? "bottom-0 left-0 right-0 md:bottom-auto md:left-4 md:right-auto md:top-[340px] lg:top-[360px]" 
-            : "pointer-events-none -bottom-full opacity-0 md:pointer-events-auto md:bottom-auto md:left-4 md:top-[340px] md:opacity-100 lg:top-[360px]"
-        }`}>
-          <div className="max-h-[40vh] overflow-y-auto rounded-t-2xl border border-border bg-card/98 p-3 shadow-xl backdrop-blur-md md:max-h-none md:max-w-[200px] md:rounded-lg md:p-4">
-            {/* Mobile drag handle */}
-            <div className="flex items-center justify-center pb-2 md:hidden">
-              <div className="h-1 w-12 rounded-full bg-muted-foreground/30" />
-            </div>
-            
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-foreground">
-                Leyenda {activeLayer === "ndvi" ? "NDVI" : activeLayer === "temperature" ? "Temperatura" : "Precipitacion"}
-              </h3>
-              <button 
-                onClick={() => setShowLegend(false)}
-                className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-secondary md:hidden"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 md:grid-cols-1">
-              {activeLayer === "ndvi" && [
-                { color: "#1e8c46", label: "Vegetacion densa", value: "0.6-1.0" },
-                { color: "#3cb464", label: "Vegetacion moderada", value: "0.45-0.6" },
-                { color: "#8cc850", label: "Vegetacion buena", value: "0.3-0.45" },
-                { color: "#c8b432", label: "Vegetacion escasa", value: "0.15-0.3" },
-                { color: "#dc7832", label: "Muy poca vegetacion", value: "0-0.15" },
-                { color: "#b43232", label: "Sin vegetacion", value: "-0.2-0" },
-                { color: "#1e64b4", label: "Agua", value: "<-0.2" },
-              ].map((item) => (
-                <div key={item.label} className="flex items-center gap-2">
-                  <div className="h-3 w-5 flex-shrink-0 rounded" style={{ backgroundColor: item.color }} />
-                  <span className="truncate text-[10px] text-muted-foreground">{item.label}</span>
-                </div>
-              ))}
-              
-              {activeLayer === "temperature" && [
-                { color: "#ff0000", label: "Muy caliente", value: ">35C" },
-                { color: "#ff6600", label: "Caliente", value: "30-35C" },
-                { color: "#ffcc00", label: "Templado", value: "20-30C" },
-                { color: "#00cc00", label: "Fresco", value: "10-20C" },
-                { color: "#0066ff", label: "Frio", value: "0-10C" },
-                { color: "#9900ff", label: "Muy frio", value: "<0C" },
-              ].map((item) => (
-                <div key={item.label} className="flex items-center gap-2">
-                  <div className="h-3 w-5 flex-shrink-0 rounded" style={{ backgroundColor: item.color }} />
-                  <span className="truncate text-[10px] text-muted-foreground">{item.label}</span>
-                </div>
-              ))}
-              
-              {activeLayer === "precipitation" && [
-                { color: "#ff00ff", label: "Muy intensa", value: ">50mm/h" },
-                { color: "#ff0000", label: "Intensa", value: "25-50mm/h" },
-                { color: "#ff6600", label: "Moderada", value: "10-25mm/h" },
-                { color: "#ffcc00", label: "Ligera", value: "2.5-10mm/h" },
-                { color: "#00cc00", label: "Muy ligera", value: "<2.5mm/h" },
-              ].map((item) => (
-                <div key={item.label} className="flex items-center gap-2">
-                  <div className="h-3 w-5 flex-shrink-0 rounded" style={{ backgroundColor: item.color }} />
-                  <span className="truncate text-[10px] text-muted-foreground">{item.label}</span>
-                </div>
-              ))}
+        {/* NDVI zoom warning */}
+        {isNDVIZoomExceeded && (
+          <div className="absolute left-1/2 top-14 z-[500] -translate-x-1/2">
+            <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 px-3 py-1.5 backdrop-blur-md">
+              <p className="text-xs text-yellow-400">Zoom máximo para NDVI: nivel 9 (actual: {currentZoom})</p>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Coordinates Display - Center bottom */}
-      <div className="absolute bottom-3 left-1/2 z-[999] -translate-x-1/2 md:bottom-4">
-        <div className="rounded-lg border border-border bg-card/95 px-2 py-1.5 shadow-lg backdrop-blur-md md:px-4 md:py-2">
-          <div className="flex items-center gap-2 md:gap-4">
-            <div className="flex items-center gap-1">
-              <span className="hidden text-[10px] text-muted-foreground md:inline">Lat:</span>
-              <span className="font-mono text-[10px] font-medium text-foreground md:text-xs">{mouseCoords.lat.toFixed(4)}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="hidden text-[10px] text-muted-foreground md:inline">Lng:</span>
-              <span className="font-mono text-[10px] font-medium text-foreground md:text-xs">{mouseCoords.lng.toFixed(4)}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] text-muted-foreground">Z:</span>
-              <span className="font-mono text-[10px] font-medium text-primary md:text-xs">{currentZoom}</span>
-            </div>
+        {/* Coordinates bar — center bottom */}
+        <div className="absolute bottom-2 left-1/2 z-[500] -translate-x-1/2 pointer-events-none">
+          <div className="rounded-full border border-border bg-card/90 backdrop-blur-sm px-3 py-1 text-[10px] text-muted-foreground font-mono shadow">
+            Lat: {mouseCoords.lat.toFixed(4)} | Lng: {mouseCoords.lng.toFixed(4)} | Z: {currentZoom}
           </div>
         </div>
       </div>
-      </>}
+
     </div>
   )
 }
