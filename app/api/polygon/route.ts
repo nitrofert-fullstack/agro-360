@@ -50,10 +50,8 @@ export async function POST(req: NextRequest) {
     signal:  AbortSignal.timeout(8000),
   })
 
-  if (!res.ok) {
-    return NextResponse.json({ error: `API externa error: ${res.status}` }, { status: res.status })
-  }
-
+  // Pasar siempre el body original de Agromonitoring (incluyendo 422 duplicado),
+  // porque el cliente parsea el mensaje de error para recuperar el ID del polígono existente.
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })
 }
