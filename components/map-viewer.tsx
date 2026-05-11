@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { PanelLeft } from "lucide-react"
 import L from "leaflet"
 
@@ -282,6 +282,7 @@ export function MapViewer({
   const mapInstanceRef = useRef<L.Map | null>(null)
   const leafletRef = useRef<typeof L | null>(null)
   const initialViewRef = useRef<{ center: [number, number]; zoom: number } | null>(null)
+  const coordBarRef = useRef<HTMLSpanElement | null>(null)
   const layersRef = useRef<{ [key: string]: L.TileLayer }>({})
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null)
   const currentDrawLayerRef = useRef<L.Circle | L.Rectangle | L.Polygon | null>(null)
@@ -308,7 +309,7 @@ export function MapViewer({
   const [isLoadingWeather, setIsLoadingWeather] = useState(false)
   const [averageNDVI, setAverageNDVI] = useState<number | null>(null)
   const [mapBounds, setMapBounds] = useState({ north: 10, south: 4, east: -70, west: -76 })
-  const coordBarRef = useRef<HTMLSpanElement | null>(null)
+  const [mouseCoords, setMouseCoords] = useState({ lat: 7.1254, lng: -73.1198 })
   const [polygonPoints, setPolygonPoints] = useState<L.LatLng[]>([])
 
   // Panel de predio seleccionado
@@ -504,7 +505,7 @@ export function MapViewer({
     },
   }
 
-  const calculateStats = (layer: L.Circle | L.Rectangle | L.Polygon) => {
+  const calculateStats = useCallback((layer: L.Circle | L.Rectangle | L.Polygon): AreaStats => {
     let area = 0
     let perimeter = 0
     let bounds: L.LatLngBounds
@@ -562,9 +563,9 @@ export function MapViewer({
     }
 
     return { area, perimeter, center, bounds, type: shapeType }
-  }
+  }, [])
 
-  const finishDrawing = () => {
+  const finishDrawing = useCallback(() => {
     const map = mapInstanceRef.current
     const drawnItems = drawnItemsRef.current
     const currentLayer = currentDrawLayerRef.current
@@ -583,7 +584,7 @@ export function MapViewer({
     setPolygonPoints([])
     currentDrawLayerRef.current = null
     drawStartRef.current = null
-  }
+  }, [calculateStats])
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return
@@ -759,13 +760,7 @@ export function MapViewer({
     }
   }, [])
 
-  // Stable key derived from markers content — avoids re-running the heavy effect when the
-  // parent re-renders with a new array reference but the same marker data.
-  const markersKey = markers ? markers.map(m => `${m.id ?? ''}:${m.position[0]}:${m.position[1]}`).join('|') : ''
-
   // Reactive effect: re-render markers/polygons whenever data loads or map becomes ready
-  // Uses markersKey (stable string) instead of the markers array reference to avoid
-  // unnecessary re-runs when the parent re-renders with a new array but same data.
   useEffect(() => {
     if (!isMapReady || !mapInstanceRef.current || !leafletRef.current) return
     const map = mapInstanceRef.current
@@ -799,7 +794,6 @@ export function MapViewer({
       setNdviError(null)
       setShowNdviPanel(true)
       setSectionDraw(false)
-      // Zoom suave al polígono del predio seleccionado
       map.flyToBounds(polygon.getBounds(), { padding: [60, 60], maxZoom: 15, duration: 0.8 })
     }
 
@@ -833,7 +827,6 @@ export function MapViewer({
             setNdviSource('nasa')
             setShowNdviPanel(true)
             setSectionDraw(false)
-            // Zoom suave al marker sin polígono
             map.flyTo(m.position, Math.max(map.getZoom(), 14), { duration: 0.8 })
           })
         }
@@ -1287,9 +1280,10 @@ export function MapViewer({
   const [sectionDraw, setSectionDraw] = useState(false)
   const [sectionLegend, setSectionLegend] = useState(false)
 
-  const visibleCategories: Array<'base' | 'satelital' | 'nasa' | 'clima'> = canSee(role, 'all-layers')
-    ? ['base', 'satelital', 'nasa', 'clima']
-    : ['base', 'satelital', 'nasa']
+  // Visible layer categories based on role
+  const visibleCategories = canSee(role, 'all-layers')
+    ? (['base', 'satelital', 'nasa', 'clima'] as const)
+    : (['base', 'satelital', 'nasa'] as const)
 
   // Helper to close the NDVI panel and reset state
   const closeNdviPanel = () => {
@@ -1378,7 +1372,6 @@ export function MapViewer({
                 <p className="text-xs text-muted-foreground">{markers.length} predios registrados</p>
               )}
             </div>
-            {/* Botón reset vista */}
             <button
               onClick={() => {
                 const map = mapInstanceRef.current
