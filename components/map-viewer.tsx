@@ -343,7 +343,7 @@ export function MapViewer({
   }
 
   // Memoized: getGibsDate() only depends on the current date (computed once per mount)
-  const layers = useMemo((): Record<LayerType, LayerConfig> => ({
+  const layers = useMemo(() => ({
     // ── Base maps ──────────────────────────────────────────────────────────
     osm: {
       name: "OpenStreetMap",
@@ -1292,13 +1292,9 @@ export function MapViewer({
   const [sectionDraw, setSectionDraw] = useState(false)
   const [sectionLegend, setSectionLegend] = useState(false)
 
-  // Visible layer categories based on role — memoized so it only recomputes when role changes
-  const visibleCategories = useMemo(
-    () => canSee(role, 'all-layers')
-      ? (['base', 'satelital', 'nasa', 'clima'] as const)
-      : (['base', 'satelital', 'nasa'] as const),
-    [role]
-  )
+  const visibleCategories: Array<'base' | 'satelital' | 'nasa' | 'clima'> = canSee(role, 'all-layers')
+    ? ['base', 'satelital', 'nasa', 'clima']
+    : ['base', 'satelital', 'nasa']
 
   // Helper to close the NDVI panel and reset state
   const closeNdviPanel = useCallback(() => {
