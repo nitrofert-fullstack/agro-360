@@ -4,6 +4,9 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import L from "leaflet"
 
 type LayerType = "ndvi" | "satellite" | "temperature" | "precipitation"
+  | "osm" | "cartoLight" | "cartoDark" | "cartoVoyager"
+  | "esriTopo" | "esriStreet" | "openTopo" | "esriNatGeo"
+  | "nasaTrueColor" | "nasaViirs" | "nasaEVI" | "nasaLST" | "nasaFire"
 type DrawMode = "none" | "circle" | "rectangle" | "polygon"
 
 interface LayerConfig {
@@ -14,6 +17,8 @@ interface LayerConfig {
   opacity: number
   useColorRemap?: boolean
   maxZoom?: number
+  category: 'base' | 'satelital' | 'nasa' | 'clima'
+  subdomains?: string
 }
 
 interface AreaStats {
@@ -317,6 +322,112 @@ export function MapViewer({
   }
 
   const layers: Record<LayerType, LayerConfig> = {
+    // ── Base maps ──────────────────────────────────────────────────────────
+    osm: {
+      name: "OpenStreetMap",
+      description: "Mapa estándar colaborativo",
+      url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      attribution: "© OpenStreetMap contributors",
+      opacity: 1,
+      maxZoom: 19,
+      category: 'base',
+      subdomains: 'abc',
+    },
+    cartoLight: {
+      name: "Carto Claro",
+      description: "Mapa minimalista fondo claro",
+      url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      attribution: "© CARTO",
+      opacity: 1,
+      maxZoom: 19,
+      category: 'base',
+      subdomains: 'abcd',
+    },
+    cartoDark: {
+      name: "Carto Oscuro",
+      description: "Mapa minimalista fondo oscuro",
+      url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      attribution: "© CARTO",
+      opacity: 1,
+      maxZoom: 19,
+      category: 'base',
+      subdomains: 'abcd',
+    },
+    cartoVoyager: {
+      name: "Carto Voyager",
+      description: "Mapa detallado estilo Voyager",
+      url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+      attribution: "© CARTO",
+      opacity: 1,
+      maxZoom: 19,
+      category: 'base',
+      subdomains: 'abcd',
+    },
+    esriTopo: {
+      name: "Esri Topo",
+      description: "Mapa topográfico con curvas de nivel",
+      url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+      attribution: "Esri, HERE, Garmin, FAO, NOAA, USGS",
+      opacity: 1,
+      maxZoom: 19,
+      category: 'base',
+    },
+    esriStreet: {
+      name: "Esri Calles",
+      description: "Mapa de calles y carreteras Esri",
+      url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+      attribution: "Esri, HERE, Garmin, USGS",
+      opacity: 1,
+      maxZoom: 19,
+      category: 'base',
+    },
+    openTopo: {
+      name: "OpenTopoMap",
+      description: "Mapa topográfico de OpenStreetMap",
+      url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+      attribution: "© OpenTopoMap (CC-BY-SA)",
+      opacity: 1,
+      maxZoom: 17,
+      category: 'base',
+      subdomains: 'abc',
+    },
+    // ── Satelital ──────────────────────────────────────────────────────────
+    satellite: {
+      name: "Esri Satelital",
+      description: "Vista satelital de alta resolucion",
+      url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      attribution: "Esri World Imagery",
+      opacity: 1,
+      category: 'satelital',
+    },
+    esriNatGeo: {
+      name: "Esri NatGeo",
+      description: "Mapa estilo National Geographic",
+      url: "https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}",
+      attribution: "Esri, NatGeo, DeLorme",
+      opacity: 1,
+      maxZoom: 16,
+      category: 'satelital',
+    },
+    nasaTrueColor: {
+      name: "MODIS Color Real",
+      description: "MODIS Terra color real diario",
+      url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${getGibsDate()}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+      attribution: "NASA GIBS MODIS Terra",
+      opacity: 1,
+      maxZoom: 9,
+      category: 'satelital',
+    },
+    nasaViirs: {
+      name: "VIIRS Color Real",
+      description: "VIIRS SNPP color real diario",
+      url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${getGibsDate()}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpg`,
+      attribution: "NASA GIBS VIIRS SNPP",
+      opacity: 1,
+      maxZoom: 8,
+      category: 'satelital',
+    },
+    // ── NASA overlays ──────────────────────────────────────────────────────
     ndvi: {
       name: "NDVI",
       description: "Indice de Vegetacion (NASA MODIS) - Max zoom: 9",
@@ -324,20 +435,43 @@ export function MapViewer({
       attribution: "NASA GIBS MODIS",
       opacity: 0.85,
       maxZoom: 9,
+      category: 'nasa',
     },
-    satellite: {
-      name: "Satelital",
-      description: "Vista satelital de alta resolucion",
-      url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      attribution: "Esri World Imagery",
-      opacity: 1,
+    nasaEVI: {
+      name: "EVI (8 días)",
+      description: "Índice de Vegetación Mejorado MODIS",
+      url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_EVI_8Day/default/${getGibsDate()}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`,
+      attribution: "NASA GIBS MODIS EVI",
+      opacity: 0.85,
+      maxZoom: 9,
+      category: 'nasa',
     },
+    nasaLST: {
+      name: "Temp. Superficie",
+      description: "Temperatura superficial terrestre MODIS",
+      url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_Land_Surface_Temp_Day/default/${getGibsDate()}/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png`,
+      attribution: "NASA GIBS MODIS LST",
+      opacity: 0.85,
+      maxZoom: 7,
+      category: 'nasa',
+    },
+    nasaFire: {
+      name: "Incendios Activos",
+      description: "Anomalías térmicas VIIRS 375m",
+      url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_Thermal_Anomalies_375m_All/default/${getGibsDate()}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`,
+      attribution: "NASA GIBS VIIRS Fire",
+      opacity: 0.9,
+      maxZoom: 8,
+      category: 'nasa',
+    },
+    // ── Clima ──────────────────────────────────────────────────────────────
     temperature: {
       name: "Temperatura",
       description: "Mapa de calor con temperaturas actuales",
       url: "/api/weather-tile?type=temp_new&z={z}&x={x}&y={y}",
       attribution: "OpenWeatherMap",
       opacity: 0.7,
+      category: 'clima',
     },
     precipitation: {
       name: "Precipitacion",
@@ -345,6 +479,7 @@ export function MapViewer({
       url: "/api/weather-tile?type=precipitation_new&z={z}&x={x}&y={y}",
       attribution: "OpenWeatherMap",
       opacity: 0.7,
+      category: 'clima',
     },
   }
 
@@ -579,6 +714,7 @@ export function MapViewer({
           layer = L.default.tileLayer(config.url, {
             attribution: config.attribution,
             opacity: key === activeLayer ? opacity : 0,
+            subdomains: (config as any).subdomains || 'abc',
           })
         }
         
@@ -1175,19 +1311,19 @@ export function MapViewer({
           ? "bottom-0 left-0 right-0 md:bottom-auto md:left-auto md:right-4 md:top-4 md:w-64 lg:w-72" 
           : "pointer-events-none -bottom-full opacity-0 md:pointer-events-auto md:bottom-auto md:right-4 md:top-4 md:w-64 md:opacity-100 lg:w-72"
       }`}>
-        <div className="max-h-[50vh] overflow-y-auto rounded-t-2xl border border-border bg-card/98 shadow-xl backdrop-blur-md md:max-h-none md:rounded-lg">
+        <div className="rounded-t-2xl border border-border bg-card/98 shadow-xl backdrop-blur-md md:rounded-lg flex flex-col" style={{ maxHeight: '70vh' }}>
           {/* Mobile drag handle */}
-          <div className="flex items-center justify-center py-2 md:hidden">
+          <div className="flex items-center justify-center py-2 md:hidden flex-shrink-0">
             <div className="h-1 w-12 rounded-full bg-muted-foreground/30" />
           </div>
-          
-          <div className="border-b border-border p-3 md:p-4">
+
+          <div className="border-b border-border p-3 md:p-4 flex-shrink-0">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-semibold text-foreground">Capas del Mapa</h2>
                 <p className="text-xs text-muted-foreground">Selecciona una capa</p>
               </div>
-              <button 
+              <button
                 onClick={() => setShowLayerPanel(false)}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary md:hidden"
               >
@@ -1197,27 +1333,42 @@ export function MapViewer({
               </button>
             </div>
           </div>
-          
-          <div className="p-3">
-            <div className="grid grid-cols-4 gap-2 md:grid-cols-2">
-              {(Object.keys(layers) as LayerType[]).map((key) => (
-                <button
-                  key={key}
-                  onClick={() => handleLayerChange(key)}
-                  className={`group flex flex-col items-center gap-1.5 rounded-lg border p-2 transition-all duration-200 md:gap-2 md:p-3 ${
-                    activeLayer === key
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-secondary/50 text-muted-foreground hover:border-primary/50 hover:bg-secondary"
-                  }`}
-                >
-                  <LayerIcon type={key} active={activeLayer === key} />
-                  <span className="text-[10px] font-medium md:text-xs">{layers[key].name}</span>
-                </button>
-              ))}
-            </div>
+
+          {/* Scrollable layer list grouped by category */}
+          <div className="overflow-y-auto flex-1 p-3 space-y-3">
+            {([
+              { key: 'base',     label: '🗺️ Base' },
+              { key: 'satelital', label: '🛰️ Satelital' },
+              { key: 'nasa',     label: '🌿 NASA' },
+              { key: 'clima',    label: '🌤️ Clima' },
+            ] as { key: LayerConfig['category']; label: string }[]).map(({ key: cat, label }) => {
+              const catLayers = (Object.keys(layers) as LayerType[]).filter(k => layers[k].category === cat)
+              if (!catLayers.length) return null
+              return (
+                <div key={cat}>
+                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">{label}</p>
+                  <div className="space-y-1">
+                    {catLayers.map((key) => (
+                      <button
+                        key={key}
+                        onClick={() => handleLayerChange(key)}
+                        className={`w-full rounded-lg border px-3 py-2 text-left transition-all duration-150 ${
+                          activeLayer === key
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-secondary/40 text-foreground hover:border-primary/40 hover:bg-secondary"
+                        }`}
+                      >
+                        <span className="block text-xs font-medium leading-tight">{layers[key].name}</span>
+                        <span className="block text-[10px] leading-tight text-muted-foreground mt-0.5 line-clamp-1">{layers[key].description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
-          <div className="border-t border-border p-3 md:p-4">
+          <div className="border-t border-border p-3 md:p-4 flex-shrink-0">
             <div className="mb-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-foreground">{layers[activeLayer].name}</span>
