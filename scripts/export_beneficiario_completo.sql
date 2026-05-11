@@ -61,7 +61,7 @@ SELECT
   v.codigo_formulario,
   v.radicado_local,
   v.radicado_oficial,
-  v.estado                            AS estado_visita,
+  c.estado                            AS estado_visita,
   v.version_formulario,
   v.fecha_emision_formulario,
   -- Perfil del asesor
@@ -278,7 +278,7 @@ SELECT
   v.nombre_tecnico                    AS asesor_visita,
   v.radicado_local,
   v.radicado_oficial,
-  v.estado                            AS estado_visita,
+  c.estado                            AS estado_visita,
   v.codigo_formulario,
 
   -- PREDIO

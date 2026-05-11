@@ -24,7 +24,7 @@ SELECT
   c.id                                          AS caracterizacion_id,
   v.radicado_local,
   v.radicado_oficial,
-  v.estado                                      AS estado_visita,
+  c.estado                                      AS estado_visita,
   v.fecha_visita,
   v.version_formulario,
 
