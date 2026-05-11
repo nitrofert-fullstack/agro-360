@@ -328,6 +328,9 @@ export function MapViewer({
   const [ndviEnd, setNdviEnd] = useState('')
   const [ndviPreset, setNdviPreset] = useState<number>(6)
   const [ndviImageryStatus, setNdviImageryStatus] = useState<'idle' | 'loading' | 'loaded' | 'no-images' | 'error'>('idle')
+  const [selectedBand, setSelectedBand] = useState<string>('truecolor')
+  const [availableBands, setAvailableBands] = useState<Record<string, string>>({})
+  const [imageryMeta, setImageryMeta] = useState<{ fecha: string; nubes: string; tipo: string } | null>(null)
 
   const drawStartRef = useRef<L.LatLng | null>(null)
 
@@ -1035,36 +1038,46 @@ export function MapViewer({
           return Math.abs(cloudDiff) > 20 ? cloudDiff : b.dt - a.dt
         })[0]
 
-      // Preferir ndvi; fallback a falsecolor (infrarrojo) o truecolor
-      const tileUrl = best?.tile?.ndvi || best?.tile?.falsecolor || best?.tile?.truecolor
+      // Guardar todas las bandas disponibles y elegir truecolor por defecto (más profesional)
+      const bands = best?.tile ?? {}
+      setAvailableBands(bands)
+
+      const fecha = best.dt ? new Date(best.dt * 1000).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : ''
+      const nubes = best.cl != null ? `${Math.round(best.cl)}% nubes` : ''
+      const tipo = best.type ?? 'Sentinel-2'
+      setImageryMeta({ fecha, nubes, tipo })
+
+      // Preferir truecolor (foto real), luego ndvi, luego falsecolor
+      const bandPref = selectedBand !== 'truecolor' && bands[selectedBand] ? selectedBand
+        : bands.truecolor ? 'truecolor'
+        : bands.ndvi ? 'ndvi'
+        : Object.keys(bands)[0]
+      const tileUrl = bands[bandPref]
       if (!tileUrl) {
         setNdviImageryStatus('no-images')
         return
       }
+      setSelectedBand(bandPref)
 
-      const fecha = best.dt ? new Date(best.dt * 1000).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : ''
-
-      // Crear pane dedicado con z-index sobre la capa base (tilePane=200)
-      // pero bajo los vectores (overlayPane=400) para que el tile se vea
+      // Crear pane dedicado z=350 (sobre base, bajo vectores)
       if (!map.getPane('sentinelPane')) {
         const pane = map.createPane('sentinelPane')
         pane.style.zIndex = '350'
         pane.style.pointerEvents = 'none'
       }
 
+      // tms:true → Agromonitoring usa TMS (y invertido), Leaflet usa XYZ por defecto
       ndviTileLayerRef.current = Lf.tileLayer(tileUrl, {
         pane: 'sentinelPane',
         opacity: 0.9,
+        tms: true,
         maxNativeZoom: 14,
         maxZoom: 20,
-        attribution: `Sentinel-2 · ${fecha}`,
+        attribution: `${tipo} · ${fecha}`,
       })
 
       ndviTileLayerRef.current.on('tileerror', (e: any) => {
-        console.warn('[sentinel-tile] error cargando tile:', e.tile?.src)
-      })
-      ndviTileLayerRef.current.on('load', () => {
-        console.log('[sentinel-tile] capa cargada correctamente')
+        console.warn('[sentinel-tile] 404 en tile:', e.tile?.src?.split('?')[0])
       })
 
       ndviTileLayerRef.current.addTo(map)
@@ -1075,11 +1088,35 @@ export function MapViewer({
     }
   }
 
+  // Cambiar banda activa sin re-consultar Agromonitoring
+  const switchBand = (band: string) => {
+    const map = mapInstanceRef.current
+    const Lf = leafletRef.current
+    if (!map || !Lf || !availableBands[band]) return
+    if (ndviTileLayerRef.current) {
+      map.removeLayer(ndviTileLayerRef.current)
+      ndviTileLayerRef.current = null
+    }
+    ndviTileLayerRef.current = Lf.tileLayer(availableBands[band], {
+      pane: 'sentinelPane',
+      opacity: 0.9,
+      tms: true,
+      maxNativeZoom: 14,
+      maxZoom: 20,
+      attribution: imageryMeta ? `${imageryMeta.tipo} · ${imageryMeta.fecha}` : '',
+    })
+    ndviTileLayerRef.current.addTo(map)
+    setSelectedBand(band)
+  }
+
   const consultarNDVI = async () => {
     if (!selectedPredio) return
     setNdviLoading(true)
     setNdviError(null)
     setNdviImageryStatus('idle')
+    setAvailableBands({})
+    setImageryMeta(null)
+    setSelectedBand('truecolor')
     try {
       let polyId = agroPolyId
 
@@ -1464,20 +1501,92 @@ export function MapViewer({
                               })}
                             </div>
                           )}
-                          {ndviImageryStatus !== 'idle' && (
-                            <div className={`rounded border p-2 text-[10px] flex items-center gap-2 ${
-                              ndviImageryStatus === 'loading' ? 'border-border bg-secondary/30 text-muted-foreground' :
-                              ndviImageryStatus === 'loaded' ? 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400' :
-                              ndviImageryStatus === 'no-images' ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400' :
-                              'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400'
-                            }`}>
-                              {ndviImageryStatus === 'loading' && <svg className="h-3 w-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>}
-                              <span>
-                                {ndviImageryStatus === 'loading' && 'Cargando imagen satelital...'}
-                                {ndviImageryStatus === 'loaded' && '✓ Imagen Sentinel-2 visible en el mapa'}
-                                {ndviImageryStatus === 'no-images' && 'Sin imágenes en este período. Prueba 1-2 años.'}
-                                {ndviImageryStatus === 'error' && 'Error al cargar imagen. Intenta de nuevo.'}
-                              </span>
+                          {/* Estado de carga */}
+                          {ndviImageryStatus === 'loading' && (
+                            <div className="rounded border border-border bg-secondary/30 p-2 text-[10px] flex items-center gap-2 text-muted-foreground">
+                              <svg className="h-3 w-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                              Cargando imagen satelital...
+                            </div>
+                          )}
+                          {ndviImageryStatus === 'no-images' && (
+                            <div className="rounded border border-yellow-500/30 bg-yellow-500/10 p-2 text-[10px] text-yellow-700 dark:text-yellow-400">
+                              Sin imágenes en este período. Prueba 1-2 años.
+                            </div>
+                          )}
+                          {ndviImageryStatus === 'error' && (
+                            <div className="rounded border border-red-500/30 bg-red-500/10 p-2 text-[10px] text-red-700 dark:text-red-400">
+                              Error al cargar imagen. Intenta de nuevo.
+                            </div>
+                          )}
+
+                          {/* Selector de banda + leyenda — solo cuando hay imagen cargada */}
+                          {ndviImageryStatus === 'loaded' && Object.keys(availableBands).length > 0 && (
+                            <div className="space-y-2">
+                              {/* Info de la imagen */}
+                              {imageryMeta && (
+                                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                  <span>{imageryMeta.tipo} · {imageryMeta.fecha}</span>
+                                  {imageryMeta.nubes && <span>{imageryMeta.nubes}</span>}
+                                </div>
+                              )}
+
+                              {/* Selector de banda */}
+                              <div>
+                                <p className="text-[10px] font-medium text-muted-foreground mb-1.5">VISUALIZACIÓN</p>
+                                <div className="grid grid-cols-2 gap-1">
+                                  {([
+                                    { key: 'truecolor', label: 'Color real',    desc: 'Foto satelital' },
+                                    { key: 'falsecolor', label: 'Infrarrojo',   desc: 'Vegetación en rojo' },
+                                    { key: 'ndvi',       label: 'NDVI',         desc: 'Índice vegetación' },
+                                    { key: 'evi',        label: 'EVI',          desc: 'Vegetación mejorado' },
+                                    { key: 'ndwi',       label: 'NDWI',         desc: 'Humedad hoja' },
+                                    { key: 'dswi',       label: 'DSWI',         desc: 'Estrés hídrico' },
+                                  ] as { key: string; label: string; desc: string }[])
+                                    .filter(b => availableBands[b.key])
+                                    .map(b => (
+                                      <button
+                                        key={b.key}
+                                        onClick={() => switchBand(b.key)}
+                                        className={`text-left rounded px-2 py-1.5 transition-colors ${
+                                          selectedBand === b.key
+                                            ? 'bg-primary text-primary-foreground'
+                                            : 'bg-secondary/50 hover:bg-secondary text-foreground'
+                                        }`}
+                                      >
+                                        <div className="text-[10px] font-medium">{b.label}</div>
+                                        <div className={`text-[9px] ${selectedBand === b.key ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{b.desc}</div>
+                                      </button>
+                                    ))
+                                  }
+                                </div>
+                              </div>
+
+                              {/* Leyenda NDVI/EVI cuando corresponda */}
+                              {(selectedBand === 'ndvi' || selectedBand === 'evi') && (
+                                <div>
+                                  <p className="text-[10px] font-medium text-muted-foreground mb-1">ESCALA {selectedBand.toUpperCase()}</p>
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="flex-1 h-3 rounded" style={{
+                                      background: 'linear-gradient(to right, #a52a2a, #d2691e, #ffff00, #9acd32, #228b22, #006400)'
+                                    }} />
+                                  </div>
+                                  <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
+                                    <span>-0.2 Agua/suelo</span>
+                                    <span>0</span>
+                                    <span>0.5</span>
+                                    <span>1.0 Denso</span>
+                                  </div>
+                                </div>
+                              )}
+                              {selectedBand === 'ndwi' && (
+                                <div>
+                                  <p className="text-[10px] font-medium text-muted-foreground mb-1">ESCALA NDWI</p>
+                                  <div className="flex-1 h-3 rounded" style={{ background: 'linear-gradient(to right, #d2691e, #ffffff, #0000ff)' }} />
+                                  <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
+                                    <span>Seco</span><span>Húmedo</span>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
