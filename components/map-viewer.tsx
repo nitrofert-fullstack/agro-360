@@ -88,12 +88,13 @@ interface MapViewerProps {
   role?: 'admin' | 'asesor' | 'analista' | 'agricultor' | 'campesino'
 }
 
-function canSee(role: string | undefined, feature: 'ndvi-nasa' | 'ndvi-agro' | 'draw' | 'all-layers' | 'weather' | 'predio-info'): boolean {
-  if (!role || role === 'admin') return true
+function canSee(role: string | undefined, feature: 'ndvi-nasa' | 'ndvi-agro' | 'draw' | 'all-layers' | 'weather' | 'predio-info' | 'zone-stats'): boolean {
+  if (!role) return true
   const matrix: Record<string, string[]> = {
     'ndvi-nasa':   ['agricultor', 'campesino', 'admin'],
     'ndvi-agro':   ['admin'],
-    'draw':        ['asesor', 'analista', 'admin'],
+    'draw':        ['asesor', 'analista'],       // admin NO dibuja
+    'zone-stats':  ['admin'],                    // admin ve stats por zona
     'all-layers':  ['asesor', 'analista', 'admin'],
     'weather':     ['agricultor', 'campesino', 'admin'],
     'predio-info': ['asesor', 'analista', 'admin', 'agricultor', 'campesino'],
@@ -1744,6 +1745,26 @@ export function MapViewer({
           )}
 
           {/* ── Section: Herramientas de dibujo ── */}
+          {/* Panel de estadísticas por zona — solo admin */}
+          {canSee(role, 'zone-stats') && markers && markers.length > 0 && (
+            <div className="border-b border-border">
+              <div className="px-4 py-3">
+                <p className="text-xs font-semibold text-foreground mb-2">Resumen de predios</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border-l-4 border-primary bg-primary/5 p-2.5">
+                    <p className="text-lg font-bold text-foreground">{markers.length}</p>
+                    <p className="text-[10px] text-muted-foreground">Predios registrados</p>
+                  </div>
+                  <div className="rounded-lg border-l-4 border-green-500 bg-green-500/5 p-2.5">
+                    <p className="text-lg font-bold text-foreground">{markers.filter(m => m.polygonCoords && m.polygonCoords.length >= 3).length}</p>
+                    <p className="text-[10px] text-muted-foreground">Con polígono</p>
+                  </div>
+                </div>
+                <p className="mt-2 text-[10px] text-muted-foreground">Haz clic en un marcador para ver detalle e historial NDVI.</p>
+              </div>
+            </div>
+          )}
+
           {canSee(role, 'draw') && (
             <div className="border-b border-border">
               <button
