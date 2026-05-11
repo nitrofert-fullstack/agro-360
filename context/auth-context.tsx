@@ -156,8 +156,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               }
             }
           }
-        } catch {
-          // Silenciar: el onAuthStateChange manejará el estado resultante
+        } catch (err) {
+          // Para errores de red u otros fallos inesperados, loguear sin mostrar nada al usuario.
+          // onAuthStateChange manejará el estado resultante si el token expiró.
+          const msg = err instanceof Error ? err.message : String(err)
+          if (msg.includes('refresh_token_not_found') || msg.includes('Refresh Token')) {
+            await supabase.auth.signOut()
+            setProfile(null)
+            setState(prev => ({ ...prev, user: null, session: null, loading: false }))
+          } else {
+            console.warn('[auth] visibilitychange refresh error:', msg)
+          }
         }
       }
     }

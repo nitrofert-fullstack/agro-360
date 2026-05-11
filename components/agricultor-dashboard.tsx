@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { motion } from "framer-motion"
@@ -107,13 +107,27 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
     finally { setIsLoading(false) }
   }
 
-  const prediosConCoords = predios.filter(p => p.predio.latitud && p.predio.longitud)
-  const mapCenter: [number, number] = prediosConCoords.length > 0
-    ? [
-        prediosConCoords.reduce((s, p) => s + parseFloat(p.predio.latitud!), 0) / prediosConCoords.length,
-        prediosConCoords.reduce((s, p) => s + parseFloat(p.predio.longitud!), 0) / prediosConCoords.length,
-      ]
-    : [7.1254, -73.1198]
+  const prediosConCoords = useMemo(
+    () => predios.filter(p => p.predio.latitud && p.predio.longitud),
+    [predios]
+  )
+
+  const mapCenter = useMemo<[number, number]>(
+    () => prediosConCoords.length > 0
+      ? [
+          prediosConCoords.reduce((s, p) => s + parseFloat(p.predio.latitud!), 0) / prediosConCoords.length,
+          prediosConCoords.reduce((s, p) => s + parseFloat(p.predio.longitud!), 0) / prediosConCoords.length,
+        ]
+      : [7.1254, -73.1198],
+    [prediosConCoords]
+  )
+
+  const markerPosition = useMemo<[number, number] | undefined>(
+    () => prediosConCoords.length === 1
+      ? [parseFloat(prediosConCoords[0].predio.latitud!), parseFloat(prediosConCoords[0].predio.longitud!)]
+      : undefined,
+    [prediosConCoords]
+  )
 
   const viables  = predios.filter(p => p.visita.estado === 'APROBADO').length
   const revision = predios.filter(p => ['REVISADO','EN_ESTUDIO_CREDITO','EN_REVISION','SINCRONIZADO'].includes(p.visita.estado)).length
@@ -228,10 +242,7 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
                     <MapViewer
                       initialCenter={mapCenter}
                       initialZoom={prediosConCoords.length === 1 ? 14 : 10}
-                      markerPosition={prediosConCoords.length === 1 ? [
-                        parseFloat(prediosConCoords[0].predio.latitud!),
-                        parseFloat(prediosConCoords[0].predio.longitud!),
-                      ] : undefined}
+                      markerPosition={markerPosition}
                       minimal={true}
                     />
                   </div>

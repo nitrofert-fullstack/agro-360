@@ -47,7 +47,11 @@ export default function DashboardPage() {
     if (isAdmin || isAnalista) { router.replace('/admin/estadisticas'); return }
     if (!statsLoadedRef.current) {
       statsLoadedRef.current = true
-      if (isAsesor) loadAsesorStats()
+      if (isAsesor) {
+        let mounted = true
+        loadAsesorStats(() => mounted)
+        return () => { mounted = false }
+      }
     }
   }, [loading, isAuthenticated, isAdmin, isAnalista, isAsesor])
 
@@ -57,7 +61,7 @@ export default function DashboardPage() {
     return () => window.removeEventListener('pageshow', handlePageShow)
   }, [])
 
-  const loadAsesorStats = async () => {
+  const loadAsesorStats = async (isMounted: () => boolean = () => true) => {
     if (!user?.id) return
     setIsLoadingStats(true)
     const supabase = createClient()
@@ -70,9 +74,10 @@ export default function DashboardPage() {
         .or(`asesor_id.eq.${user.id},asesor_id.is.null`)
         .order('created_at', { ascending: false })
         .limit(200)
+      if (!isMounted()) return
       if (!error && data) setServerStats({ total: data.length, registros: data })
     } catch (err) { console.error('Error loading stats:', err) }
-    finally { setIsLoadingStats(false) }
+    finally { if (isMounted()) setIsLoadingStats(false) }
   }
 
   if (loading || (!loading && (isAdmin || isAnalista))) {

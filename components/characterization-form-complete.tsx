@@ -599,6 +599,18 @@ export function CharacterizationFormComplete({
     }
   }, [formData.beneficiario.fechaNacimiento, edadManual])
 
+  // Advertir al usuario si intenta salir con cambios no guardados
+  useEffect(() => {
+    const hasChanges = submittedData === null && currentStep > 1
+    if (!hasChanges) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [currentStep, submittedData])
+
   // Helper para actualizar campos anidados
   const updateField = (section: keyof FormData, field: string, value: unknown) => {
     setFormData((prev) => ({
@@ -2631,7 +2643,12 @@ export function CharacterizationFormComplete({
 
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-center">
                 <button
-                  onClick={() => { setSubmittedData(null); setFormData(initialFormData); setCurrentStep(1) }}
+                  onClick={() => {
+                    if (!window.confirm('¿Iniciar un nuevo formulario? Los datos del formulario anterior se limpiarán.')) return
+                    setSubmittedData(null)
+                    setFormData(initialFormData)
+                    setCurrentStep(1)
+                  }}
                   className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                 >
                   <Plus className="h-4 w-4" />

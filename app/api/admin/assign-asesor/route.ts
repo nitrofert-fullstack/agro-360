@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 export async function POST(request: Request) {
   try {
@@ -39,10 +40,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'El usuario seleccionado no es asesor ni admin' }, { status: 400 })
     }
 
-    await prisma.visitas.update({
-      where: { id: visitaId },
-      data:  { asesor_id: asesorId, updated_at: new Date() },
-    })
+    try {
+      await prisma.visitas.update({
+        where: { id: visitaId },
+        data:  { asesor_id: asesorId, updated_at: new Date() },
+      })
+    } catch (updateErr) {
+      if (
+        updateErr instanceof Prisma.PrismaClientKnownRequestError &&
+        updateErr.code === 'P2025'
+      ) {
+        return NextResponse.json({ error: 'Visita no encontrada' }, { status: 404 })
+      }
+      throw updateErr
+    }
 
     return NextResponse.json({
       success: true,
