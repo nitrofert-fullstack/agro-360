@@ -505,7 +505,7 @@ export function MapViewer({
     },
   }
 
-  const calculateStats = useCallback((layer: L.Circle | L.Rectangle | L.Polygon): AreaStats => {
+  const calculateStats = useCallback((layer: L.Circle | L.Rectangle | L.Polygon) => {
     let area = 0
     let perimeter = 0
     let bounds: L.LatLngBounds
