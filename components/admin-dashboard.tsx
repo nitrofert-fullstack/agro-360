@@ -1248,7 +1248,7 @@ export function AdminDashboard() {
                       <SelectItem value="EN_ESTUDIO_CREDITO">En Estudio Crédito</SelectItem>
                       <SelectItem value="APROBADO">Viable</SelectItem>
                       <SelectItem value="CANCELADO">No Viable</SelectItem>
-                      {isAdmin && <SelectItem value="sin_asesor">Sin Asesor</SelectItem>}
+                      <SelectItem value="sin_asesor" className={isAdmin ? '' : 'hidden'}>Sin Asesor</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
