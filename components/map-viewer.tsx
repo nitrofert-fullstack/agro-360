@@ -305,6 +305,7 @@ export function MapViewer({
   const [agroPolyId, setAgroPolyId] = useState<string | null>(null)
   const [ndviStart, setNdviStart] = useState('')
   const [ndviEnd, setNdviEnd] = useState('')
+  const [ndviPreset, setNdviPreset] = useState<number>(6) // meses seleccionados
 
   const drawStartRef = useRef<L.LatLng | null>(null)
 
@@ -834,14 +835,14 @@ export function MapViewer({
       .finally(() => setModisNdviLoading(false))
   }, [selectedPredio?.id])
 
-  // Fechas por defecto: últimos 6 meses
+  // Fechas por defecto según preset (meses hacia atrás desde hoy)
   useEffect(() => {
     const today = new Date()
-    const sixAgo = new Date()
-    sixAgo.setMonth(today.getMonth() - 6)
+    const from = new Date()
+    from.setMonth(today.getMonth() - ndviPreset)
     setNdviEnd(today.toISOString().split('T')[0])
-    setNdviStart(sixAgo.toISOString().split('T')[0])
-  }, [])
+    setNdviStart(from.toISOString().split('T')[0])
+  }, [ndviPreset])
 
   // Colorear el polígono seleccionado según NDVI real
   useEffect(() => {
@@ -1599,32 +1600,36 @@ export function MapViewer({
               {/* ── Tab Agromonitoring ── */}
               {ndviSource === 'agro' && (
                 <div className="space-y-3">
-                  {/* Selector de fechas */}
-                  <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2">
+                  {/* Selector de período */}
+                  <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2.5">
                     <p className="text-[10px] font-medium text-muted-foreground">HISTORIAL NDVI · Agromonitoring / Sentinel-2</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] text-muted-foreground">Desde</label>
-                        <input
-                          type="date"
-                          value={ndviStart}
-                          onChange={e => setNdviStart(e.target.value)}
-                          className="mt-0.5 w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-muted-foreground">Hasta</label>
-                        <input
-                          type="date"
-                          value={ndviEnd}
-                          onChange={e => setNdviEnd(e.target.value)}
-                          className="mt-0.5 w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
-                        />
-                      </div>
+                    <p className="text-[10px] text-muted-foreground">¿Cuánto tiempo atrás quieres ver?</p>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {([
+                        { label: '3 meses', value: 3 },
+                        { label: '6 meses', value: 6 },
+                        { label: '1 año',   value: 12 },
+                        { label: '2 años',  value: 24 },
+                      ] as { label: string; value: number }[]).map(({ label, value }) => (
+                        <button
+                          key={value}
+                          onClick={() => setNdviPreset(value)}
+                          className={`rounded px-2 py-1.5 text-[10px] font-medium transition-colors ${
+                            ndviPreset === value
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-background border border-border text-muted-foreground hover:text-foreground hover:border-primary/50'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
                     </div>
+                    <p className="text-[10px] text-muted-foreground/70">
+                      {ndviStart} → {ndviEnd}
+                    </p>
                     <button
                       onClick={consultarNDVI}
-                      disabled={ndviLoading || !ndviStart || !ndviEnd}
+                      disabled={ndviLoading}
                       className="flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
                     >
                       {ndviLoading ? (
@@ -1635,7 +1640,7 @@ export function MapViewer({
                           </svg>
                           Consultando...
                         </>
-                      ) : 'Consultar NDVI'}
+                      ) : 'Ver historial NDVI'}
                     </button>
                   </div>
 

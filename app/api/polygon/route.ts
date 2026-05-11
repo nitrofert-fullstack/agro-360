@@ -53,5 +53,20 @@ export async function POST(req: NextRequest) {
   // Pasar siempre el body original de Agromonitoring (incluyendo 422 duplicado),
   // porque el cliente parsea el mensaje de error para recuperar el ID del polígono existente.
   const data = await res.json()
+
+  // Traducir mensajes de error conocidos de Agromonitoring (vienen en inglés)
+  if (!res.ok && typeof data.message === 'string') {
+    const msg: string = data.message
+    if (/area of the polygon/i.test(msg)) {
+      const haMatch = msg.match(/([\d.]+)\s*ha/)
+      const ha = haMatch ? haMatch[1] : '?'
+      data.message = `El área del polígono (${ha} ha) es demasiado pequeña. Agromonitoring requiere entre 1 y 3.000 ha. Dibuja un área mayor o usa NASA MODIS para predios pequeños.`
+    } else if (/must be from/i.test(msg)) {
+      data.message = data.message
+        .replace('must be from', 'debe estar entre')
+        .replace('to', 'y')
+    }
+  }
+
   return NextResponse.json(data, { status: res.status })
 }
