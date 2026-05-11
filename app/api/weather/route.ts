@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rate-limit'
 
 interface WeatherData {
   temperature: number
@@ -9,6 +10,14 @@ interface WeatherData {
 }
 
 export async function POST(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+          || request.headers.get('x-real-ip')
+          || 'unknown'
+
+  if (!rateLimit(`weather:${ip}`, 30, 60_000)) {
+    return NextResponse.json({ error: 'Demasiadas solicitudes. Intente en un momento.' }, { status: 429 })
+  }
+
   try {
     const { lat, lng } = await request.json()
     

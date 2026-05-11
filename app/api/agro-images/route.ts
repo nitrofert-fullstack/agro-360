@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rate-limit'
 
 const AGRO_BASE = 'https://api.agromonitoring.com/agro/1.0'
 
@@ -8,6 +9,14 @@ const AGRO_BASE = 'https://api.agromonitoring.com/agro/1.0'
 // con las tile URLs reescritas para ir a través de nuestro proxy /api/agro-tile
 // (así el API key nunca se expone al cliente).
 export async function GET(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+          || req.headers.get('x-real-ip')
+          || 'unknown'
+
+  if (!rateLimit(`agro-images:${ip}`, 10, 60_000)) {
+    return NextResponse.json({ error: 'Demasiadas solicitudes. Intente en un momento.' }, { status: 429 })
+  }
+
   const API_KEY = process.env.AGROMONITORING_API_KEY
   if (!API_KEY) {
     return NextResponse.json({ error: 'AGROMONITORING_API_KEY no configurada' }, { status: 503 })

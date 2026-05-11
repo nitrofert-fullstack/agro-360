@@ -1059,6 +1059,23 @@ export function CharacterizationFormComplete({
       }
 
       const result = await res.json()
+
+      // Si el servidor detectó un duplicado (re-sync de formulario ya procesado),
+      // tratar como éxito silencioso: el form ya fue registrado, no es un error.
+      if (result.duplicate) {
+        const radicadoDup = result.radicadoOficial && result.radicadoOficial !== 'YA_REGISTRADO'
+          ? result.radicadoOficial
+          : null
+        toast.success('Formulario ya registrado', {
+          description: radicadoDup
+            ? `Este formulario ya fue enviado anteriormente. Radicado: ${radicadoDup}.`
+            : 'Este formulario ya fue enviado anteriormente.',
+          duration: 6000,
+        })
+        setSubmittedData({ radicado: radicadoDup || 'YA_REGISTRADO', sincronizado: true })
+        return
+      }
+
       const radicadoOficial = result.radicadoOficial || ''
       const tieneCorreo = !!formData.beneficiario.correo
       const emailMsg = tieneCorreo

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rate-limit'
 
 const AGRO_BASE = 'https://api.agromonitoring.com/agro/1.0'
 const API_KEY   = process.env.AGROMONITORING_API_KEY
@@ -6,6 +7,14 @@ const API_KEY   = process.env.AGROMONITORING_API_KEY
 // GET /api/agro-ndvi?polyid=XXX&start=1700000000&end=1710000000
 // start y end son unix timestamps en segundos
 export async function GET(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+          || req.headers.get('x-real-ip')
+          || 'unknown'
+
+  if (!rateLimit(`agro-ndvi:${ip}`, 10, 60_000)) {
+    return NextResponse.json({ error: 'Demasiadas solicitudes. Intente en un momento.' }, { status: 429 })
+  }
+
   if (!API_KEY) {
     return NextResponse.json(
       { error: 'NDVI no disponible: AGROMONITORING_API_KEY no configurada' },

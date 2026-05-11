@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rate-limit'
 
 const ALLOWED_TYPES = ['temp_new', 'precipitation_new'] as const
 type TileType = typeof ALLOWED_TYPES[number]
 
 export async function GET(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+          || request.headers.get('x-real-ip')
+          || 'unknown'
+
+  if (!rateLimit(`weather-tile:${ip}`, 60, 60_000)) {
+    return NextResponse.json({ error: 'Demasiadas solicitudes. Intente en un momento.' }, { status: 429 })
+  }
+
   const { searchParams } = request.nextUrl
   const type = searchParams.get('type') as TileType | null
   const z = searchParams.get('z')

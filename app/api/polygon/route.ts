@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rate-limit'
 
 const AGRO_BASE = 'https://api.agromonitoring.com/agro/1.0'
 const API_KEY   = process.env.AGROMONITORING_API_KEY
@@ -11,7 +12,15 @@ function noKeyResponse() {
 }
 
 // GET → lista todos los polígonos de la cuenta
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+          || req.headers.get('x-real-ip')
+          || 'unknown'
+
+  if (!rateLimit(`polygon:${ip}`, 5, 60_000)) {
+    return NextResponse.json({ error: 'Demasiadas solicitudes. Intente en un momento.' }, { status: 429 })
+  }
+
   if (!API_KEY) return noKeyResponse()
   const res  = await fetch(`${AGRO_BASE}/polygons?appid=${API_KEY}`, { signal: AbortSignal.timeout(8000) })
   if (!res.ok) {
@@ -24,6 +33,14 @@ export async function GET() {
 // POST → crea un polígono nuevo
 // Body: { name: string, coordinates: [lat, lng][] }
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+          || req.headers.get('x-real-ip')
+          || 'unknown'
+
+  if (!rateLimit(`polygon:${ip}`, 5, 60_000)) {
+    return NextResponse.json({ error: 'Demasiadas solicitudes. Intente en un momento.' }, { status: 429 })
+  }
+
   if (!API_KEY) return noKeyResponse()
   const { name, coordinates } = await req.json()
 

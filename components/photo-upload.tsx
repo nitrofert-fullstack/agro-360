@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -41,7 +41,11 @@ function resizeImage(file: File, maxWidth: number, maxHeight: number, quality: n
         const ctx = canvas.getContext('2d')
         if (!ctx) { reject(new Error('No canvas context')); return }
         ctx.drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', quality))
+        const dataUrl = canvas.toDataURL('image/jpeg', quality)
+        // Libera el buffer del canvas antes de que el GC lo recoja
+        canvas.width = 0
+        canvas.height = 0
+        resolve(dataUrl)
       }
       img.onerror = reject
       img.src = e.target?.result as string
@@ -87,6 +91,15 @@ export function PhotoUpload({
   const [cameraMode, setCameraMode] = useState(false)
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
+
+  // Cleanup: detener stream de cámara si el componente se desmonta mientras está activo
+  useEffect(() => {
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop())
+      }
+    }
+  }, [stream])
 
   const stopCamera = useCallback(() => {
     if (stream) {
@@ -142,7 +155,10 @@ export function PhotoUpload({
 
       ctx.drawImage(video, 0, 0)
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
-      
+      // Libera el buffer del canvas antes de que el GC lo recoja
+      canvas.width = 0
+      canvas.height = 0
+
       setPreviewUrl(dataUrl)
       onPhotoCapture(dataUrl)
       stopCamera()
