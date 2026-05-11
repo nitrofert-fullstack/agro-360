@@ -741,9 +741,12 @@ export function AdminDashboard() {
             ${predio.area_productiva_hectareas ? `<p style="margin:2px 0;font-size:12px;"><b>Área productiva:</b> ${predio.area_productiva_hectareas} ha</p>` : ''}
             ${temp ? `<p style="margin:2px 0;font-size:12px;"><b>Temperatura:</b> ${temp}°C</p>` : ''}
           </div>`
-          const polygonCoords = predio.poligono
-            ? (typeof predio.poligono === 'string' ? JSON.parse(predio.poligono) : predio.poligono) as [number, number][]
-            : undefined
+          let polygonCoords: [number, number][] | undefined
+          if (predio.poligono) {
+            try {
+              polygonCoords = (typeof predio.poligono === 'string' ? JSON.parse(predio.poligono) : predio.poligono) as [number, number][]
+            } catch { polygonCoords = undefined }
+          }
           markers.push({ id: predio.id, name: predio.nombre_predio || 'Sin nombre', position: [predio.latitud, predio.longitud], popupContent: popup, polygonCoords })
         }
         setAdminMapMarkers(markers)

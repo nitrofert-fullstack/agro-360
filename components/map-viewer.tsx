@@ -654,6 +654,17 @@ export function MapViewer({
       } else {
         const marker = Lf.marker(m.position, { icon: markerIcon }).addTo(map)
         marker.bindPopup(m.popupContent)
+        if (m.id) {
+          marker.on('click', () => {
+            setSelectedPredio({ id: m.id!, name: m.name || 'Predio', coords: [], position: m.position })
+            setNdviData([])
+            setAgroPolyId(null)
+            setNdviError(null)
+            setNdviSource('nasa')
+            setShowNdviPanel(true)
+            setShowDrawTools(false)
+          })
+        }
         markerLayersRef.current.push(marker)
       }
     })
@@ -1513,12 +1524,14 @@ export function MapViewer({
                 NASA MODIS
               </button>
               <button
-                onClick={() => setNdviSource('agro')}
-                className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                onClick={() => selectedPredio?.coords.length ? setNdviSource('agro') : undefined}
+                disabled={!selectedPredio?.coords.length}
+                className={`flex-1 px-3 py-2 text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                   ndviSource === 'agro'
                     ? 'border-b-2 border-primary text-primary'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
+                title={!selectedPredio?.coords.length ? 'Requiere polígono dibujado en el predio' : undefined}
               >
                 Agromonitoring
               </button>
