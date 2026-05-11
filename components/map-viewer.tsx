@@ -322,7 +322,6 @@ export function MapViewer({
       url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/${getGibsDate()}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`,
       attribution: "NASA GIBS MODIS",
       opacity: 0.85,
-      useColorRemap: true,
       maxZoom: 9,
     },
     satellite: {
