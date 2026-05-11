@@ -883,6 +883,7 @@ export function MapViewer({
           return Math.abs(cloudDiff) > 20 ? cloudDiff : b.dt - a.dt
         })[0]
 
+      // Preferir ndvi; fallback a falsecolor (infrarrojo) o truecolor
       const tileUrl = best?.tile?.ndvi || best?.tile?.falsecolor || best?.tile?.truecolor
       if (!tileUrl) {
         setNdviImageryStatus('no-images')
@@ -890,19 +891,32 @@ export function MapViewer({
       }
 
       const fecha = best.dt ? new Date(best.dt * 1000).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : ''
-      const nubes = best.cl != null ? `${Math.round(best.cl)}% nubes` : ''
+
+      // Crear pane dedicado con z-index sobre la capa base (tilePane=200)
+      // pero bajo los vectores (overlayPane=400) para que el tile se vea
+      if (!map.getPane('sentinelPane')) {
+        const pane = map.createPane('sentinelPane')
+        pane.style.zIndex = '350'
+        pane.style.pointerEvents = 'none'
+      }
 
       ndviTileLayerRef.current = Lf.tileLayer(tileUrl, {
-        opacity: 0.85,
-        maxNativeZoom: 14,  // Sentinel-2 nativo ~10m/px, tiles hasta z14
-        maxZoom: 20,        // Leaflet upscalea z14 para zoom mayor → visible de cerca
+        pane: 'sentinelPane',
+        opacity: 0.9,
+        maxNativeZoom: 14,
+        maxZoom: 20,
         attribution: `Sentinel-2 · ${fecha}`,
-      }).addTo(map)
+      })
 
+      ndviTileLayerRef.current.on('tileerror', (e: any) => {
+        console.warn('[sentinel-tile] error cargando tile:', e.tile?.src)
+      })
+      ndviTileLayerRef.current.on('load', () => {
+        console.log('[sentinel-tile] capa cargada correctamente')
+      })
+
+      ndviTileLayerRef.current.addTo(map)
       setNdviImageryStatus('loaded')
-
-      // Guardar metadata de la imagen para mostrar en panel
-      ;(ndviTileLayerRef.current as any)._meta = { fecha, nubes }
     } catch (err) {
       console.error('[agro-imagery]', err)
       setNdviImageryStatus('error')
