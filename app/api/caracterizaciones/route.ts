@@ -92,6 +92,30 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { offlineSync, ...c } = body
 
+    // === Idempotencia: detectar reintentos offline ya comprometidos ===
+    // El header X-Sync-Id es el localId de IndexedDB. Si ya existe una visita
+    // con ese valor en codigo_formulario, el primer intento tuvo éxito y el cliente
+    // reintenta por un timeout de red. Devolvemos 200 para que borre el form local.
+    const syncId = request.headers.get('X-Sync-Id')
+    if (syncId) {
+      const serviceRoleKeyEarly = process.env.SUPABASE_SERVICE_ROLE_KEY
+      const supabaseUrlEarly = process.env.NEXT_PUBLIC_SUPABASE_URL
+      if (serviceRoleKeyEarly && supabaseUrlEarly) {
+        const adminEarly = createAdminClient(supabaseUrlEarly, serviceRoleKeyEarly)
+        const { data: existingVisita } = await adminEarly
+          .from('visitas')
+          .select('radicado_oficial')
+          .eq('codigo_formulario', syncId)
+          .maybeSingle()
+        if (existingVisita) {
+          return NextResponse.json(
+            { radicadoOficial: existingVisita.radicado_oficial || 'YA_REGISTRADO', duplicate: true },
+            { status: 200 }
+          )
+        }
+      }
+    }
+
     // === Auth: sesión opcional ===
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -122,16 +146,21 @@ export async function POST(request: Request) {
           .eq('activo', true)
 
         if (asesores && asesores.length > 0) {
-          const counts = await Promise.all(
-            asesores.map(async (a: { id: string; nombre_completo: string }) => {
-              const { count } = await adminForAssign
-                .from('visitas')
-                .select('id', { count: 'exact', head: true })
-                .eq('asesor_id', a.id)
-              return { id: a.id, nombre: a.nombre_completo, count: count ?? 0 }
-            })
-          )
-          counts.sort((a, b) => a.count - b.count)
+          const asesorIds = asesores.map((a: { id: string; nombre_completo: string }) => a.id)
+          const { data: visitasCounts } = await adminForAssign
+            .from('visitas')
+            .select('asesor_id')
+            .in('asesor_id', asesorIds)
+          const countMap = new Map<string, number>()
+          for (const v of (visitasCounts ?? [])) {
+            countMap.set(v.asesor_id, (countMap.get(v.asesor_id) ?? 0) + 1)
+          }
+          const counts = asesores.map((a: { id: string; nombre_completo: string }) => ({
+            id: a.id,
+            nombre: a.nombre_completo,
+            count: countMap.get(a.id) ?? 0,
+          }))
+          counts.sort((a: { count: number }, b: { count: number }) => a.count - b.count)
           asesorId = counts[0].id
           asesorAutoNombre = counts[0].nombre
         }

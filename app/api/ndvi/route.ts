@@ -44,6 +44,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Coordenadas inválidas' }, { status: 400 })
   }
 
+  if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) {
+    return NextResponse.json({ error: 'Coordenadas fuera de rango válido' }, { status: 400 })
+  }
+
   const { startDate, endDate } = getModisDateRange()
 
   try {

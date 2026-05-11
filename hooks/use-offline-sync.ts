@@ -34,7 +34,10 @@ export function useOfflineSync(isAsesor: boolean) {
       try {
         const res = await fetch('/api/caracterizaciones', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Sync-Id': form.localId,
+          },
           body: JSON.stringify(form.payload),
         })
         if (res.ok) {

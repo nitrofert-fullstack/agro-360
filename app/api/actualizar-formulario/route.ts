@@ -81,150 +81,153 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── 1. Visita ───────────────────────────────────────────────────────────
-    await prisma.visitas.update({
-      where: { id: visitaId },
-      data: {
-        fecha_visita: datos.visita.fechaVisita ? new Date(datos.visita.fechaVisita) : undefined,
-        updated_at:   new Date(),
-      },
-    })
-
-    // ── 2. Beneficiario ─────────────────────────────────────────────────────
+    // ── 1-8. Actualizaciones en transacción ────────────────────────────────
     const nombres   = [datos.beneficiario.primerNombre, datos.beneficiario.segundoNombre].filter(Boolean).join(' ') || datos.beneficiario.nombres || ''
     const apellidos = [datos.beneficiario.primerApellido, datos.beneficiario.segundoApellido].filter(Boolean).join(' ') || datos.beneficiario.apellidos || ''
 
-    await prisma.beneficiarios.update({
-      where: { id: beneficiarioId },
-      data: {
-        tipo_documento:                  datos.beneficiario.tipoDocumento || undefined,
-        nombres,
-        apellidos,
-        correo:                          datos.beneficiario.email || datos.beneficiario.correo || null,
-        fecha_nacimiento:                datos.beneficiario.fechaNacimiento ? new Date(datos.beneficiario.fechaNacimiento) : null,
-        edad:                            datos.beneficiario.edad ?? null,
-        telefono:                        datos.beneficiario.telefono || null,
-        ocupacion_principal:             datos.beneficiario.ocupacionPrincipal || null,
-        genero:                          datos.beneficiario.genero || null,
-        personas_a_cargo:                datos.beneficiario.personasACargo ?? null,
-        nombre_contacto_secundario:      datos.beneficiario.nombreContactoSecundario || null,
-        telefono_secundario:             datos.beneficiario.telefonoSecundario || null,
-        parentesco_contacto_secundario:  datos.beneficiario.parentescoContactoSecundario || null,
-        asociacion:                      datos.beneficiario.asociacion || null,
-        updated_at:                      new Date(),
-      },
-    })
+    await prisma.$transaction(async (tx) => {
+      // ── 1. Visita ─────────────────────────────────────────────────────────
+      await tx.visitas.update({
+        where: { id: visitaId },
+        data: {
+          fecha_visita: datos.visita.fechaVisita ? new Date(datos.visita.fechaVisita) : undefined,
+          updated_at:   new Date(),
+        },
+      })
 
-    // ── 3. Predio ───────────────────────────────────────────────────────────
-    await prisma.predios.update({
-      where: { id: predioId },
-      data: {
-        nombre_predio:             datos.predio.nombrePredio || undefined,
-        departamento:              datos.predio.departamento || undefined,
-        municipio:                 datos.predio.municipio || undefined,
-        vereda:                    datos.predio.vereda || null,
-        tipo_tenencia:             datos.predio.tipoTenencia || null,
-        tipo_tenencia_otro:        datos.predio.tipoTenenciaOtro || null,
-        documento_tenencia:        datos.predio.documentoTenencia || null,
-        area_total_hectareas:      datos.predio.areaTotalHectareas ?? null,
-        area_productiva_hectareas: datos.predio.areaProductivaHectareas ?? null,
-        latitud:                   datos.predio.latitud ?? null,
-        longitud:                  datos.predio.longitud ?? null,
-        coordenada_x:              datos.predio.coordenadaX || null,
-        coordenada_y:              datos.predio.coordenadaY || null,
-        poligono:                  datos.predio.poligono !== undefined ? datos.predio.poligono : null,
-        altitud_msnm:              datos.predio.altitudMsnm ?? null,
-        direccion:                 datos.predio.direccion || null,
-        codigo_catastral:          datos.predio.codigoCatastral || null,
-        vive_en_predio:            datos.predio.viveEnPredio || null,
-        tiene_vivienda:            datos.predio.tieneVivienda ?? null,
-        cultivos_existentes:       datos.predio.cultivosExistentes || null,
-        updated_at:                new Date(),
-      },
-    })
+      // ── 2. Beneficiario ───────────────────────────────────────────────────
+      await tx.beneficiarios.update({
+        where: { id: beneficiarioId },
+        data: {
+          tipo_documento:                  datos.beneficiario.tipoDocumento || undefined,
+          nombres,
+          apellidos,
+          correo:                          datos.beneficiario.email || datos.beneficiario.correo || null,
+          fecha_nacimiento:                datos.beneficiario.fechaNacimiento ? new Date(datos.beneficiario.fechaNacimiento) : null,
+          edad:                            datos.beneficiario.edad ?? null,
+          telefono:                        datos.beneficiario.telefono || null,
+          ocupacion_principal:             datos.beneficiario.ocupacionPrincipal || null,
+          genero:                          datos.beneficiario.genero || null,
+          personas_a_cargo:                datos.beneficiario.personasACargo ?? null,
+          nombre_contacto_secundario:      datos.beneficiario.nombreContactoSecundario || null,
+          telefono_secundario:             datos.beneficiario.telefonoSecundario || null,
+          parentesco_contacto_secundario:  datos.beneficiario.parentescoContactoSecundario || null,
+          asociacion:                      datos.beneficiario.asociacion || null,
+          updated_at:                      new Date(),
+        },
+      })
 
-    // Helper upsert sub-tablas de predio
-    const upsertByPredio = async <T extends { id_predio: string }>(
-      table: 'caracterizacion_predio' | 'abastecimiento_agua' | 'riesgos_predio' | 'area_productiva',
-      data: Omit<T, 'id_predio' | 'id'>
-    ) => {
-      const existing = await (prisma[table] as any).findFirst({ where: { id_predio: predioId }, select: { id: true } })
-      if (existing) {
-        await (prisma[table] as any).update({ where: { id: existing.id }, data })
-      } else {
-        await (prisma[table] as any).create({ data: { id_predio: predioId, ...data } })
+      // ── 3. Predio ─────────────────────────────────────────────────────────
+      await tx.predios.update({
+        where: { id: predioId },
+        data: {
+          nombre_predio:             datos.predio.nombrePredio || undefined,
+          departamento:              datos.predio.departamento || undefined,
+          municipio:                 datos.predio.municipio || undefined,
+          vereda:                    datos.predio.vereda || null,
+          tipo_tenencia:             datos.predio.tipoTenencia || null,
+          tipo_tenencia_otro:        datos.predio.tipoTenenciaOtro || null,
+          documento_tenencia:        datos.predio.documentoTenencia || null,
+          area_total_hectareas:      datos.predio.areaTotalHectareas ?? null,
+          area_productiva_hectareas: datos.predio.areaProductivaHectareas ?? null,
+          latitud:                   datos.predio.latitud ?? null,
+          longitud:                  datos.predio.longitud ?? null,
+          coordenada_x:              datos.predio.coordenadaX || null,
+          coordenada_y:              datos.predio.coordenadaY || null,
+          poligono:                  datos.predio.poligono !== undefined ? datos.predio.poligono : null,
+          altitud_msnm:              datos.predio.altitudMsnm ?? null,
+          direccion:                 datos.predio.direccion || null,
+          codigo_catastral:          datos.predio.codigoCatastral || null,
+          vive_en_predio:            datos.predio.viveEnPredio || null,
+          tiene_vivienda:            datos.predio.tieneVivienda ?? null,
+          cultivos_existentes:       datos.predio.cultivosExistentes || null,
+          updated_at:                new Date(),
+        },
+      })
+
+      // Helper upsert sub-tablas de predio (dentro de la transacción)
+      const upsertByPredio = async <T extends { id_predio: string }>(
+        table: 'caracterizacion_predio' | 'abastecimiento_agua' | 'riesgos_predio' | 'area_productiva',
+        data: Omit<T, 'id_predio' | 'id'>
+      ) => {
+        const existing = await (tx[table] as any).findFirst({ where: { id_predio: predioId }, select: { id: true } })
+        if (existing) {
+          await (tx[table] as any).update({ where: { id: existing.id }, data })
+        } else {
+          await (tx[table] as any).create({ data: { id_predio: predioId, ...data } })
+        }
       }
-    }
 
-    // ── 4-7. Sub-tablas del predio ──────────────────────────────────────────
-    await Promise.all([
-      upsertByPredio('caracterizacion_predio', {
-        ruta_acceso:         datos.caracterizacion.rutaAcceso || null,
-        distancia_km:        datos.caracterizacion.distanciaKm ?? null,
-        tiempo_acceso:       datos.caracterizacion.tiempoAcceso || null,
-        temperatura_celsius: datos.caracterizacion.temperaturaCelsius ?? null,
-        meses_lluvia:        datos.caracterizacion.mesesLluvia || null,
-        topografia:          datos.caracterizacion.topografia || null,
-        cobertura_bosque:    datos.caracterizacion.coberturaBosque ?? false,
-        cobertura_cultivos:  datos.caracterizacion.coberturaCultivos ?? false,
-        cobertura_pastos:    datos.caracterizacion.coberturaPastos ?? false,
-        cobertura_rastrojo:  datos.caracterizacion.coberturaRastrojo ?? false,
-        updated_at:          new Date(),
-      }),
-      upsertByPredio('abastecimiento_agua', {
-        nacimiento_manantial: datos.aguaRiesgos.nacimientoManantial ?? false,
-        rio_quebrada:         datos.aguaRiesgos.rioQuebrada ?? false,
-        pozo:                 datos.aguaRiesgos.pozo ?? false,
-        acueducto_rural:      datos.aguaRiesgos.acueductoRural ?? false,
-        canal_distrito_riego: datos.aguaRiesgos.canalDistritoRiego ?? false,
-        jaguey_reservorio:    datos.aguaRiesgos.jagueyReservorio ?? false,
-        agua_lluvia:          datos.aguaRiesgos.aguaLluvia ?? false,
-        otra_fuente:          datos.aguaRiesgos.otraFuente || null,
-      }),
-      upsertByPredio('riesgos_predio', {
-        inundacion:    datos.aguaRiesgos.inundacion ?? false,
-        sequia:        datos.aguaRiesgos.sequia ?? false,
-        viento:        datos.aguaRiesgos.viento ?? false,
-        helada:        datos.aguaRiesgos.helada ?? false,
-        otros_riesgos: datos.aguaRiesgos.otrosRiesgos || null,
-      }),
-      upsertByPredio('area_productiva', {
-        sistema_productivo:                  datos.areaProductiva.sistemaProductivo || null,
-        caracterizacion_cultivo:             datos.areaProductiva.caracterizacionCultivo || null,
-        cantidad_produccion:                 datos.areaProductiva.cantidadProduccion || null,
-        estado_cultivo:                      datos.areaProductiva.estadoCultivo || null,
-        tiene_infraestructura_procesamiento: datos.areaProductiva.tieneInfraestructuraProcesamiento ?? false,
-        estructuras:                         datos.areaProductiva.estructuras || null,
-        interesado_programa:                 datos.areaProductiva.interesadoPrograma ?? false,
-        donde_comercializa:                  datos.areaProductiva.dondeComercializa || null,
-        ingreso_mensual_ventas:              datos.areaProductiva.ingresoMensualVentas ?? null,
-        sistema_productivo_interes:          datos.areaProductiva.sistemaProductivoInteres || null,
-        hectareas_siembra_nueva:             datos.areaProductiva.hectareasSiembraNueva ?? null,
-        hectareas_renovacion:               datos.areaProductiva.hectareasRenovacion ?? null,
-        updated_at:                          new Date(),
-      }),
-    ])
+      // ── 4-7. Sub-tablas del predio ────────────────────────────────────────
+      await Promise.all([
+        upsertByPredio('caracterizacion_predio', {
+          ruta_acceso:         datos.caracterizacion.rutaAcceso || null,
+          distancia_km:        datos.caracterizacion.distanciaKm ?? null,
+          tiempo_acceso:       datos.caracterizacion.tiempoAcceso || null,
+          temperatura_celsius: datos.caracterizacion.temperaturaCelsius ?? null,
+          meses_lluvia:        datos.caracterizacion.mesesLluvia || null,
+          topografia:          datos.caracterizacion.topografia || null,
+          cobertura_bosque:    datos.caracterizacion.coberturaBosque ?? false,
+          cobertura_cultivos:  datos.caracterizacion.coberturaCultivos ?? false,
+          cobertura_pastos:    datos.caracterizacion.coberturaPastos ?? false,
+          cobertura_rastrojo:  datos.caracterizacion.coberturaRastrojo ?? false,
+          updated_at:          new Date(),
+        }),
+        upsertByPredio('abastecimiento_agua', {
+          nacimiento_manantial: datos.aguaRiesgos.nacimientoManantial ?? false,
+          rio_quebrada:         datos.aguaRiesgos.rioQuebrada ?? false,
+          pozo:                 datos.aguaRiesgos.pozo ?? false,
+          acueducto_rural:      datos.aguaRiesgos.acueductoRural ?? false,
+          canal_distrito_riego: datos.aguaRiesgos.canalDistritoRiego ?? false,
+          jaguey_reservorio:    datos.aguaRiesgos.jagueyReservorio ?? false,
+          agua_lluvia:          datos.aguaRiesgos.aguaLluvia ?? false,
+          otra_fuente:          datos.aguaRiesgos.otraFuente || null,
+        }),
+        upsertByPredio('riesgos_predio', {
+          inundacion:    datos.aguaRiesgos.inundacion ?? false,
+          sequia:        datos.aguaRiesgos.sequia ?? false,
+          viento:        datos.aguaRiesgos.viento ?? false,
+          helada:        datos.aguaRiesgos.helada ?? false,
+          otros_riesgos: datos.aguaRiesgos.otrosRiesgos || null,
+        }),
+        upsertByPredio('area_productiva', {
+          sistema_productivo:                  datos.areaProductiva.sistemaProductivo || null,
+          caracterizacion_cultivo:             datos.areaProductiva.caracterizacionCultivo || null,
+          cantidad_produccion:                 datos.areaProductiva.cantidadProduccion || null,
+          estado_cultivo:                      datos.areaProductiva.estadoCultivo || null,
+          tiene_infraestructura_procesamiento: datos.areaProductiva.tieneInfraestructuraProcesamiento ?? false,
+          estructuras:                         datos.areaProductiva.estructuras || null,
+          interesado_programa:                 datos.areaProductiva.interesadoPrograma ?? false,
+          donde_comercializa:                  datos.areaProductiva.dondeComercializa || null,
+          ingreso_mensual_ventas:              datos.areaProductiva.ingresoMensualVentas ?? null,
+          sistema_productivo_interes:          datos.areaProductiva.sistemaProductivoInteres || null,
+          hectareas_siembra_nueva:             datos.areaProductiva.hectareasSiembraNueva ?? null,
+          hectareas_renovacion:               datos.areaProductiva.hectareasRenovacion ?? null,
+          updated_at:                          new Date(),
+        }),
+      ])
 
-    // ── 8. Información financiera ───────────────────────────────────────────
-    const finData = {
-      ingresos_mensuales_agropecuaria: datos.infoFinanciera?.ingresosMensualesAgropecuaria ?? null,
-      ingresos_mensuales_otros:        datos.infoFinanciera?.ingresosMensualesOtros ?? null,
-      egresos_mensuales:               datos.infoFinanciera?.egresosMensuales ?? null,
-      activos_totales:                 datos.infoFinanciera?.activosTotales ?? null,
-      activos_agropecuaria:            datos.infoFinanciera?.activosAgropecuaria ?? null,
-      pasivos_totales:                 datos.infoFinanciera?.pasivosTotales ?? null,
-      updated_at:                      new Date(),
-    }
-    const existingFin = await prisma.informacion_financiera.findFirst({
-      where:   { id_beneficiario: beneficiarioId },
-      orderBy: { created_at: 'desc' },
-      select:  { id: true },
+      // ── 8. Información financiera ─────────────────────────────────────────
+      const finData = {
+        ingresos_mensuales_agropecuaria: datos.infoFinanciera?.ingresosMensualesAgropecuaria ?? null,
+        ingresos_mensuales_otros:        datos.infoFinanciera?.ingresosMensualesOtros ?? null,
+        egresos_mensuales:               datos.infoFinanciera?.egresosMensuales ?? null,
+        activos_totales:                 datos.infoFinanciera?.activosTotales ?? null,
+        activos_agropecuaria:            datos.infoFinanciera?.activosAgropecuaria ?? null,
+        pasivos_totales:                 datos.infoFinanciera?.pasivosTotales ?? null,
+        updated_at:                      new Date(),
+      }
+      const existingFin = await tx.informacion_financiera.findFirst({
+        where:   { id_beneficiario: beneficiarioId },
+        orderBy: { created_at: 'desc' },
+        select:  { id: true },
+      })
+      if (existingFin) {
+        await tx.informacion_financiera.update({ where: { id: existingFin.id }, data: finData })
+      } else {
+        await tx.informacion_financiera.create({ data: { id_beneficiario: beneficiarioId, ...finData } })
+      }
     })
-    if (existingFin) {
-      await prisma.informacion_financiera.update({ where: { id: existingFin.id }, data: finData })
-    } else {
-      await prisma.informacion_financiera.create({ data: { id_beneficiario: beneficiarioId, ...finData } })
-    }
 
     // ── 9. Subir fotos (Supabase Storage) ──────────────────────────────────
     const storageClient = createStorageClient(
