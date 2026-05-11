@@ -135,10 +135,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       emailEnviado,
-      credenciales: { email: correo, password: tempPassword },
       mensaje: emailEnviado
-        ? `Credenciales enviadas a ${correo}`
-        : `Cuenta lista. Email: ${correo} | Contraseña: ${tempPassword}`,
+        ? 'Credenciales enviadas al correo.'
+        : 'Cuenta creada. El email de bienvenida no pudo enviarse. Contacte al administrador.',
     })
   } catch (err) {
     console.error('[EnviarCredenciales] Error:', err)

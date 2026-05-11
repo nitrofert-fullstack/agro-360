@@ -85,9 +85,14 @@ export default function MapaPage() {
             </div>
           `
 
-          const polygonCoords = predio.poligono
-            ? (typeof predio.poligono === 'string' ? JSON.parse(predio.poligono) : predio.poligono) as [number, number][]
-            : undefined
+          let polygonCoords: [number, number][] | undefined
+          if (predio.poligono) {
+            try {
+              polygonCoords = (typeof predio.poligono === 'string' ? JSON.parse(predio.poligono) : predio.poligono) as [number, number][]
+            } catch {
+              polygonCoords = undefined
+            }
+          }
 
           mapMarkers.push({
             id: predio.id,

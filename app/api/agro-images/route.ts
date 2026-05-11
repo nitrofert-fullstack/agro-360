@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const AGRO_BASE = 'https://api.agromonitoring.com/agro/1.0'
-const API_KEY   = process.env.AGROMONITORING_API_KEY!
 
 // GET /api/agro-images?polyid=XXX&start=T1&end=T2
 // start y end son unix timestamps en segundos
@@ -9,6 +8,11 @@ const API_KEY   = process.env.AGROMONITORING_API_KEY!
 // con las tile URLs reescritas para ir a través de nuestro proxy /api/agro-tile
 // (así el API key nunca se expone al cliente).
 export async function GET(req: NextRequest) {
+  const API_KEY = process.env.AGROMONITORING_API_KEY
+  if (!API_KEY) {
+    return NextResponse.json({ error: 'AGROMONITORING_API_KEY no configurada' }, { status: 503 })
+  }
+
   const { searchParams } = new URL(req.url)
   const polyid = searchParams.get('polyid')
   const start  = searchParams.get('start')
@@ -22,7 +26,8 @@ export async function GET(req: NextRequest) {
   }
 
   const res  = await fetch(
-    `${AGRO_BASE}/image/search?start=${start}&end=${end}&polyid=${polyid}&appid=${API_KEY}`
+    `${AGRO_BASE}/image/search?start=${start}&end=${end}&polyid=${polyid}&appid=${API_KEY}`,
+    { signal: AbortSignal.timeout(8000) }
   )
   const data = await res.json()
 

@@ -30,8 +30,8 @@ export async function POST(request: NextRequest) {
 
     const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${apiKey}&units=metric&lang=es`
 
-    const response = await fetch(url)
-    
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) })
+
     if (!response.ok) {
       return NextResponse.json(
         { error: 'Error al obtener datos del clima' },

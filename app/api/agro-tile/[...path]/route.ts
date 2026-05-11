@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const AGRO_BASE = 'https://api.agromonitoring.com/agro/1.0'
-const API_KEY   = process.env.AGROMONITORING_API_KEY!
 
 // Catch-all proxy for Agromonitoring tile requests.
 // URL pattern: /api/agro-tile/[...path]
@@ -11,6 +10,11 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
+  const API_KEY = process.env.AGROMONITORING_API_KEY
+  if (!API_KEY) {
+    return NextResponse.json({ error: 'AGROMONITORING_API_KEY no configurada' }, { status: 503 })
+  }
+
   const { path: pathSegments } = await params
   const path = pathSegments.join('/')
   const { searchParams } = new URL(req.url)
@@ -22,7 +26,7 @@ export async function GET(
   const url = `${AGRO_BASE}/${path}?${forwardParams.toString()}`
 
   try {
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
     const buffer = await res.arrayBuffer()
     return new NextResponse(buffer, {
       status: res.status,

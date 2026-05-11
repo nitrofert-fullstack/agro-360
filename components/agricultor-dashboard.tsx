@@ -38,7 +38,7 @@ interface VisitaResumen {
   fecha_visita: string; estado: string; nombre_tecnico: string | null
 }
 
-interface PredioCompleto { predio: Predio; visita: VisitaResumen }
+interface PredioCompleto { id: string; predio: Predio; visita: VisitaResumen }
 
 const estadoConfig: Record<string, { label: string; badge: string; cardBorder: string }> = {
   INICIADO:           { label: "Iniciado",          badge: "bg-slate-500/10 text-slate-600 border-slate-500/20",  cardBorder: "border-l-slate-400" },
@@ -98,7 +98,7 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
 
       const result: PredioCompleto[] = caracterizaciones.map((c: any) => {
         const visita = visitasData?.find((v: any) => v.id === c.id_visita)
-        return { predio: prediosData?.find((p: any) => p.id === c.id_predio), visita: visita ? { ...visita, estado: c.estado || 'INICIADO' } : null }
+        return { id: c.id, predio: prediosData?.find((p: any) => p.id === c.id_predio), visita: visita ? { ...visita, estado: c.estado || 'INICIADO' } : null }
       }).filter((r: PredioCompleto) => r.predio && r.visita)
 
       setPredios(result)
@@ -259,8 +259,8 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-sm)'}
                         role="button" tabIndex={0}
                         aria-label={`Ver ${item.predio.nombre_predio || 'terreno'}`}
-                        onClick={() => router.push(`/dashboard/caracterizacion/${item.visita.id}`)}
-                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/dashboard/caracterizacion/${item.visita.id}`) } }}
+                        onClick={() => router.push(`/dashboard/caracterizacion/${item.id}`)}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/dashboard/caracterizacion/${item.id}`) } }}
                       >
                         <CardContent className="flex items-center gap-3 p-4 min-h-[60px]">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">

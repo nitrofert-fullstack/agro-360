@@ -113,14 +113,13 @@ export async function POST(request: Request) {
       success: true,
       method,
       emailEnviado,
-      credenciales: method === 'admin' ? { email, password: tempPassword } : null,
       invitationUrl: method === 'invitation'
         ? `${process.env.NEXT_PUBLIC_APP_URL || ''}/auth/invitation?token=${token}`
         : null,
       mensaje: method === 'admin'
         ? emailEnviado
-          ? `Cuenta creada y credenciales enviadas por email a ${email}.`
-          : `Cuenta creada. Email: ${email} | Contraseña temporal: ${tempPassword}`
+          ? 'Credenciales enviadas al correo.'
+          : 'Cuenta creada. El email de bienvenida no pudo enviarse. Contacte al administrador.'
         : 'Invitación creada.',
     })
   } catch (err) {

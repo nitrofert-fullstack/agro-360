@@ -333,14 +333,14 @@ export function MapViewer({
     temperature: {
       name: "Temperatura",
       description: "Mapa de calor con temperaturas actuales",
-      url: "https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=2d799fd2c087ab502eec61dd876a912d",
+      url: "/api/weather-tile?type=temp_new&z={z}&x={x}&y={y}",
       attribution: "OpenWeatherMap",
       opacity: 0.7,
     },
     precipitation: {
       name: "Precipitacion",
       description: "Niveles de precipitacion actual",
-      url: "https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=2d799fd2c087ab502eec61dd876a912d",
+      url: "/api/weather-tile?type=precipitation_new&z={z}&x={x}&y={y}",
       attribution: "OpenWeatherMap",
       opacity: 0.7,
     },

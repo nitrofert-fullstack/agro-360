@@ -13,7 +13,10 @@ function noKeyResponse() {
 // GET → lista todos los polígonos de la cuenta
 export async function GET() {
   if (!API_KEY) return noKeyResponse()
-  const res  = await fetch(`${AGRO_BASE}/polygons?appid=${API_KEY}`)
+  const res  = await fetch(`${AGRO_BASE}/polygons?appid=${API_KEY}`, { signal: AbortSignal.timeout(8000) })
+  if (!res.ok) {
+    return NextResponse.json({ error: `API externa error: ${res.status}` }, { status: res.status })
+  }
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })
 }
@@ -44,7 +47,12 @@ export async function POST(req: NextRequest) {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(body),
+    signal:  AbortSignal.timeout(8000),
   })
+
+  if (!res.ok) {
+    return NextResponse.json({ error: `API externa error: ${res.status}` }, { status: res.status })
+  }
 
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })

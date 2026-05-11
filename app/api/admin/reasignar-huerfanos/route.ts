@@ -47,30 +47,49 @@ export async function POST(request: Request) {
       return NextResponse.json({ mensaje: 'Todos los registros ya tienen asesor actualizado.', actualizadas: 0 })
     }
 
-    // Calcular carga actual de cada asesor
-    const cargas = await Promise.all(
+    // Calcular carga actual de cada asesor y mantenerla en un Map mutable
+    const cargasIniciales = await Promise.all(
       asesores.map(async (a) => ({
-        ...a,
+        id: a.id,
+        nombre_completo: a.nombre_completo,
         carga: await prisma.visitas.count({ where: { asesor_id: a.id } }),
       }))
     )
 
+    // Map<asesor_id, carga_actual> — se actualiza en cada iteración para balanceo real
+    const cargaMap = new Map<string, number>(
+      cargasIniciales.map((a) => [a.id, a.carga])
+    )
+    const asesorInfo = new Map<string, string | null>(
+      cargasIniciales.map((a) => [a.id, a.nombre_completo])
+    )
+
     let actualizadas = 0
 
-    // Asignar cada visita al asesor con menor carga (balanceo dinámico)
+    // Asignar cada visita al asesor con menor carga actual (balanceo dinámico correcto)
     for (const visita of visitasDesactualizadas) {
-      const destino = cargas.reduce((min, curr) => curr.carga < min.carga ? curr : min)
+      // Buscar el asesor con menor carga usando el mapa actualizado
+      let destinoId = asesores[0].id
+      let minCarga = cargaMap.get(destinoId) ?? 0
+
+      for (const asesor of asesores) {
+        const cargaActual = cargaMap.get(asesor.id) ?? 0
+        if (cargaActual < minCarga) {
+          minCarga = cargaActual
+          destinoId = asesor.id
+        }
+      }
 
       await prisma.visitas.update({
         where: { id: visita.id },
         data: {
-          asesor_id: destino.id,
-          nombre_tecnico: destino.nombre_completo ?? undefined,
+          asesor_id: destinoId,
+          nombre_tecnico: asesorInfo.get(destinoId) ?? undefined,
         },
       })
 
-      // Incrementar carga local para balanceo correcto en el loop
-      destino.carga++
+      // Incrementar carga en el mapa local para que la próxima iteración vea la carga real
+      cargaMap.set(destinoId, (cargaMap.get(destinoId) ?? 0) + 1)
       actualizadas++
     }
 

@@ -27,8 +27,12 @@ export async function GET(req: NextRequest) {
   }
 
   const url = `${AGRO_BASE}/ndvi/history?polyid=${polyid}&start=${start}&end=${end}&appid=${API_KEY}`
-  const res  = await fetch(url)
-  const data = await res.json()
+  const res  = await fetch(url, { signal: AbortSignal.timeout(8000) })
 
+  if (!res.ok) {
+    return NextResponse.json({ error: `API externa error: ${res.status}` }, { status: res.status })
+  }
+
+  const data = await res.json()
   return NextResponse.json(data, { status: res.status })
 }

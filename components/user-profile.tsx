@@ -79,7 +79,7 @@ export function UserProfile() {
               {profile?.nombre_completo || user?.email?.split("@")[0]}
             </span>
             <span className="text-xs text-muted-foreground">
-              {profile?.rol === "admin" ? "Administrador" : profile?.rol === "analista" ? "Analista" : "Asesor"}
+              {profile?.rol === "admin" ? "Administrador" : profile?.rol === "analista" ? "Analista" : profile?.rol === "campesino" || profile?.rol === "agricultor" ? "Agricultor" : "Asesor"}
             </span>
           </div>
         </Button>
