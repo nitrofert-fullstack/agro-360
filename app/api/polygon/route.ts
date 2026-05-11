@@ -67,11 +67,18 @@ export async function POST(req: NextRequest) {
     signal:  AbortSignal.timeout(8000),
   })
 
-  // Pasar siempre el body original de Agromonitoring (incluyendo 422 duplicado),
-  // porque el cliente parsea el mensaje de error para recuperar el ID del polígono existente.
   const data = await res.json()
 
-  // Traducir mensajes de error conocidos de Agromonitoring (vienen en inglés)
+  // 422 duplicado: Agromonitoring indica que el polígono ya existe y da su ID.
+  // Lo tratamos como éxito — devolvemos el ID existente con status 200.
+  if (res.status === 422 && typeof data.message === 'string') {
+    const match = data.message.match(/['"]([a-f0-9]{24})['"]/i)
+    if (match) {
+      return NextResponse.json({ id: match[1], duplicated: true }, { status: 200 })
+    }
+  }
+
+  // Traducir otros mensajes de error conocidos de Agromonitoring (vienen en inglés)
   if (!res.ok && typeof data.message === 'string') {
     const msg: string = data.message
     if (/area of the polygon/i.test(msg)) {
