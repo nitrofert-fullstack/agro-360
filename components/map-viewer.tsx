@@ -757,7 +757,7 @@ export function MapViewer({
         mapInstanceRef.current = null
       }
     }
-  }
+  }, [])
 
   // Stable key derived from markers content — avoids re-running the heavy effect when the
   // parent re-renders with a new array reference but the same marker data.
