@@ -79,11 +79,17 @@ import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import { staggerContainer, staggerItem, fadeUp } from "@/lib/animations"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import {
-  BarChart, Bar, PieChart, Pie, Cell,
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer,
-} from "recharts"
+const chartFallback = () => (
+  <div className="flex h-[220px] w-full items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+  </div>
+)
+const MonthlyTrendChart = dynamic(() => import("./admin-charts").then((m) => m.MonthlyTrendChart), { ssr: false, loading: chartFallback })
+const EstadoDonutChart = dynamic(() => import("./admin-charts").then((m) => m.EstadoDonutChart), { ssr: false, loading: chartFallback })
+const MunicipioBarChart = dynamic(() => import("./admin-charts").then((m) => m.MunicipioBarChart), { ssr: false, loading: chartFallback })
+const GenderDonutChart = dynamic(() => import("./admin-charts").then((m) => m.GenderDonutChart), { ssr: false, loading: chartFallback })
+const AsesorBarChart = dynamic(() => import("./admin-charts").then((m) => m.AsesorBarChart), { ssr: false, loading: chartFallback })
+const DepartamentoBarChart = dynamic(() => import("./admin-charts").then((m) => m.DepartamentoBarChart), { ssr: false, loading: chartFallback })
 
 const MapViewer = dynamic(
   () => import("./map-viewer").then((mod) => mod.MapViewer),
@@ -361,6 +367,7 @@ export function AdminDashboard() {
   const isInitialMount = useRef(true)
   const [observaciones, setObservaciones] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const [isExporting, setIsExporting] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [credencialesEmail, setCredencialesEmail] = useState("")
   const [isSendingCredenciales, setIsSendingCredenciales] = useState(false)
@@ -959,6 +966,42 @@ export function AdminDashboard() {
     toast.success(`Archivo descargado: ${filename}`)
   }
 
+  const exportExcel = async () => {
+    setIsExporting(true)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 90_000)
+    try {
+      const res = await fetch('/api/admin/export-caracterizaciones', { signal: controller.signal })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        toast.error(json.error || 'Error al exportar')
+        return
+      }
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      const fecha = new Date().toISOString().split('T')[0]
+      a.href     = url
+      a.download = `Data_360_${fecha}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      // Diferir revocación para que el agente de descarga del navegador
+      // pueda leer el objeto URL antes de que sea invalidado (Firefox)
+      setTimeout(() => URL.revokeObjectURL(url), 2000)
+      toast.success('Excel exportado correctamente')
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        toast.error('Tiempo de espera agotado. El dataset puede ser muy grande.')
+      } else {
+        toast.error('Error al descargar el archivo')
+      }
+    } finally {
+      clearTimeout(timeout)
+      setIsExporting(false)
+    }
+  }
+
   const generatePDF = (cTyped: CaracterizacionDB) => {
     const c: any = cTyped
     const nombre = getNombreCompleto(cTyped)
@@ -1171,50 +1214,6 @@ export function AdminDashboard() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-0">
-          {/* Tabs de sección — visibles solo en mobile donde el sidebar está oculto */}
-          <div className="mb-4 flex flex-wrap gap-2 md:hidden">
-            <Button
-              variant={activeSection === 'caracterizaciones' ? 'default' : 'outline'}
-              size="sm"
-              className="gap-2"
-              onClick={() => router.push('/admin/caracterizaciones')}
-            >
-              <FileText className="h-4 w-4" />
-              Caracterizaciones
-            </Button>
-            {!isAnalista && (
-              <Button
-                variant={activeSection === 'usuarios' ? 'default' : 'outline'}
-                size="sm"
-                className="gap-2"
-                onClick={() => router.push('/admin/usuarios')}
-              >
-                <Users className="h-4 w-4" />
-                Usuarios
-              </Button>
-            )}
-            <Button
-              variant={activeSection === 'estadisticas' ? 'default' : 'outline'}
-              size="sm"
-              className="gap-2"
-              onClick={() => router.push('/admin/estadisticas')}
-            >
-              <BarChart2 className="h-4 w-4" />
-              Estadísticas
-            </Button>
-            {!isAnalista && (
-              <Button
-                variant={activeSection === 'mapa' ? 'default' : 'outline'}
-                size="sm"
-                className="gap-2"
-                onClick={() => router.push('/admin/mapa')}
-              >
-                <Map className="h-4 w-4" />
-                Mapa
-              </Button>
-            )}
-          </div>
-
           {activeSection === 'caracterizaciones' && (
             <motion.div key="caracterizaciones" variants={fadeUp} initial="hidden" animate="visible" className="flex flex-col flex-1 min-h-0"><>
               <div className="mb-4 flex items-start justify-between gap-2">
@@ -1257,18 +1256,34 @@ export function AdminDashboard() {
                     {caracterizaciones.length} cargados de {totalCount} total(es)
                   </p>
                   {caracterizaciones.length > 0 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => {
-                        const fecha = new Date().toISOString().split('T')[0]
-                        downloadCSV(caracterizaciones, `encuestas-${fecha}.csv`)
-                      }}
-                    >
-                      <Download className="h-4 w-4" />
-                      <span className="hidden xs:inline">Descargar</span> CSV
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => {
+                          const fecha = new Date().toISOString().split('T')[0]
+                          downloadCSV(caracterizaciones, `encuestas-${fecha}.csv`)
+                        }}
+                      >
+                        <Download className="h-4 w-4" />
+                        <span className="hidden xs:inline">Descargar</span> CSV
+                      </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 border-green-600/40 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950/30"
+                          onClick={exportExcel}
+                          disabled={isExporting}
+                        >
+                          {isExporting
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <Download className="h-4 w-4" />}
+                          <span className="hidden xs:inline">{isExporting ? 'Exportando…' : 'Exportar'}</span> Excel
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -1875,7 +1890,7 @@ export function AdminDashboard() {
                       variants={staggerContainer}
                       initial="hidden"
                       animate="visible"
-                      className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+                      className="grid grid-cols-2 gap-3 lg:grid-cols-4"
                     >
                       {[
                         { label: 'Viables', value: viables, sub: `${viablePct}% del total`, icon: CheckCircle, color: 'text-green-500', border: 'border-l-green-500', bg: 'bg-green-500/5' },
@@ -1899,7 +1914,7 @@ export function AdminDashboard() {
                     </motion.div>
 
                     {/* Promedios — fila de métricas secundarias */}
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                       {[
                         dashStats.promedios.edad != null && { label: 'Edad promedio', value: dashStats.promedios.edad, unit: 'años' },
                         dashStats.promedios.personasACargo != null && { label: 'Personas a cargo', value: dashStats.promedios.personasACargo, unit: 'prom.' },
@@ -1927,25 +1942,7 @@ export function AdminDashboard() {
                         </div>
                       </CardHeader>
                       <CardContent className="px-2 pb-3">
-                        <ResponsiveContainer width="100%" height={220}>
-                          <AreaChart data={dashStats.porMes} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="oklch(0.45 0.18 145)" stopOpacity={0.35} />
-                                <stop offset="95%" stopColor="oklch(0.45 0.18 145)" stopOpacity={0.02} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                            <XAxis dataKey="mes" tick={{ fontSize: 11 }} tickFormatter={mesFormatter} />
-                            <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                            <Tooltip
-                              contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }}
-                              labelFormatter={(v) => mesFormatter(String(v))}
-                              formatter={(value) => [`${value}`, 'Registros']}
-                            />
-                            <Area type="monotone" dataKey="total" stroke="oklch(0.45 0.18 145)" fill="url(#areaGrad)" strokeWidth={2.5} dot={{ r: 3, fill: 'oklch(0.45 0.18 145)', strokeWidth: 0 }} activeDot={{ r: 5 }} />
-                          </AreaChart>
-                        </ResponsiveContainer>
+                        <MonthlyTrendChart data={dashStats.porMes} mesFormatter={mesFormatter} />
                       </CardContent>
                     </Card>
 
@@ -1961,21 +1958,7 @@ export function AdminDashboard() {
                         </CardHeader>
                         <CardContent className="pb-3">
                           {estadosChartData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={260}>
-                              <PieChart>
-                                <Pie data={estadosChartData} cx="50%" cy="46%" innerRadius={65} outerRadius={95} paddingAngle={3} dataKey="value" strokeWidth={0}>
-                                  {estadosChartData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                                  <text x="50%" y="43%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 28, fontWeight: 700, fill: 'var(--foreground)' }}>
-                                    {estadosChartData.reduce((a, b) => a + b.value, 0)}
-                                  </text>
-                                  <text x="50%" y="53%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 11, fill: 'var(--muted-foreground)' }}>
-                                    registros
-                                  </text>
-                                </Pie>
-                                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }} formatter={(v) => [`${v} registros`, '']} />
-                                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, paddingTop: 4 }} />
-                              </PieChart>
-                            </ResponsiveContainer>
+                            <EstadoDonutChart data={estadosChartData} />
                           ) : (
                             <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">Sin datos</div>
                           )}
@@ -1991,19 +1974,7 @@ export function AdminDashboard() {
                         </CardHeader>
                         <CardContent className="px-2 pb-3">
                           {dashStats.porMunicipio.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={260}>
-                              <BarChart data={dashStats.porMunicipio} layout="vertical" margin={{ left: 4, right: 20, top: 4, bottom: 4 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />
-                                <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                                <YAxis type="category" dataKey="municipio" tick={{ fontSize: 10 }} width={92} />
-                                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }} formatter={(v) => [`${v}`, 'Registros']} />
-                                <Bar dataKey="total" radius={[0, 5, 5, 0]}>
-                                  {dashStats.porMunicipio.map((_, i) => (
-                                    <Cell key={i} fill={`oklch(${0.45 + i * 0.035} 0.18 145)`} />
-                                  ))}
-                                </Bar>
-                              </BarChart>
-                            </ResponsiveContainer>
+                            <MunicipioBarChart data={dashStats.porMunicipio} />
                           ) : (
                             <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">Sin datos</div>
                           )}
@@ -2023,21 +1994,7 @@ export function AdminDashboard() {
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="pb-3">
-                            <ResponsiveContainer width="100%" height={220}>
-                              <PieChart>
-                                <Pie data={genderData} cx="50%" cy="48%" innerRadius={60} outerRadius={88} dataKey="value" strokeWidth={0} paddingAngle={3}>
-                                  {genderData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                                  <text x="50%" y="45%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 26, fontWeight: 700, fill: 'var(--foreground)' }}>
-                                    {genderData.reduce((a, b) => a + b.value, 0)}
-                                  </text>
-                                  <text x="50%" y="56%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 11, fill: 'var(--muted-foreground)' }}>
-                                    productores
-                                  </text>
-                                </Pie>
-                                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }} formatter={(v) => [`${v}`, 'Productores']} />
-                                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, paddingTop: 4 }} />
-                              </PieChart>
-                            </ResponsiveContainer>
+                            <GenderDonutChart data={genderData} />
                           </CardContent>
                         </Card>
                       )}
@@ -2051,19 +2008,7 @@ export function AdminDashboard() {
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="px-2 pb-3">
-                            <ResponsiveContainer width="100%" height={Math.max(220, (dashStats.porAsesor?.length ?? 0) * 44)}>
-                              <BarChart data={dashStats.porAsesor} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />
-                                <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                                <YAxis type="category" dataKey="nombre" tick={{ fontSize: 11 }} width={140} />
-                                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }} formatter={(v) => [`${v} visitas`, '']} />
-                                <Bar dataKey="total" radius={[0, 5, 5, 0]}>
-                                  {(dashStats.porAsesor ?? []).map((_, i) => (
-                                    <Cell key={i} fill={i % 2 === 0 ? '#f59e0b' : '#d97706'} />
-                                  ))}
-                                </Bar>
-                              </BarChart>
-                            </ResponsiveContainer>
+                            <AsesorBarChart data={dashStats.porAsesor ?? []} />
                           </CardContent>
                         </Card>
                       )}
@@ -2077,15 +2022,7 @@ export function AdminDashboard() {
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="px-2 pb-3">
-                            <ResponsiveContainer width="100%" height={200}>
-                              <BarChart data={dashStats.porDepartamento} margin={{ top: 4, right: 8, left: -10, bottom: 4 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                                <XAxis dataKey="departamento" tick={{ fontSize: 11 }} />
-                                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: 12 }} formatter={(v) => [`${v}`, 'Registros']} />
-                                <Bar dataKey="total" fill="#a855f7" radius={[5, 5, 0, 0]} />
-                              </BarChart>
-                            </ResponsiveContainer>
+                            <DepartamentoBarChart data={dashStats.porDepartamento} />
                           </CardContent>
                         </Card>
                       )}

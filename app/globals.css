@@ -53,9 +53,9 @@
 .dark {
   --background: oklch(0.12 0.01 250);
   --foreground: oklch(0.95 0 0);
-  --card: oklch(0.16 0.01 250);
+  --card: oklch(0.21 0.01 250);
   --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.16 0.01 250);
+  --popover: oklch(0.21 0.01 250);
   --popover-foreground: oklch(0.95 0 0);
   --primary: oklch(0.65 0.18 145);
   --primary-foreground: oklch(0.12 0.01 250);
@@ -202,6 +202,17 @@
   }
 }
 
+/* Atributo selector: busca la cadena literal en el atributo class del HTML.
+   No depende de cómo Tailwind escape el "/" en los nombres de clase CSS.
+   Fuera de @layer = mayor prioridad que cualquier utilidad de Tailwind. */
+.dark [class*="bg-card/"] {
+  background-color: var(--color-card) !important;
+}
+
+.dark [class*="bg-background/"] {
+  background-color: color-mix(in oklch, var(--color-background) 97%, transparent) !important;
+}
+
 /* Leaflet z-index overrides */
 .leaflet-pane {
   z-index: 1 !important;
@@ -244,4 +255,49 @@
 .map-controls {
   z-index: 1000 !important;
   position: relative;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* === Animaciones CSS de la home (sin framer-motion en el path crítico) ===
+   El hero anima en cuanto el CSS parsea — no espera hidratación de React,
+   así el LCP (h1) pinta de inmediato. Stagger via animation-delay inline. */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Reveal al hacer scroll (below-the-fold): IntersectionObserver añade .in-view */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; }
+}
+
+/* Variante para el elemento LCP (h1 del hero): anima SOLO transform, nunca
+   opacity — un LCP que nace con opacity:0 no registra candidato en Chrome
+   y el LCP se va al siguiente elemento que pinte (mucho más tarde). */
+@keyframes slide-up {
+  from { transform: translateY(28px); }
+  to   { transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
