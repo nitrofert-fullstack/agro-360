@@ -29,3 +29,10 @@ next-env.d.ts
 .env*.local
 
 /lib/generated/prisma
+
+# herramientas locales / artefactos
+.claude/
+.playwright-mcp/
+server-stdout.log
+server-stderr.log
+/lighthouse-reports/

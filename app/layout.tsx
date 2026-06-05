@@ -1,5 +1,5 @@
 import React from "react"
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Poppins, Plus_Jakarta_Sans } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -11,28 +11,49 @@ import { SuppressInstallPrompt } from '@/components/suppress-install-prompt'
 import { AutoSync } from '@/components/auto-sync'
 import './globals.css'
 
+// display 'optional': si la fuente no carga en ~100ms se usa el fallback ajustado
+// (next/font calibra métricas → CLS 0) y NO hay re-paint tardío — el swap tardío
+// de 'swap' contaba como nuevo LCP y arruinaba la métrica en redes lentas.
 const poppins = Poppins({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
+  weight: ['400', '600', '700', '800'],
   variable: '--font-display',
-  display: 'swap',
+  display: 'optional',
 })
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
   variable: '--font-sans',
-  display: 'swap',
+  display: 'optional',
 })
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#09090b' },
+  ],
+}
+
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://santanderagro360.com'),
   title: 'Santander Agro360 - Sistema de Caracterizacion Predial',
   description: 'Sistema de caracterizacion predial con monitoreo NDVI, temperatura y precipitacion en Santander, Colombia',
+  openGraph: {
+    title: 'Santander Agro360',
+    description: 'Sistema de caracterización predial con monitoreo NDVI, temperatura y precipitación en Santander, Colombia',
+    url: '/',
+    siteName: 'Santander Agro360',
+    locale: 'es_CO',
+    type: 'website',
+    images: [{ url: '/icons/icon-512x512.png', width: 512, height: 512, alt: 'Santander Agro360' }],
+  },
   formatDetection: {
     telephone: false,
   },
   manifest: '/manifest.webmanifest',
   appleWebApp: {
-    capable: true,
     statusBarStyle: 'default',
     title: 'Santander Agro360',
   },
