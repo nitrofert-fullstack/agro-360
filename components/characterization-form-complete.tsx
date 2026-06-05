@@ -1030,27 +1030,24 @@ export function CharacterizationFormComplete({
         autorizaciones: formData.autorizaciones,
       }
 
+      // ID de envío único: el servidor lo guarda en visitas.codigo_formulario y lo usa
+      // para detectar reintentos (timeout de red, doble click) como duplicados.
+      const submissionId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+
       let res: Response
       try {
         res = await fetch('/api/caracterizaciones', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Sync-Id': submissionId,
+          },
           body: JSON.stringify(payload),
         })
       } catch {
-        // Error de red: si es asesor, guardar localmente como fallback
-        if (!isAsesor) {
-          throw new Error('No hay conexión a internet. Verifica tu red e inténtalo de nuevo.')
-        }
-        const offlinePayload = { ...payload, offlineSync: true }
-        const localId = await savePendingForm(offlinePayload as Record<string, unknown>)
-        await refreshCount()
-        toast.success('Formulario guardado localmente', {
-          description: 'Se sincronizará automáticamente cuando recuperes la conexión.',
-          duration: 6000,
-        })
-        setSubmittedData({ radicado: localId, sincronizado: false })
-        return
+        // Error de red en modo online: NO guardar en IndexedDB (única escritura
+        // permitida es el path !isOnline). El usuario reintenta manualmente.
+        throw new Error('No hay conexión a internet. Verifica tu red e inténtalo de nuevo.')
       }
 
       if (!res.ok) {
@@ -1221,7 +1218,7 @@ export function CharacterizationFormComplete({
                 <div className="space-y-2">
                   <Label htmlFor="numeroDocumento" className="flex items-center gap-2">
                     Numero Documento <span className="text-red-500">*</span>
-                    {buscandoDocumento && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                    {buscandoDocumento && <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin text-muted-foreground" />}
                   </Label>
                   <Input
                     id="numeroDocumento"
@@ -1825,7 +1822,7 @@ export function CharacterizationFormComplete({
               {/* Cobertura vegetal */}
               <div className="space-y-3">
                 <Label>Cobertura Vegetal</Label>
-                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="coberturaBosque"
@@ -1883,7 +1880,7 @@ export function CharacterizationFormComplete({
               <div className="space-y-3">
                 <Label className="text-base font-medium">Fuentes de Abastecimiento de Agua <span className="text-red-500">*</span></Label>
                 {errors['abastecimientoAgua'] && <p role="alert" className="text-sm text-red-500">{errors['abastecimientoAgua']}</p>}
-                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="nacimientoManantial"
@@ -1959,7 +1956,7 @@ export function CharacterizationFormComplete({
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
                   Riesgos Identificados
                 </Label>
-                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   <div className="flex items-center gap-3 min-h-[44px] cursor-pointer select-none">
                     <Checkbox
                       id="inundacion"
@@ -2150,7 +2147,7 @@ export function CharacterizationFormComplete({
 
               {/* Sistema productivo de interés en el programa */}
               <div className="border-t pt-4 space-y-4">
-                <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Interés en el Programa</h4>
+                <h4 className="font-medium text-sm text-foreground/80 uppercase tracking-wide">Interés en el Programa</h4>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Sistema Productivo de Interés en el Programa</Label>
@@ -2380,7 +2377,7 @@ export function CharacterizationFormComplete({
                 <Label className="text-base font-medium">Documento de Identidad</Label>
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-3">
-                    <Label className="text-sm text-muted-foreground">Frontal del documento</Label>
+                    <Label className="text-sm text-foreground/80">Frontal del documento</Label>
                     <PhotoUpload
                       onPhotoCapture={(dataUrl) => updateField("archivos", "fotoDocFrontalUrl", dataUrl)}
                       currentPhoto={formData.archivos.fotoDocFrontalUrl}
@@ -2389,7 +2386,7 @@ export function CharacterizationFormComplete({
                     />
                   </div>
                   <div className="space-y-3">
-                    <Label className="text-sm text-muted-foreground">Reverso del documento</Label>
+                    <Label className="text-sm text-foreground/80">Reverso del documento</Label>
                     <PhotoUpload
                       onPhotoCapture={(dataUrl) => updateField("archivos", "fotoDocTraseraUrl", dataUrl)}
                       currentPhoto={formData.archivos.fotoDocTraseraUrl}
@@ -2457,7 +2454,7 @@ export function CharacterizationFormComplete({
                       <Label htmlFor="autorizacionDatosPersonales" className="font-medium">
                         Autorización de Tratamiento de Datos Personales <span className="text-red-500">*</span>
                       </Label>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-foreground/80">
                         Conozco y autorizo que he suministrado datos personales a CONSULTORES Y OPERADORES AGROINDUSTRIALES S.A.S. (en adelante &ldquo;COA&rdquo; o la &ldquo;Compañía&rdquo;), para que, por sí mismo o en asocio con terceros, almacene, registre, transmita, transfiera, use, circule y suprima mis datos personales en sus bases de datos bajo estrictas medidas de confidencialidad y seguridad con el fin de que sean objeto de tratamiento, incluyendo cualquier operación o conjunto de operaciones sobre datos personales, bajo los efectos que indica la Ley 1266 de 2008 y la Ley 1581 de 2012; y manifiesto que conozco y autorizo a que mis datos personales serán tratados conforme se dispone en la política de tratamiento de datos de COA.
                       </p>
                       <button
@@ -2484,7 +2481,7 @@ export function CharacterizationFormComplete({
                       <Label htmlFor="autorizacionAvisoPrivacidad" className="font-medium">
                         He leído la Política de Tratamiento de Datos <span className="text-red-500">*</span>
                       </Label>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-foreground/80">
                         Declaro conocer la Política de Tratamiento de Datos de COA (SIG-62) y mis derechos como titular.
                       </p>
                       <div className="flex flex-wrap gap-3 mt-1">
@@ -2729,8 +2726,8 @@ export function CharacterizationFormComplete({
               </Button>
             )}
             <Button variant="ghost" size="icon" asChild className="h-10 w-10 text-muted-foreground hover:text-foreground">
-              <Link href={isAuthenticated ? "/dashboard" : "/"}>
-                <Home className="h-4 w-4" />
+              <Link href={isAuthenticated ? "/dashboard" : "/"} aria-label={isAuthenticated ? "Ir al panel" : "Ir al inicio"}>
+                <Home aria-hidden="true" className="h-4 w-4" />
               </Link>
             </Button>
             <ThemeToggle />

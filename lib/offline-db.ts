@@ -29,6 +29,12 @@ export function getOfflineDB(): OfflineDB {
 export async function savePendingForm(payload: Record<string, unknown>): Promise<string> {
   const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
   const db = getOfflineDB()
+  // Máximo 1 formulario pendiente: evita acumular copias offline que luego
+  // se sincronizan en lote y generan duplicados.
+  const pendientes = await db.pendingForms.count()
+  if (pendientes >= 1) {
+    throw new Error('Ya hay un formulario guardado sin sincronizar. Recupera la conexión y sincronízalo antes de guardar otro.')
+  }
   try {
     await db.pendingForms.add({ localId, payload, createdAt: Date.now(), retries: 0 })
   } catch (err) {

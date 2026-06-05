@@ -4,6 +4,8 @@ import { createClient as createAdminClient, SupabaseClient } from '@supabase/sup
 import crypto from 'crypto'
 import { sendEmail, buildSyncNotificationEmail, buildConfirmacionRegistroEmail } from '@/lib/email/mailer'
 import { prisma } from '@/lib/prisma'
+import { checkRateLimit } from '@/lib/rate-limit'
+import { emailSchema, numeroDocumentoSchema, stripAngleBrackets } from '@/lib/schemas/caracterizacion'
 
 /**
  * Sube un base64 data URL a Supabase Storage y retorna la URL pública.
@@ -132,6 +134,19 @@ export async function POST(request: Request) {
       }
     }
 
+    // === Rate limit: solo para peticiones SIN sesión autenticada ===
+    // Las sincronizaciones offline de asesores (con sesión) no deben bloquearse;
+    // el límite protege el formulario público anónimo contra abuso por ráfagas.
+    if (!user) {
+      const ip = (request.headers.get('x-forwarded-for') ?? '127.0.0.1').split(',')[0].trim()
+      if (!checkRateLimit(ip, 10)) {
+        return NextResponse.json(
+          { error: 'Demasiadas solicitudes. Intenta de nuevo en un minuto.' },
+          { status: 429 }
+        )
+      }
+    }
+
     // === Auto-asignación: asesor con menor carga cuando no hay asesor autenticado ===
     let asesorAutoNombre: string | null = null
     if (!asesorId) {
@@ -171,6 +186,29 @@ export async function POST(request: Request) {
     const docNum = c.beneficiario?.numeroDocumento
     if (!docNum) {
       return NextResponse.json({ error: 'Número de documento del agricultor es requerido' }, { status: 400 })
+    }
+    const docCheck = numeroDocumentoSchema.safeParse(docNum)
+    if (!docCheck.success) {
+      return NextResponse.json({ error: docCheck.error.issues[0].message }, { status: 400 })
+    }
+    if (c.beneficiario?.email) {
+      const emailCheck = emailSchema.safeParse(c.beneficiario.email)
+      if (!emailCheck.success) {
+        return NextResponse.json({ error: emailCheck.error.issues[0].message }, { status: 400 })
+      }
+    }
+    // Longitudes máximas razonables para nombres/apellidos (≤80 c/u)
+    const partesNombre = [
+      c.beneficiario?.primerNombre,
+      c.beneficiario?.segundoNombre,
+      c.beneficiario?.primerApellido,
+      c.beneficiario?.segundoApellido,
+    ]
+    if (partesNombre.some((p) => typeof p === 'string' && p.length > 80)) {
+      return NextResponse.json(
+        { error: 'Cada nombre o apellido no puede superar los 80 caracteres.' },
+        { status: 400 }
+      )
     }
 
     // === Cliente admin (bypass RLS para inserts en cascada) ===
@@ -391,7 +429,9 @@ export async function POST(request: Request) {
       .insert({
         fecha_visita: c.visita?.fechaVisita || new Date().toISOString().split('T')[0],
         nombre_tecnico: asesorAutoNombre || c.visita?.nombreTecnico || null,
-        codigo_formulario: c.visita?.codigoFormulario || null,
+        // Guardar el syncId del cliente: clave de la idempotencia. El chequeo inicial
+        // busca X-Sync-Id en codigo_formulario; si no se persiste aquí, nunca matchea.
+        codigo_formulario: c.visita?.codigoFormulario || syncId || null,
         version_formulario: c.visita?.versionFormulario || '1.0',
         fecha_emision_formulario: c.visita?.fechaEmisionFormulario || null,
         radicado_oficial: radicadoOficial,
@@ -399,7 +439,17 @@ export async function POST(request: Request) {
       })
       .select('id')
       .single()
-    if (visitaErr) throw new Error(`Error creando visita: ${visitaErr.message}`)
+    if (visitaErr) {
+      // 23505 en uq_visitas_codigo_formulario: otro request con el mismo X-Sync-Id
+      // ya insertó la visita (carrera entre reintentos). Tratar como duplicado.
+      if (visitaErr.code === '23505') {
+        return NextResponse.json(
+          { radicadoOficial: 'YA_REGISTRADO', duplicate: true },
+          { status: 200 }
+        )
+      }
+      throw new Error(`Error creando visita: ${visitaErr.message}`)
+    }
     const visitaId = newVisita.id
 
     // === 9. Vincular beneficiario con visita ===
@@ -466,13 +516,33 @@ export async function POST(request: Request) {
         autorizacion_uso_imagen: c.autorizaciones?.autorizacionUsoImagen ?? c.autorizacion?.autorizaUsoImagen ?? false,
         estado: 'INICIADO',
       })
-    if (caracErr) throw new Error(`Error creando caracterización: ${caracErr.message}`)
+    if (caracErr) {
+      // 23505 en uq_caracterizacion_activa_por_beneficiario: otra petición simultánea
+      // ya creó la caracterización activa (TOCTOU que los SELECT previos no atrapan).
+      // El índice único parcial garantiza atomicidad — devolver duplicado, no error.
+      if (caracErr.code === '23505') {
+        if (offlineSync) {
+          return NextResponse.json(
+            { radicadoOficial: 'YA_REGISTRADO', duplicate: true },
+            { status: 200 }
+          )
+        }
+        return NextResponse.json(
+          { error: 'Este agricultor ya tiene un proceso activo. Solo puede iniciar uno nuevo cuando el proceso actual esté cancelado o aprobado.' },
+          { status: 409 }
+        )
+      }
+      throw new Error(`Error creando caracterización: ${caracErr.message}`)
+    }
 
     // === 12. Crear cuenta + email al agricultor (si tiene correo) ===
     const correoAg = c.beneficiario?.email
-    const nombreAg = [c.beneficiario?.primerNombre || '', c.beneficiario?.primerApellido || '']
-      .filter(Boolean).join(' ') || 'Agricultor'
-    const nombrePredio = c.predio?.nombrePredio || 'Sin nombre'
+    // Sanitizar (quitar < y >) los valores que se inyectan en el HTML de los correos.
+    const nombreAg = stripAngleBrackets(
+      [c.beneficiario?.primerNombre || '', c.beneficiario?.primerApellido || '']
+        .filter(Boolean).join(' ')
+    ) || 'Agricultor'
+    const nombrePredio = stripAngleBrackets(c.predio?.nombrePredio) || 'Sin nombre'
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
 
     if (correoAg) {
