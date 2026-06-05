@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { isUuid } from '@/lib/validation'
 
 export async function POST(request: Request) {
   try {
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
 
     const { visitaId, asesorId } = await request.json()
     if (!visitaId || !asesorId) return NextResponse.json({ error: 'visitaId y asesorId requeridos' }, { status: 400 })
+    if (!isUuid(visitaId) || !isUuid(asesorId)) return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 })
 
     const asesor = await prisma.profiles.findUnique({
       where: { id: asesorId },

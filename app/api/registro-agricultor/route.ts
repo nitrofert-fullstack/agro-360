@@ -1,25 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
-
-const rl = new Map<string, { count: number; resetAt: number }>()
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now()
-  const entry = rl.get(ip)
-  if (!entry || entry.resetAt < now) {
-    rl.set(ip, { count: 1, resetAt: now + 3_600_000 })
-    return true
-  }
-  if (entry.count >= 5) return false
-  entry.count++
-  return true
-}
+import { checkRateLimit } from '@/lib/rate-limit'
+import { emailSchema, nombreCompletoSchema, numeroDocumentoSchema } from '@/lib/schemas/caracterizacion'
 
 export async function POST(request: Request) {
   const ip = (request.headers.get('x-forwarded-for') ?? '127.0.0.1').split(',')[0].trim()
-  if (!checkRateLimit(ip)) {
+  if (!checkRateLimit(ip, 5)) {
     return NextResponse.json(
-      { error: 'Demasiados intentos. Intenta de nuevo en una hora.' },
+      { error: 'Demasiados intentos. Intenta de nuevo en un minuto.' },
       { status: 429 }
     )
   }
@@ -41,8 +30,21 @@ export async function POST(request: Request) {
     if (!numero_documento) {
       return NextResponse.json({ error: 'El número de documento es requerido' }, { status: 400 })
     }
-    if (password.length < 8) {
+    if (typeof password !== 'string' || password.length < 8) {
       return NextResponse.json({ error: 'La contraseña debe tener al menos 8 caracteres' }, { status: 400 })
+    }
+
+    const emailCheck = emailSchema.safeParse(email)
+    if (!emailCheck.success) {
+      return NextResponse.json({ error: emailCheck.error.issues[0].message }, { status: 400 })
+    }
+    const docCheck = numeroDocumentoSchema.safeParse(numero_documento)
+    if (!docCheck.success) {
+      return NextResponse.json({ error: docCheck.error.issues[0].message }, { status: 400 })
+    }
+    const nombreCheck = nombreCompletoSchema.safeParse(nombre_completo)
+    if (!nombreCheck.success) {
+      return NextResponse.json({ error: nombreCheck.error.issues[0].message }, { status: 400 })
     }
 
     const existingProfile = await prisma.profiles.findFirst({

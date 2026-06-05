@@ -45,13 +45,53 @@ const withPWA = withPWAInit({
   },
 })
 
+// === Content-Security-Policy ===
+// Inventario real de orígenes que carga el NAVEGADOR (las APIs server-side
+// como openweathermap/agromonitoring pasan por route handlers = 'self'):
+// - Supabase: REST/Auth/Storage (https) + Realtime (wss)
+// - Tiles de mapa (leaflet los carga como <img>): OSM, Carto, OpenTopoMap, ArcGIS, NASA GIBS
+// - Avatares: api.dicebear.com
+// - Vercel Analytics: script + beacon
+// 'unsafe-inline' en script-src es requerido por los inline scripts de hidratación
+// de Next.js sin nonces; 'unsafe-eval' SOLO en desarrollo (source maps de next dev).
+const supabaseHost = (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://nwhdnjyxmawxoxjxnyma.supabase.co').replace(/^https:\/\//, '')
+const isDev = process.env.NODE_ENV === 'development'
+const csp = [
+  `default-src 'self'`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://va.vercel-scripts.com`,
+  `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
+  `font-src 'self' data: https://fonts.gstatic.com`,
+  `img-src 'self' data: blob: https://${supabaseHost} https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.tile.opentopomap.org https://server.arcgisonline.com https://gibs.earthdata.nasa.gov https://api.dicebear.com`,
+  `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://vitals.vercel-insights.com${isDev ? ' ws:' : ''}`,
+  `worker-src 'self' blob:`,
+  `media-src 'self' blob: data:`,
+  `object-src 'none'`,
+  `base-uri 'self'`,
+  `form-action 'self'`,
+  `frame-ancestors 'none'`,
+  `upgrade-insecure-requests`,
+].join('; ')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   compress: true,
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   turbopack: {},
+  experimental: {
+    optimizePackageImports: [
+      'lucide-react',
+      'recharts',
+      '@radix-ui/react-accordion',
+      '@radix-ui/react-alert-dialog',
+      '@radix-ui/react-checkbox',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-select',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-tooltip',
+      '@supabase/supabase-js',
+    ],
+  },
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
@@ -62,11 +102,23 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Headers de seguridad globales
+        source: '/(.*)',
+        headers: [
+          { key: 'Content-Security-Policy', value: csp },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+          { key: 'Permissions-Policy', value: 'camera=(self), geolocation=(self), microphone=()' },
+        ],
+      },
+      {
         source: '/(admin|dashboard|mapa|profile|settings|consultar)(.*)',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'no-store, no-cache, must-revalidate, max-age=0',
+            value: 'private, no-cache',
           },
         ],
       },

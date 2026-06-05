@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { isUuid, sanitizeStoragePath } from '@/lib/validation'
 
 export async function DELETE(request: Request) {
   try {
@@ -22,6 +23,10 @@ export async function DELETE(request: Request) {
     const { caracterizacionId } = await request.json()
     if (!caracterizacionId) {
       return NextResponse.json({ error: 'caracterizacionId es requerido' }, { status: 400 })
+    }
+
+    if (!isUuid(caracterizacionId)) {
+      return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 })
     }
 
     // ── Obtener IDs relacionados ─────────────────────────────────────────────
@@ -60,7 +65,10 @@ export async function DELETE(request: Request) {
         const match = url.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/)
         if (match) {
           const [, bucket, path] = match
-          await supabaseAdmin.storage.from(bucket).remove([decodeURIComponent(path)])
+          const safePath = sanitizeStoragePath(decodeURIComponent(path))
+          if (safePath) {
+            await supabaseAdmin.storage.from(bucket).remove([safePath])
+          }
         }
       } catch {
         // Si falla la limpieza del storage no bloqueamos la eliminación

@@ -68,10 +68,10 @@ export async function POST(request: Request) {
 
     if (createErr) {
       if (createErr.message?.includes('already been registered') || createErr.message?.includes('already exists')) {
-        return NextResponse.json({ error: 'Este correo ya tiene una cuenta registrada.' }, { status: 409 })
+        return NextResponse.json({ error: 'Este correo ya está registrado' }, { status: 409 })
       }
       console.error('[Invitar] Error creando usuario:', createErr.message)
-      return NextResponse.json({ error: `Error creando usuario: ${createErr.message}` }, { status: 500 })
+      return NextResponse.json({ error: 'Error interno' }, { status: 500 })
     }
 
     if (newUser?.user) {

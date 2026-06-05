@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, buildEstadoNotificationEmail } from '@/lib/email/mailer'
+import { isUuid } from '@/lib/validation'
 
 export async function POST(request: Request) {
   try {
@@ -16,6 +17,10 @@ export async function POST(request: Request) {
 
     if (!visitaId || !estado) {
       return NextResponse.json({ error: 'visitaId y estado son requeridos' }, { status: 400 })
+    }
+
+    if (!isUuid(visitaId)) {
+      return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 })
     }
 
     const estadosValidos = ['REVISADO', 'EN_ESTUDIO_CREDITO', 'APROBADO', 'CANCELADO']
@@ -100,9 +105,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, estado })
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Error interno' },
-      { status: 500 }
-    )
+    console.error('[Estado] Error:', err)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

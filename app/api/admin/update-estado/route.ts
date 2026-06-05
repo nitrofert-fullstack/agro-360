@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, buildEstadoNotificationEmail } from '@/lib/email/mailer'
+import { isUuid } from '@/lib/validation'
 
 export async function POST(request: Request) {
   try {
@@ -25,6 +26,10 @@ export async function POST(request: Request) {
 
     if (!id || !nuevoEstado) {
       return NextResponse.json({ error: 'id y nuevoEstado son requeridos' }, { status: 400 })
+    }
+
+    if (!isUuid(id)) {
+      return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 })
     }
 
     const estadosValidos = ['INICIADO', 'REVISADO', 'EN_ESTUDIO_CREDITO', 'APROBADO', 'CANCELADO']

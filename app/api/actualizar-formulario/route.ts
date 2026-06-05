@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createStorageClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { isUuid } from '@/lib/validation'
 
 // Storage sigue en Supabase (Prisma es ORM, no maneja archivos)
 async function uploadBase64ToStorage(
@@ -46,6 +47,10 @@ export async function POST(request: Request) {
 
     if (!visitaId || !datos) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
+    }
+
+    if (!isUuid(visitaId)) {
+      return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 })
     }
 
     // ── Obtener la caracterización ──────────────────────────────────────────

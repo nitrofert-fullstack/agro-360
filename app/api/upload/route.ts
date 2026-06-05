@@ -27,6 +27,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Sanear radicadoLocal: solo [a-zA-Z0-9_-] para evitar path traversal
+    const safeRadicado = radicadoLocal.replace(/[^a-zA-Z0-9_-]/g, '')
+    if (!safeRadicado) {
+      return NextResponse.json(
+        { error: 'Parámetro inválido' },
+        { status: 400 }
+      )
+    }
+
     // Determinar bucket según tipo
     let bucket: string
     let fileExt: string
@@ -45,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generar nombre de archivo único
-    const fileName = `${radicadoLocal}/${tipo}-${Date.now()}.${fileExt}`
+    const fileName = `${safeRadicado}/${tipo}-${Date.now()}.${fileExt}`
 
     // Convertir File a ArrayBuffer
     const arrayBuffer = await file.arrayBuffer()

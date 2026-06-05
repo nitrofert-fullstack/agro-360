@@ -4,6 +4,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { sendEmail, buildCredentialsEmail } from '@/lib/email/mailer'
+import { isUuid } from '@/lib/validation'
 
 export async function POST(request: Request) {
   try {
@@ -30,6 +31,9 @@ export async function POST(request: Request) {
     }
     if (!nombreCompleto) {
       return NextResponse.json({ error: 'Nombre completo requerido' }, { status: 400 })
+    }
+    if (beneficiarioId !== undefined && beneficiarioId !== null && !isUuid(beneficiarioId)) {
+      return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 })
     }
 
     const supabaseAdmin = createAdminClient(

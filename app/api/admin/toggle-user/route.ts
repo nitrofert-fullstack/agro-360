@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
+import { isUuid } from '@/lib/validation'
 
 export async function POST(request: Request) {
   try {
@@ -31,6 +32,10 @@ export async function POST(request: Request) {
 
     if (!userId || typeof activo !== 'boolean') {
       return NextResponse.json({ error: 'userId y activo son requeridos' }, { status: 400 })
+    }
+
+    if (!isUuid(userId)) {
+      return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 })
     }
 
     const targetProfile = await prisma.profiles.findUnique({
