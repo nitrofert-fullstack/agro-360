@@ -106,7 +106,7 @@ export default function RegistroPage() {
   // ── Formulario de registro ─────────────────────────────────────
   return (
     <>
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+      <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
         <motion.div variants={scaleIn} initial="hidden" animate="visible" className="w-full max-w-lg">
           <Card className="border-border/60 bg-card/80 backdrop-blur-md" style={{ boxShadow: 'var(--shadow-lg)' }}>
             <motion.div variants={staggerContainer} initial="hidden" animate="visible">
@@ -139,7 +139,7 @@ export default function RegistroPage() {
                     <div className="space-y-2">
                       <Label htmlFor="nombre">Nombre completo *</Label>
                       <div className="relative">
-                        <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <User aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                           id="nombre"
                           type="text"
@@ -221,8 +221,8 @@ export default function RegistroPage() {
                           className="pl-10 pr-10"
                           required
                         />
-                        <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Ocultar" : "Mostrar"} className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground">
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={showPassword} className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground">
+                          {showPassword ? <EyeOff aria-hidden="true" className="h-4 w-4" /> : <Eye aria-hidden="true" className="h-4 w-4" />}
                         </button>
                       </div>
                     </div>
@@ -240,8 +240,8 @@ export default function RegistroPage() {
                           className="pl-10 pr-10"
                           required
                         />
-                        <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? "Ocultar" : "Mostrar"} className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground">
-                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={showConfirmPassword} className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground">
+                          {showConfirmPassword ? <EyeOff aria-hidden="true" className="h-4 w-4" /> : <Eye aria-hidden="true" className="h-4 w-4" />}
                         </button>
                       </div>
                     </div>
@@ -285,7 +285,7 @@ export default function RegistroPage() {
             </motion.div>
           </Card>
         </motion.div>
-      </div>
+      </main>
 
       {legalModalOpen && (
         <LegalDocumentModal

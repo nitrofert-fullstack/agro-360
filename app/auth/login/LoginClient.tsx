@@ -52,7 +52,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <motion.div
         variants={scaleIn}
         initial="hidden"
@@ -91,7 +91,7 @@ export default function LoginPage() {
                 <motion.div variants={staggerItem} className="space-y-2">
                   <Label htmlFor="email">Correo electrónico</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Mail aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       id="email"
                       type="email"
@@ -108,7 +108,7 @@ export default function LoginPage() {
                 <motion.div variants={staggerItem} className="space-y-2">
                   <Label htmlFor="password">Contraseña</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Lock aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
@@ -123,15 +123,16 @@ export default function LoginPage() {
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                      aria-pressed={showPassword}
                       className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground"
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? <EyeOff aria-hidden="true" className="h-4 w-4" /> : <Eye aria-hidden="true" className="h-4 w-4" />}
                     </button>
                   </div>
                 </motion.div>
 
                 <motion.div variants={staggerItem} className="flex items-center justify-end">
-                  <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline">
+                  <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline py-2 inline-block">
                     ¿Olvidaste tu contraseña?
                   </Link>
                 </motion.div>
@@ -160,6 +161,6 @@ export default function LoginPage() {
           </motion.div>
         </Card>
       </motion.div>
-    </div>
+    </main>
   )
 }
