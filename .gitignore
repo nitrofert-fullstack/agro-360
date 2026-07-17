@@ -36,3 +36,9 @@ next-env.d.ts
 server-stdout.log
 server-stderr.log
 /lighthouse-reports/
+lint-output.txt
+.agents/
+
+# gestor de paquetes: solo pnpm (Vercel usa pnpm) — no npm/yarn
+package-lock.json
+yarn.lock
