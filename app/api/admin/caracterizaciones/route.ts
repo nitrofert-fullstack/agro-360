@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     let searchVisitaIds: string[] | undefined
 
     if (search) {
-      const safe = search.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9 \-]/g, '').trim()
+      const safe = search.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9 -]/g, '').trim()
       if (!safe) return NextResponse.json({ data: [], total: 0, page, limit })
 
       const [benefs, predios, visitasAsesor] = await Promise.all([
@@ -137,7 +137,7 @@ export async function GET(request: Request) {
 
     // ── Enriquecer con perfil del asesor ────────────────────────────────────
     const asesorIds = [...new Set(data.map(c => c.visitas?.asesor_id).filter((x): x is string => !!x))]
-    let profilesMap: Record<string, { id: string; nombre_completo: string | null; email: string | null }> = {}
+    const profilesMap: Record<string, { id: string; nombre_completo: string | null; email: string | null }> = {}
     if (asesorIds.length > 0) {
       const profiles = await prisma.profiles.findMany({
         where: { id: { in: asesorIds } },

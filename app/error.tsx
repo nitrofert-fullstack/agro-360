@@ -18,7 +18,7 @@ export default function Error({
   }, [error])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/30 p-4">
+    <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/30 p-4">
       <div className="max-w-md w-full text-center space-y-8">
         {/* Icono de error */}
         <div className="relative mx-auto w-32 h-32">
@@ -73,6 +73,6 @@ export default function Error({
           </Button>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

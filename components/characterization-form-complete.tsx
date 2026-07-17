@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -457,6 +456,9 @@ export function CharacterizationFormComplete({
   // Scroll al inicio + foco en primer input editable al cambiar de paso
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
+    // No auto-enfocar en pantallas táctiles: el teclado se abriría tapando el
+    // encabezado del paso que el asesor quiere leer primero.
+    if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return
     const timer = setTimeout(() => {
       const first = document.querySelector<HTMLElement>(
         'main input:not([disabled]):not([readonly]):not([type="hidden"]):not([type="date"]):not([type="number"]), main textarea:not([disabled])'
@@ -479,9 +481,6 @@ export function CharacterizationFormComplete({
 
   // Estado de modales legales (null = ninguno abierto)
   const [legalModalOpen, setLegalModalOpen] = useState<keyof typeof LEGAL_DOCUMENTS | null>(null)
-
-  // Desactivar temporalmente la autorización de consulta crediticia
-  const SHOW_CONSULTA_CREDITICIA = false
 
   // Estados para comboboxes con búsqueda
   const [municipioOpen, setMunicipioOpen] = useState(false)
@@ -662,7 +661,7 @@ export function CharacterizationFormComplete({
         if (!formData.caracterizacion.topografia) stepErrors['caracterizacion.topografia'] = 'La topografía es requerida'
         break
 
-      case 5: // Agua y Riesgos
+      case 5: { // Agua y Riesgos
         // Al menos una fuente de agua debe estar seleccionada
         const tieneAgua = formData.abastecimientoAgua.nacimientoManantial ||
           formData.abastecimientoAgua.rioQuebrada ||
@@ -674,6 +673,7 @@ export function CharacterizationFormComplete({
           formData.abastecimientoAgua.otraFuente.trim()
         if (!tieneAgua) stepErrors['abastecimientoAgua'] = 'Debe seleccionar al menos una fuente de agua'
         break
+      }
 
       case 6: // Area Productiva
         if (!formData.areaProductiva.sistemaProductivo.trim()) stepErrors['areaProductiva.sistemaProductivo'] = 'El sistema productivo es requerido'
@@ -695,6 +695,7 @@ export function CharacterizationFormComplete({
       case 9: // Autorizacion
         if (!formData.autorizaciones.autorizacionDatosPersonales) stepErrors['autorizaciones.autorizacionDatosPersonales'] = 'Debe autorizar el tratamiento de datos personales'
         if (!formData.autorizaciones.autorizacionAvisoPrivacidad) stepErrors['autorizaciones.autorizacionAvisoPrivacidad'] = 'Debe confirmar que ha leído la Política de Tratamiento de Datos'
+        if (!formData.autorizaciones.autorizacionConsultaCrediticia) stepErrors['autorizaciones.autorizacionConsultaCrediticia'] = 'Debe autorizar la consulta a centrales de riesgo'
         break
     }
 
@@ -797,16 +798,10 @@ export function CharacterizationFormComplete({
         toast.error('Sin conexión', { description: 'Se requiere conexión a internet para enviar el formulario.' })
         return
       }
-      // Validar pasos 1-9 (sin captcha — no aplica offline).
       const validation = validateAllSteps()
       if (!validation.valid) { submitLock.current = false; handleValidationError(validation); return }
 
     } else {
-      if (false) {  // captcha eliminado
-        submitLock.current = false
-        toast.error('Verificación de seguridad', { description: 'Completa la verificación de seguridad antes de enviar.' })
-        return
-      }
       const validation = validateAllSteps()
       if (!validation.valid) { submitLock.current = false; handleValidationError(validation); return }
     }
@@ -2349,6 +2344,7 @@ export function CharacterizationFormComplete({
                   currentPhoto={formData.archivos.fotoBeneficiario}
                   label="Foto del Productor"
                   guideType="persona"
+                  stampMetadata
                 />
               </div>
 
@@ -2360,6 +2356,7 @@ export function CharacterizationFormComplete({
                     onPhotoCapture={(dataUrl) => updateField("archivos", "foto1Url", dataUrl)}
                     currentPhoto={formData.archivos.foto1Url}
                     label="Foto 1"
+                    stampMetadata
                   />
                 </div>
                 <div className="space-y-3">
@@ -2368,6 +2365,7 @@ export function CharacterizationFormComplete({
                     onPhotoCapture={(dataUrl) => updateField("archivos", "foto2Url", dataUrl)}
                     currentPhoto={formData.archivos.foto2Url}
                     label="Foto 2"
+                    stampMetadata
                   />
                 </div>
               </div>
@@ -2498,30 +2496,28 @@ export function CharacterizationFormComplete({
                   </div>
                 </div>
 
-                {/* 3. Consulta crediticia (temporal: desactivada) */}
-                {SHOW_CONSULTA_CREDITICIA && (
-                  <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        id="autorizacionConsultaCrediticia"
-                        checked={formData.autorizaciones.autorizacionConsultaCrediticia}
-                        onCheckedChange={(checked) => {
-                          updateField("autorizaciones", "autorizacionConsultaCrediticia", checked)
-                          updateField("areaProductiva", "interesadoPrograma", checked)
-                        }}
-                      />
-                      <div className="flex-1 space-y-1">
-                        <Label htmlFor="autorizacionConsultaCrediticia" className="font-medium">
-                          Autorización de Consulta Crediticia <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Autorizo la consulta de mi historial crediticio en centrales de riesgo para la evaluación
-                          de opciones de financiación. También expreso mi interés en acompañamiento crediticio.
-                        </p>
+                {/* 3. Autorización de consulta a centrales de riesgo */}
+                <div className={`rounded-lg border p-4 ${errors['autorizaciones.autorizacionConsultaCrediticia'] ? 'border-red-500 bg-red-50 dark:bg-red-950/20' : 'border-border/50 bg-muted/30'}`}>
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="autorizacionConsultaCrediticia"
+                      checked={formData.autorizaciones.autorizacionConsultaCrediticia}
+                      onCheckedChange={(checked) => {
+                        updateField("autorizaciones", "autorizacionConsultaCrediticia", checked)
+                        updateField("areaProductiva", "interesadoPrograma", checked)
+                      }}
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor="autorizacionConsultaCrediticia" className="font-medium">
+                        Autorización de Consulta a Centrales de Riesgo <span className="text-red-500">*</span>
+                      </Label>
+                      <div className="max-h-40 overflow-y-auto rounded border border-border/50 bg-background/50 p-3 text-sm text-muted-foreground leading-relaxed">
+                        Autorizo de manera expresa, inequívoca e irrevocable al COA - CONSULTORES Y OPERADORES AGROINDUSTRIALES S.A.S. o a quien represente sus derechos, para que solicite, consulte, verifique y reporte en las centrales de riesgo y/o de información financiera u otras fuentes, mi información personal o la información sobre la asociación, empresa, sus representantes legales o apoderados y accionistas representativos, en cuanto a comportamiento y crédito comercial, hábitos de pagos, manejos de cuentas bancarias, situaciones legales y en general, al cumplimiento de sus obligaciones comerciales y legales, que ha sido presentada en este formato y documentos soportes. De igual forma, autorizo a COA para que, de conformidad con sus políticas de protección de datos, transfiera la presente autorización a terceros bancos, cooperativas de ahorro y crédito y estructuradoras de crédito con el fin de ser utilizado en los posibles desembolsos de crédito para el desarrollo de actividades agrícolas, entre otras.
                       </div>
+                      {errors['autorizaciones.autorizacionConsultaCrediticia'] && <p className="text-sm text-red-500 mt-2">{errors['autorizaciones.autorizacionConsultaCrediticia']}</p>}
                     </div>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Resumen */}
@@ -2539,7 +2535,7 @@ export function CharacterizationFormComplete({
               {/* Botón de envío */}
               <Button
                 onClick={handleSubmit}
-                disabled={isSubmitting || !formData.autorizaciones.autorizacionDatosPersonales || !formData.autorizaciones.autorizacionAvisoPrivacidad}
+                disabled={isSubmitting}
                 className="w-full h-12 text-base"
               >
                 {isSubmitting ? (
@@ -2574,12 +2570,7 @@ export function CharacterizationFormComplete({
       generateCaracterizacionPDF(pdfData)
     }
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5"
-      >
+      <div className="animate-fade-up min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
         <header className="border-b border-border bg-card/80 backdrop-blur-md">
           <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4">
             <Link href="/" className="flex items-center gap-2">
@@ -2590,14 +2581,9 @@ export function CharacterizationFormComplete({
         <main className="mx-auto max-w-2xl px-4 py-12">
           <Card className="text-center">
             <CardHeader className="pb-4">
-              <motion.div
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.2 }}
-                className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10"
-              >
-                <CheckCircle className="h-10 w-10 text-green-500" />
-              </motion.div>
+              <div className="animate-pop mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-status-success/10">
+                <CheckCircle className="h-10 w-10 text-status-success" />
+              </div>
               <CardTitle className="text-2xl">
                 {submittedData.sincronizado ? '¡Registrado!' : 'Guardado localmente'}
               </CardTitle>
@@ -2686,16 +2672,13 @@ export function CharacterizationFormComplete({
             </CardContent>
           </Card>
         </main>
-      </motion.div>
+      </div>
     )
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="min-h-screen bg-background"
+    <div
+      className="animate-fade-up min-h-screen bg-background"
     >
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/90 backdrop-blur-md">
@@ -2869,18 +2852,10 @@ export function CharacterizationFormComplete({
           </div>
         )}
 
-        <div className="rounded-xl" style={{boxShadow: 'var(--shadow-md)'}}>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: stepDirection * 32 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: stepDirection * -24 }}
-              transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-            >
-              {renderStep()}
-            </motion.div>
-          </AnimatePresence>
+        <div className="rounded-xl overflow-hidden" style={{boxShadow: 'var(--shadow-md)'}}>
+          <div key={currentStep} className="animate-step" style={{ '--step-dir': stepDirection } as React.CSSProperties}>
+            {renderStep()}
+          </div>
         </div>
 
         {/* Navigation */}
@@ -2923,6 +2898,6 @@ export function CharacterizationFormComplete({
           beneficiarioFirma={formData.archivos.firmaProductorUrl || undefined}
         />
       )}
-    </motion.div>
+    </div>
   )
 }

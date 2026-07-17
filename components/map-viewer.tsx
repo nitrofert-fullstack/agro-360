@@ -289,7 +289,7 @@ export function MapViewer({
   const predioMarkerRef = useRef<L.Marker | null>(null)
   const predioPolygonRef = useRef<L.Polygon | null>(null)
   const selectedPolygonLayerRef = useRef<L.Polygon | null>(null)
-  const markerLayersRef = useRef<(L.Marker | L.Polygon)[]>([])
+  const markerLayersRef = useRef<L.Layer[]>([])
   const ndviTileLayerRef = useRef<L.TileLayer | null>(null)
 
   const [activeLayer, setActiveLayer] = useState<LayerType>(controlledLayer ?? "ndvi")
@@ -594,6 +594,10 @@ export function MapViewer({
     const initMap = async () => {
       const L = await import("leaflet")
       await import("leaflet/dist/leaflet.css")
+      // Clustering: agrupa marcadores cercanos → fluido con miles de predios
+      await import("leaflet.markercluster")
+      await import("leaflet.markercluster/dist/MarkerCluster.css")
+      await import("leaflet.markercluster/dist/MarkerCluster.Default.css")
       
       // Check if effect was cancelled or map already initialized during async import
       if (isCancelled || mapInstanceRef.current) return
@@ -616,6 +620,7 @@ export function MapViewer({
         maxBoundsViscosity: 1.0,
         minZoom: 7,
         maxZoom: 18,
+        preferCanvas: true, // renderiza vectores/marcadores en canvas (mucho más rápido que DOM)
       })
       
       if (!initialCenter) {
@@ -650,10 +655,14 @@ export function MapViewer({
         map.fitBounds(predioPolygonRef.current.getBounds(), { padding: [50, 50] })
       }
 
-      L.default.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-        attribution: "CartoDB",
-        maxZoom: 19,
-      }).addTo(map)
+      // Tile base según el tema activo (antes: dark_all fijo → mapa oscuro junto a UI clara)
+      const isDarkTheme = typeof document !== "undefined" && document.documentElement.classList.contains("dark")
+      L.default.tileLayer(
+        isDarkTheme
+          ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        { attribution: "CartoDB", maxZoom: 19 }
+      ).addTo(map)
 
       L.default.rectangle(SANTANDER_BOUNDS, {
         color: "#22c55e",
@@ -749,7 +758,12 @@ export function MapViewer({
       })
     }
 
-    initMap()
+    initMap().catch((err) => {
+      // Sin este catch, un fallo en el import dinámico de Leaflet o en los tiles
+      // dejaba el overlay de carga girando indefinidamente sin diagnóstico.
+      console.error("[map-viewer] Error inicializando el mapa:", err)
+      setIsMapReady(false)
+    })
 
     return () => {
       isCancelled = true
@@ -772,15 +786,16 @@ export function MapViewer({
 
     if (!markers || markers.length === 0) return
 
-    const markerIcon = Lf.divIcon({
-      html: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#3b82f6" stroke="#1e40af" strokeWidth="2">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-      <circle cx="12" cy="10" r="3" fill="white"></circle>
-      </svg>`,
-      className: "multi-marker",
-      iconSize: [32, 32],
-      iconAnchor: [16, 32],
-    })
+    // circleMarker se dibuja en canvas (con preferCanvas) → miles de puntos fluidos.
+    // Antes cada marcador era un divIcon (nodo DOM + SVG) → fatal a escala.
+    const brand = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#16a34a'
+    const circleStyle = {
+      radius: 7,
+      weight: 2,
+      color: '#ffffff',
+      fillColor: brand,
+      fillOpacity: 1,
+    }
 
     const selectPredio = (polygon: L.Polygon, m: MapMarker) => {
       if (selectedPolygonLayerRef.current && selectedPolygonLayerRef.current !== polygon) {
@@ -797,6 +812,25 @@ export function MapViewer({
       map.flyToBounds(polygon.getBounds(), { padding: [60, 60], maxZoom: 15, duration: 0.8 })
     }
 
+    const clusterGroup = (Lf as unknown as { markerClusterGroup: (opts?: unknown) => L.LayerGroup }).markerClusterGroup({
+      chunkedLoading: true,
+      maxClusterRadius: 80,
+      removeOutsideVisibleBounds: true,
+      disableClusteringAtZoom: 17,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      // Burbuja de cluster con la marca (verde) — profesional y coherente
+      iconCreateFunction: (cluster: { getChildCount: () => number }) => {
+        const count = cluster.getChildCount()
+        const size = count < 10 ? 34 : count < 100 ? 42 : count < 1000 ? 50 : 58
+        return Lf.divIcon({
+          html: `<div style="width:${size}px;height:${size}px;background:${brand};color:#fff;display:flex;align-items:center;justify-content:center;border-radius:50%;font-weight:700;font-size:13px;font-family:var(--font-sans),system-ui,sans-serif;border:3px solid rgba(255,255,255,.85);box-shadow:0 2px 12px rgba(0,0,0,.28);">${count.toLocaleString('es-CO')}</div>`,
+          className: 'agro-cluster',
+          iconSize: [size, size],
+        })
+      },
+    })
+
     markers.forEach((m) => {
       if (m.polygonCoords && m.polygonCoords.length >= 3) {
         const polygon = Lf.polygon(m.polygonCoords, {
@@ -809,14 +843,15 @@ export function MapViewer({
         if (m.id) {
           polygon.on('click', () => selectPredio(polygon, m))
         }
-        const centerMarker = Lf.marker(m.position, { icon: markerIcon }).addTo(map)
+        const centerMarker = Lf.circleMarker(m.position, circleStyle)
         centerMarker.bindPopup(m.popupContent)
         if (m.id) {
           centerMarker.on('click', () => selectPredio(polygon, m))
         }
-        markerLayersRef.current.push(polygon, centerMarker)
+        clusterGroup.addLayer(centerMarker)
+        markerLayersRef.current.push(polygon)
       } else {
-        const marker = Lf.marker(m.position, { icon: markerIcon }).addTo(map)
+        const marker = Lf.circleMarker(m.position, circleStyle)
         marker.bindPopup(m.popupContent)
         if (m.id) {
           marker.on('click', () => {
@@ -830,9 +865,12 @@ export function MapViewer({
             map.flyTo(m.position, Math.max(map.getZoom(), 14), { duration: 0.8 })
           })
         }
-        markerLayersRef.current.push(marker)
+        clusterGroup.addLayer(marker)
       }
     })
+
+    map.addLayer(clusterGroup)
+    markerLayersRef.current.push(clusterGroup)
 
     // Ajustar zoom para mostrar todos los predios (solo cuando no hay centro forzado)
     if (!initialCenter) {
@@ -1338,7 +1376,7 @@ export function MapViewer({
       {/* Mobile sidebar toggle button */}
       <button
         onClick={() => setSidebarOpen(v => !v)}
-        className="md:hidden absolute top-3 left-3 z-[1002] bg-card border border-border rounded-lg p-2 shadow-md text-muted-foreground hover:text-foreground transition-colors"
+        className="lg:hidden absolute top-3 left-3 z-[1002] bg-card border border-border rounded-lg p-2 shadow-md text-muted-foreground hover:text-foreground transition-colors"
         aria-label={sidebarOpen ? 'Cerrar panel' : 'Abrir panel'}
       >
         <PanelLeft className="h-4 w-4" />
@@ -1347,18 +1385,18 @@ export function MapViewer({
       {/* Mobile overlay behind sidebar */}
       {sidebarOpen && (
         <div
-          className="md:hidden absolute inset-0 z-[1000] bg-black/30"
+          className="lg:hidden absolute inset-0 z-[1000] bg-black/30"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* ── Sidebar ── */}
       <aside className={`
-        absolute md:relative inset-y-0 left-0 z-[1001]
+        absolute lg:relative inset-y-0 left-0 z-[1001]
         w-72 lg:w-80 flex-shrink-0 flex flex-col
-        border-r border-border bg-card shadow-lg md:shadow-none
+        border-r border-border bg-card shadow-lg lg:shadow-none
         transition-transform duration-200
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
 
         {/* Sidebar header */}

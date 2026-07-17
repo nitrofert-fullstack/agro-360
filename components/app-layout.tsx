@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { MotionConfig } from "framer-motion"
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +18,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
   SidebarInset,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import {
   AlertDialog,
@@ -30,6 +32,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   LayoutDashboard,
   FileText,
@@ -82,23 +85,72 @@ const rolLabels: Record<string, string> = {
   campesino: "Productor",
 }
 
+function NavItems({ navItems, pathname, isLoadingProfile }: {
+  navItems: NavItem[]
+  pathname: string
+  isLoadingProfile: boolean
+}) {
+  const { isMobile, setOpenMobile } = useSidebar()
+
+  const handleNavClick = () => {
+    if (isMobile) setOpenMobile(false)
+  }
+
+  if (isLoadingProfile) {
+    return (
+      <>
+        {[1, 2, 3].map((i) => (
+          <SidebarMenuItem key={i}>
+            <div className="flex items-center gap-2 px-2 py-1.5">
+              <Skeleton className="h-4 w-4 rounded shrink-0" />
+              <Skeleton className="h-4 w-28 rounded group-data-[collapsible=icon]:hidden" />
+            </div>
+          </SidebarMenuItem>
+        ))}
+      </>
+    )
+  }
+
+  return (
+    <>
+      {navItems.map((item) => {
+        const Icon = item.icon
+        const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"))
+        return (
+          <SidebarMenuItem key={item.href}>
+            <SidebarMenuButton asChild isActive={isActive} tooltip={item.label} onClick={handleNavClick}>
+              <Link href={item.href}>
+                <Icon className="h-4 w-4 shrink-0" />
+                <span>{item.label}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        )
+      })}
+    </>
+  )
+}
+
 interface AppLayoutProps {
   children: React.ReactNode
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const { profile, user } = useAuth()
+  const { profile, user, loading } = useAuth()
   const pathname = usePathname()
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
 
-  // Sidebar abre por defecto — el SidebarProvider maneja su propio estado persistido
-  // No leer cookie aquí para evitar hydration mismatch server/client
-  const defaultSidebarOpen = true
+  const [defaultSidebarOpen] = useState(() => {
+    if (typeof document === 'undefined') return true
+    const match = document.cookie.match(/(?:^|;\s*)sidebar_state=([^;]*)/)
+    return match ? match[1] !== 'false' : true
+  })
 
   const rol = profile?.rol ?? "asesor"
   const navItems = navByRole[rol] ?? navByRole.asesor
   const firstName = profile?.nombre_completo?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "Usuario"
+  const isLoadingProfile = loading || (!profile && !!user)
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
@@ -107,7 +159,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <>
+    <MotionConfig reducedMotion="user">
       <SidebarProvider className="h-svh overflow-hidden" defaultOpen={defaultSidebarOpen}>
         <Sidebar variant="inset" collapsible="icon">
           {/* Logo + toggle */}
@@ -136,20 +188,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           {/* Nav items */}
           <SidebarContent className="pt-2">
             <SidebarMenu className="group-data-[collapsible=icon]:[&>li]:flex group-data-[collapsible=icon]:[&>li]:justify-center">
-              {navItems.map((item) => {
-                const Icon = item.icon
-                const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"))
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
-                      <Link href={item.href}>
-                        <Icon className="h-4 w-4 shrink-0" />
-                        <span>{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
+              <NavItems navItems={navItems} pathname={pathname} isLoadingProfile={isLoadingProfile} />
             </SidebarMenu>
           </SidebarContent>
 
@@ -158,17 +197,26 @@ export function AppLayout({ children }: AppLayoutProps) {
             <Separator className="mb-1" />
             <SidebarMenu className="group-data-[collapsible=icon]:[&>li]:flex group-data-[collapsible=icon]:[&>li]:justify-center">
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Mi Cuenta" isActive={pathname === "/settings" || pathname === "/profile"}>
-                  <Link href="/settings">
-                    <User className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{firstName}</span>
-                  </Link>
-                </SidebarMenuButton>
+                {isLoadingProfile
+                  ? (
+                    <div className="flex items-center gap-2 px-2 py-1.5">
+                      <Skeleton className="h-4 w-4 rounded shrink-0" />
+                      <Skeleton className="h-4 w-24 rounded group-data-[collapsible=icon]:hidden" />
+                    </div>
+                  ) : (
+                    <SidebarMenuButton asChild tooltip="Mi Cuenta" isActive={pathname === "/settings" || pathname === "/profile"}>
+                      <Link href="/settings">
+                        <User className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{firstName}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  )
+                }
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={() => setShowLogoutModal(true)}
-                  disabled={isSigningOut}
+                  disabled={isSigningOut || isLoadingProfile}
                   tooltip="Cerrar sesión"
                   className="text-muted-foreground hover:text-destructive"
                 >
@@ -187,13 +235,19 @@ export function AppLayout({ children }: AppLayoutProps) {
               <ThemeToggle />
             </div>
 
-            {profile?.rol && (
-              <div className="px-2 group-data-[collapsible=icon]:hidden">
-                <Badge variant="outline" className="w-full justify-center text-xs bg-primary/8 text-primary border-primary/20">
-                  {rolLabels[profile.rol] ?? profile.rol}
-                </Badge>
-              </div>
-            )}
+            {isLoadingProfile
+              ? (
+                <div className="px-2 group-data-[collapsible=icon]:hidden">
+                  <Skeleton className="h-5 w-full rounded-full" />
+                </div>
+              ) : profile?.rol && (
+                <div className="px-2 group-data-[collapsible=icon]:hidden">
+                  <Badge variant="outline" className="w-full justify-center text-xs bg-primary/8 text-primary border-primary/20">
+                    {rolLabels[profile.rol] ?? profile.rol}
+                  </Badge>
+                </div>
+              )
+            }
           </SidebarFooter>
         </Sidebar>
 
@@ -215,7 +269,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             </div>
           </header>
 
-          <main className="flex-1 flex flex-col overflow-hidden p-4 md:p-6">
+          <main id="main" className="flex-1 flex flex-col overflow-hidden p-4 md:p-6">
             {children}
           </main>
         </SidebarInset>
@@ -243,6 +297,6 @@ export function AppLayout({ children }: AppLayoutProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </MotionConfig>
   )
 }

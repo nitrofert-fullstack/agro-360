@@ -278,17 +278,17 @@ type EstadoKey =
   | "iniciado" | "revisado" | "en_estudio_credito" | "cancelado"
 
 const estadoConfig: Record<EstadoKey, { label: string; color: string; borderColor: string; cardBg: string; icon: typeof Clock }> = {
-  iniciado:              { label: "Iniciado",      color: "bg-slate-500/10 text-slate-500 border-slate-500/20",    borderColor: "border-l-slate-400",  cardBg: "bg-gradient-to-r from-slate-500/5 to-transparent",   icon: Clock },
-  revisado:              { label: "En Revisión",   color: "bg-blue-500/10 text-blue-500 border-blue-500/20",       borderColor: "border-l-blue-500",   cardBg: "bg-gradient-to-r from-blue-500/8 to-transparent",    icon: Eye },
-  en_estudio_credito:    { label: "En Estudio",    color: "bg-purple-500/10 text-purple-500 border-purple-500/20", borderColor: "border-l-purple-500", cardBg: "bg-gradient-to-r from-purple-500/8 to-transparent",  icon: Eye },
-  aprobado:              { label: "Viable",        color: "bg-green-500/10 text-green-500 border-green-500/20",    borderColor: "border-l-green-500",  cardBg: "bg-gradient-to-r from-green-500/8 to-transparent",   icon: CheckCircle },
-  cancelado:             { label: "No Viable",     color: "bg-red-500/10 text-red-500 border-red-500/20",          borderColor: "border-l-red-500",    cardBg: "bg-gradient-to-r from-red-500/6 to-transparent",     icon: XCircle },
-  pendiente:             { label: "Pendiente",     color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", borderColor: "border-l-yellow-500", cardBg: "bg-gradient-to-r from-yellow-500/8 to-transparent",  icon: Clock },
-  pendiente_sincronizacion: { label: "Pend. Sync", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", borderColor: "border-l-yellow-500", cardBg: "bg-gradient-to-r from-yellow-500/8 to-transparent",  icon: Clock },
-  sincronizado:          { label: "Sincronizado",  color: "bg-blue-500/10 text-blue-500 border-blue-500/20",       borderColor: "border-l-blue-500",   cardBg: "bg-gradient-to-r from-blue-500/8 to-transparent",    icon: Eye },
-  en_revision:           { label: "Revisado (leg.)", color: "bg-blue-500/10 text-blue-500 border-blue-500/20",       borderColor: "border-l-blue-500",   cardBg: "bg-gradient-to-r from-blue-500/8 to-transparent",    icon: Eye },
-  rechazado:             { label: "Rechazado",      color: "bg-red-500/10 text-red-500 border-red-500/20",          borderColor: "border-l-red-500",    cardBg: "bg-gradient-to-r from-red-500/6 to-transparent",     icon: XCircle },
-  error_sincronizacion:  { label: "Error",         color: "bg-red-500/10 text-red-500 border-red-500/20",          borderColor: "border-l-red-500",    cardBg: "bg-gradient-to-r from-red-500/6 to-transparent",     icon: XCircle },
+  iniciado:              { label: "Iniciado",      color: "bg-status-neutral/10 text-status-neutral border-status-neutral/20", borderColor: "border-l-status-neutral", cardBg: "bg-gradient-to-r from-status-neutral/5 to-transparent",  icon: Clock },
+  revisado:              { label: "En Revisión",   color: "bg-status-info/10 text-status-info border-status-info/20",          borderColor: "border-l-status-info",    cardBg: "bg-gradient-to-r from-status-info/8 to-transparent",     icon: Eye },
+  en_estudio_credito:    { label: "En Estudio",    color: "bg-status-review/10 text-status-review border-status-review/20",    borderColor: "border-l-status-review",  cardBg: "bg-gradient-to-r from-status-review/8 to-transparent",   icon: Eye },
+  aprobado:              { label: "Viable",        color: "bg-status-success/10 text-status-success border-status-success/20", borderColor: "border-l-status-success", cardBg: "bg-gradient-to-r from-status-success/8 to-transparent",  icon: CheckCircle },
+  cancelado:             { label: "No Viable",     color: "bg-status-danger/10 text-status-danger border-status-danger/20",    borderColor: "border-l-status-danger",  cardBg: "bg-gradient-to-r from-status-danger/6 to-transparent",   icon: XCircle },
+  pendiente:             { label: "Pendiente",     color: "bg-status-warning/10 text-status-warning border-status-warning/20", borderColor: "border-l-status-warning", cardBg: "bg-gradient-to-r from-status-warning/8 to-transparent",  icon: Clock },
+  pendiente_sincronizacion: { label: "Pend. Sync", color: "bg-status-warning/10 text-status-warning border-status-warning/20", borderColor: "border-l-status-warning", cardBg: "bg-gradient-to-r from-status-warning/8 to-transparent",  icon: Clock },
+  sincronizado:          { label: "Sincronizado",  color: "bg-status-info/10 text-status-info border-status-info/20",          borderColor: "border-l-status-info",    cardBg: "bg-gradient-to-r from-status-info/8 to-transparent",     icon: Eye },
+  en_revision:           { label: "Revisado (leg.)", color: "bg-status-info/10 text-status-info border-status-info/20",        borderColor: "border-l-status-info",    cardBg: "bg-gradient-to-r from-status-info/8 to-transparent",     icon: Eye },
+  rechazado:             { label: "Rechazado",      color: "bg-status-danger/10 text-status-danger border-status-danger/20",   borderColor: "border-l-status-danger",  cardBg: "bg-gradient-to-r from-status-danger/6 to-transparent",   icon: XCircle },
+  error_sincronizacion:  { label: "Error",         color: "bg-status-danger/10 text-status-danger border-status-danger/20",   borderColor: "border-l-status-danger",  cardBg: "bg-gradient-to-r from-status-danger/6 to-transparent",   icon: XCircle },
 }
 
 interface UserProfile {
@@ -336,6 +336,28 @@ function fmtFecha(raw: unknown, fallback = 'No registrada'): string {
   return isNaN(d.getTime()) ? fallback : d.toLocaleDateString('es-CO')
 }
 
+// Resuelve variables CSS del tema a su valor computado (oklch) y se re-computa
+// al cambiar la clase .dark del <html>, para que las gráficas de recharts (que
+// reciben un color, no una clase Tailwind) sean theme-aware.
+function useResolvedCssVars(vars: string[]) {
+  const key = vars.join(',')
+  const [resolved, setResolved] = React.useState<Record<string, string>>({})
+  React.useEffect(() => {
+    const compute = () => {
+      const cs = getComputedStyle(document.documentElement)
+      const out: Record<string, string> = {}
+      for (const v of vars) out[v] = cs.getPropertyValue(v).trim()
+      setResolved(out)
+    }
+    compute()
+    const obs = new MutationObserver(compute)
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => obs.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+  return resolved
+}
+
 export function AdminDashboard() {
   const { isAdmin, isAuthenticated, loading: authLoading, user: currentUser, profile: currentProfile, signOut } = useAuth()
   const isAnalista = currentProfile?.rol === 'analista'
@@ -369,6 +391,11 @@ export function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [pendingEstado, setPendingEstado] = useState<{ id: string; est: string } | null>(null)
+  const [mapaTipo, setMapaTipo] = useState<'reales' | 'aproximadas' | 'todos'>('reales')
+  const chartColors = useResolvedCssVars([
+    '--status-neutral', '--status-info', '--status-warning', '--status-success', '--status-danger', '--status-review',
+  ])
   const [credencialesEmail, setCredencialesEmail] = useState("")
   const [isSendingCredenciales, setIsSendingCredenciales] = useState(false)
   const [credencialesResult, setCredencialesResult] = useState<{ credenciales: { email: string; password: string }; emailEnviado: boolean } | null>(null)
@@ -720,10 +747,10 @@ export function AdminDashboard() {
 
   // Cargar markers del mapa global cuando el tab de mapa está activo
   useEffect(() => {
-    if (activeSection !== 'mapa' || adminMapMarkers.length > 0) return
+    if (activeSection !== 'mapa') return
     const load = async () => {
       try {
-        const res = await fetch('/api/admin/caracterizaciones')
+        const res = await fetch(`/api/admin/mapa?tipo=${mapaTipo}`)
         if (!res.ok) return
         const { data } = await res.json()
         if (!data) return
@@ -760,7 +787,7 @@ export function AdminDashboard() {
       } catch { /* silencioso */ }
     }
     load()
-  }, [activeSection, adminMapMarkers.length])
+  }, [activeSection, mapaTipo])
 
   // Debounce: reload from server when search or estado filter changes
   useEffect(() => {
@@ -789,6 +816,7 @@ export function AdminDashboard() {
   })
 
   const handleUpdateEstado = async (id: string, nuevoEstado: string) => {
+    const prevEstado = (selectedCaracterizacion?.estado || '').toUpperCase()
     setIsUpdating(true)
     try {
       const res = await fetch('/api/admin/update-estado', {
@@ -799,7 +827,11 @@ export function AdminDashboard() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error desconocido')
 
-      toast.success(`Estado actualizado a "${estadoConfig[nuevoEstado as EstadoKey]?.label || nuevoEstado}"`)
+      toast.success(`Estado actualizado a "${estadoConfig[nuevoEstado.toLowerCase() as EstadoKey]?.label || nuevoEstado}"`, {
+        action: prevEstado && prevEstado !== nuevoEstado.toUpperCase()
+          ? { label: 'Deshacer', onClick: () => handleUpdateEstado(id, prevEstado) }
+          : undefined,
+      })
       setObservaciones("")
       // Actualizar el modal inmediatamente sin esperar recarga
       setSelectedCaracterizacion(prev =>
@@ -1273,7 +1305,7 @@ export function AdminDashboard() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="gap-2 border-green-600/40 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950/30"
+                          className="gap-2 border-status-success/40 text-status-success hover:bg-status-success/10"
                           onClick={exportExcel}
                           disabled={isExporting}
                         >
@@ -1370,7 +1402,7 @@ export function AdminDashboard() {
                                         {new Date(c.created_at).toLocaleDateString('es-CO')}
                                       </span>
                                       {!c.visita?.asesor_id && (
-                                        <span className="flex items-center gap-1 text-blue-500">
+                                        <span className="flex items-center gap-1 text-status-info">
                                           <User className="h-3 w-3 shrink-0" />
                                           Sin asesor
                                         </span>
@@ -1543,7 +1575,7 @@ export function AdminDashboard() {
 
                     {lastInviteResult && (
                       <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
-                        <p className="mb-2 text-sm font-medium text-green-700 dark:text-green-400">
+                        <p className="mb-2 text-sm font-medium text-status-success">
                           {lastInviteResult.emailEnviado ? '✓ Credenciales enviadas por email' : '✓ Cuenta creada (email no enviado — configura SMTP)'}
                         </p>
                         {lastInviteResult.credenciales && (
@@ -1644,15 +1676,15 @@ export function AdminDashboard() {
                               {/* Badges en línea separada */}
                               <div className="mt-1 flex flex-wrap gap-1">
                                 <Badge variant="outline" className={`text-xs ${
-                                  u.rol === 'admin' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
-                                  u.rol === 'analista' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
-                                  u.rol === 'agricultor' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
-                                  'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                                  u.rol === 'admin' ? 'bg-status-warning/10 text-status-warning border-status-warning/20' :
+                                  u.rol === 'analista' ? 'bg-status-review/10 text-status-review border-status-review/20' :
+                                  u.rol === 'agricultor' ? 'bg-status-success/10 text-status-success border-status-success/20' :
+                                  'bg-status-info/10 text-status-info border-status-info/20'
                                 }`}>
                                   {u.rol === 'admin' ? 'Admin' : u.rol === 'analista' ? 'Analista' : u.rol === 'agricultor' ? 'Agricultor' : 'Asesor'}
                                 </Badge>
                                 {invitation && (
-                                  <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/20">
+                                  <Badge variant="outline" className="text-xs bg-status-success/10 text-status-success border-status-success/20">
                                     {invitation.usado ? 'Accedió' : 'Invitado'}
                                   </Badge>
                                 )}
@@ -1796,13 +1828,13 @@ export function AdminDashboard() {
           {/* Sección Estadísticas */}
           {activeSection === 'estadisticas' && (<motion.div key="estadisticas" variants={fadeUp} initial="hidden" animate="visible" className="flex-1 overflow-y-auto -m-4 md:-m-6 p-4 md:p-6">{(() => {
             const estadoColors: Record<string, string> = {
-              INICIADO: '#94a3b8',
-              REVISADO: '#3b82f6',
-              EN_ESTUDIO_CREDITO: '#a855f7',
-              APROBADO: '#22c55e',
-              CANCELADO: '#ef4444',
-              RECHAZADO: '#ef4444',
-              SINCRONIZADO: '#3b82f6',
+              INICIADO: chartColors['--status-neutral'] || '#94a3b8',
+              REVISADO: chartColors['--status-info'] || '#3b82f6',
+              EN_ESTUDIO_CREDITO: chartColors['--status-review'] || '#a855f7',
+              APROBADO: chartColors['--status-success'] || '#22c55e',
+              CANCELADO: chartColors['--status-danger'] || '#ef4444',
+              RECHAZADO: chartColors['--status-danger'] || '#ef4444',
+              SINCRONIZADO: chartColors['--status-info'] || '#3b82f6',
             }
             const estadoLabels: Record<string, string> = {
               INICIADO: 'Iniciado',
@@ -1826,7 +1858,12 @@ export function AdminDashboard() {
             const genderLabels: Record<string, string> = {
               M: 'Masculino', F: 'Femenino', Masculino: 'Masculino', Femenino: 'Femenino',
             }
-            const genderColors = ['#3b82f6', '#ec4899', '#f59e0b', '#94a3b8']
+            const genderColors = [
+              chartColors['--status-info'] || '#3b82f6',
+              chartColors['--status-review'] || '#a855f7',
+              chartColors['--status-warning'] || '#f59e0b',
+              chartColors['--status-neutral'] || '#94a3b8',
+            ]
             const genderData = (dashStats?.porGenero || []).map((g, i) => ({
               name: genderLabels[g.genero] || g.genero,
               value: g.total,
@@ -1859,7 +1896,7 @@ export function AdminDashboard() {
                     </div>
                     {dashStats && (
                       <div className="flex items-center gap-2 rounded-lg bg-background/60 px-4 py-2 backdrop-blur-sm border border-border/40">
-                        <span className="text-3xl font-bold text-foreground">{dashStats.totalRegistros}</span>
+                        <span className="text-3xl font-bold tabular-nums text-foreground">{dashStats.totalRegistros}</span>
                         <div>
                           <p className="text-xs font-medium text-foreground leading-tight">Total</p>
                           <p className="text-xs text-muted-foreground">registros</p>
@@ -1893,10 +1930,10 @@ export function AdminDashboard() {
                       className="grid grid-cols-2 gap-3 lg:grid-cols-4"
                     >
                       {[
-                        { label: 'Viables', value: viables, sub: `${viablePct}% del total`, icon: CheckCircle, color: 'text-green-500', border: 'border-l-green-500', bg: 'bg-green-500/5' },
-                        { label: 'En Revisión', value: dashStats.porEstado['REVISADO'] || 0, sub: 'En proceso', icon: Eye, color: 'text-blue-500', border: 'border-l-blue-500', bg: 'bg-blue-500/5' },
-                        { label: 'En Estudio', value: dashStats.porEstado['EN_ESTUDIO_CREDITO'] || 0, sub: 'Crédito', icon: TrendingUp, color: 'text-purple-500', border: 'border-l-purple-500', bg: 'bg-purple-500/5' },
-                        { label: 'No Viables', value: (dashStats.porEstado['CANCELADO'] || 0) + (dashStats.porEstado['RECHAZADO'] || 0), sub: 'Cancelados', icon: XCircle, color: 'text-red-500', border: 'border-l-red-500', bg: 'bg-red-500/5' },
+                        { label: 'Viables', value: viables, sub: `${viablePct}% del total`, icon: CheckCircle, color: 'text-status-success', border: 'border-l-status-success', bg: 'bg-status-success/5' },
+                        { label: 'En Revisión', value: dashStats.porEstado['REVISADO'] || 0, sub: 'En proceso', icon: Eye, color: 'text-status-info', border: 'border-l-status-info', bg: 'bg-status-info/5' },
+                        { label: 'En Estudio', value: dashStats.porEstado['EN_ESTUDIO_CREDITO'] || 0, sub: 'Crédito', icon: TrendingUp, color: 'text-status-review', border: 'border-l-status-review', bg: 'bg-status-review/5' },
+                        { label: 'No Viables', value: (dashStats.porEstado['CANCELADO'] || 0) + (dashStats.porEstado['RECHAZADO'] || 0), sub: 'Cancelados', icon: XCircle, color: 'text-status-danger', border: 'border-l-status-danger', bg: 'bg-status-danger/5' },
                       ].map(({ label, value, sub, icon: Icon, color, border, bg }) => (
                         <motion.div key={label} variants={staggerItem}>
                           <Card className={`border-l-4 ${border} ${bg} transition-all duration-200 hover:-translate-y-0.5`} style={{boxShadow: 'var(--shadow-sm)'}}>
@@ -1905,7 +1942,7 @@ export function AdminDashboard() {
                                 <span className="text-xs font-medium text-muted-foreground">{label}</span>
                                 <Icon className={`h-4 w-4 ${color}`} />
                               </div>
-                              <p className={`text-3xl font-bold ${color}`}>{value}</p>
+                              <p className={`text-3xl font-bold tabular-nums ${color}`}>{value}</p>
                               <p className={`text-xs mt-1 ${color} opacity-70`}>{sub}</p>
                             </CardContent>
                           </Card>
@@ -1924,7 +1961,7 @@ export function AdminDashboard() {
                         <Card key={item.label} className="bg-muted/30 border-border/60">
                           <CardContent className="p-4">
                             <p className="text-xs text-muted-foreground mb-2">{item.label}</p>
-                            <p className="text-2xl font-bold">{item.value} <span className="text-sm font-normal text-muted-foreground">{item.unit}</span></p>
+                            <p className="text-2xl font-bold tabular-nums">{item.value} <span className="text-sm font-normal text-muted-foreground">{item.unit}</span></p>
                           </CardContent>
                         </Card>
                       ))}
@@ -2036,14 +2073,26 @@ export function AdminDashboard() {
           {/* Sección Mapa de Predios */}
           {activeSection === 'mapa' && (
             <motion.div key="mapa" variants={fadeUp} initial="hidden" animate="visible" className="flex flex-col flex-1 min-h-0 gap-3">
-              <div className="flex items-center justify-between shrink-0">
+              <div className="flex items-center justify-between shrink-0 gap-3">
                 <div>
                   <h2 className="text-xl font-semibold">Mapa de Predios</h2>
                   <p className="text-sm text-muted-foreground">
                     {adminMapMarkers.length > 0
-                      ? `${adminMapMarkers.length} predio${adminMapMarkers.length !== 1 ? 's' : ''} registrado${adminMapMarkers.length !== 1 ? 's' : ''}`
+                      ? `${adminMapMarkers.length} predio${adminMapMarkers.length !== 1 ? 's' : ''} en el mapa`
                       : 'Cargando predios...'}
                   </p>
+                </div>
+                <div className="flex rounded-lg border border-border bg-card p-1">
+                  {([['reales', 'Reales'], ['aproximadas', 'Aproximadas'], ['todos', 'Todas']] as const).map(([val, label]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setMapaTipo(val)}
+                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${mapaTipo === val ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-border">
@@ -2596,9 +2645,13 @@ export function AdminDashboard() {
                               key={est}
                               variant={isCurrent ? "default" : "outline"}
                               size="sm"
-                              onClick={() => handleUpdateEstado(selectedCaracterizacion.id, est)}
+                              onClick={() =>
+                                est === 'APROBADO' || est === 'CANCELADO'
+                                  ? setPendingEstado({ id: selectedCaracterizacion.id, est })
+                                  : handleUpdateEstado(selectedCaracterizacion.id, est)
+                              }
                               disabled={isUpdating || isCurrent}
-                              className={`gap-2 ${est === 'APROBADO' && !isCurrent ? 'hover:bg-green-600 hover:text-white' : ''} ${est === 'CANCELADO' && !isCurrent ? 'hover:bg-red-600 hover:text-white' : ''}`}
+                              className={`gap-2 min-h-11 ${est === 'APROBADO' && !isCurrent ? 'hover:bg-status-success hover:text-white' : ''} ${est === 'CANCELADO' && !isCurrent ? 'hover:bg-status-danger hover:text-white' : ''}`}
                             >
                               <EstIcon className="h-4 w-4" />
                               {cfg.label}
@@ -2769,6 +2822,32 @@ export function AdminDashboard() {
       </Dialog>
 
       {/* AlertDialog confirmar cambio de rol */}
+      <AlertDialog open={!!pendingEstado} onOpenChange={(open) => { if (!open && !isUpdating) setPendingEstado(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingEstado?.est === 'APROBADO' ? '¿Marcar como Viable?' : '¿Marcar como No Viable?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta decisión afecta la elegibilidad crediticia del productor. Podrás deshacerla desde la notificación, pero confirma que es correcta antes de continuar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUpdating}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isUpdating}
+              className={pendingEstado?.est === 'CANCELADO' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+              onClick={() => {
+                if (pendingEstado) handleUpdateEstado(pendingEstado.id, pendingEstado.est)
+                setPendingEstado(null)
+              }}
+            >
+              {pendingEstado?.est === 'APROBADO' ? 'Sí, marcar Viable' : 'Sí, marcar No Viable'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={!!roleChangeConfirm} onOpenChange={(open) => { if (!open) setRoleChangeConfirm(null) }}>
         <AlertDialogContent>
           <AlertDialogHeader>

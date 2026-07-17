@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import type L from "leaflet"
 import { Button } from "@/components/ui/button"
-import { MapPin, Pentagon, Trash2, Check } from "lucide-react"
+import { MapPin, Pentagon, Trash2, Check, LocateFixed, Loader2 } from "lucide-react"
 
 const MUNICIPIOS_SANTANDER_COORDS: Record<string, [number, number]> = {
   // Coordenadas de centroide por municipio (87 oficiales DANE)
@@ -160,6 +160,8 @@ export function LocationPicker({ onLocationChange, initialLocation, municipio }:
     lng: initialLocation?.longitud != null ? Number(initialLocation.longitud) || -73.1198 : -73.1198,
   })
   const [isMapReady, setIsMapReady] = useState(false)
+  const [locating, setLocating] = useState(false)
+  const [geoError, setGeoError] = useState<string | null>(null)
   const isInitializingRef = useRef(false)
 
   const getCustomIcon = useCallback(() => {
@@ -309,12 +311,11 @@ export function LocationPicker({ onLocationChange, initialLocation, municipio }:
     }
   }, [])
 
-  // Handle click for point mode
-  const handlePointClick = useCallback((e: L.LeafletMouseEvent) => {
+  // Coloca (o reemplaza) el marcador de punto en unas coordenadas dadas
+  const placePoint = useCallback((lat: number, lng: number) => {
     const L = leafletRef.current
-    if (mode !== "punto" || !mapInstanceRef.current || !L) return
+    if (!mapInstanceRef.current || !L) return
 
-    const { lat, lng } = e.latlng
     setCurrentLocation({ lat, lng })
 
     // Remove existing marker
@@ -347,7 +348,13 @@ export function LocationPicker({ onLocationChange, initialLocation, municipio }:
       longitud: lng,
       tipoUbicacion: "punto",
     })
-  }, [mode, onLocationChange, getCustomIcon])
+  }, [onLocationChange, getCustomIcon])
+
+  // Handle click for point mode
+  const handlePointClick = useCallback((e: L.LeafletMouseEvent) => {
+    if (mode !== "punto") return
+    placePoint(e.latlng.lat, e.latlng.lng)
+  }, [mode, placePoint])
 
   // Handle click for polygon mode
   const handlePolygonClick = useCallback((e: L.LeafletMouseEvent) => {
@@ -486,6 +493,35 @@ export function LocationPicker({ onLocationChange, initialLocation, municipio }:
     setMode("punto")
   }
 
+  // Localiza la ubicación actual del dispositivo (GPS) y coloca el punto ahí
+  const locateMe = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoError("La geolocalización no está disponible en este dispositivo.")
+      return
+    }
+    setGeoError(null)
+    setLocating(true)
+    clearDrawing()
+    setMode("punto")
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords
+        placePoint(latitude, longitude)
+        mapInstanceRef.current?.flyTo([latitude, longitude], 16)
+        setLocating(false)
+      },
+      (err) => {
+        setLocating(false)
+        setGeoError(
+          err.code === err.PERMISSION_DENIED
+            ? "Permiso de ubicación denegado. Actívalo en el navegador para usar tu ubicación."
+            : "No se pudo obtener tu ubicación. Intenta de nuevo o marca el punto manualmente."
+        )
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    )
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
@@ -498,6 +534,17 @@ export function LocationPicker({ onLocationChange, initialLocation, municipio }:
         >
           <MapPin className="h-4 w-4" />
           Marcar Punto
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={locateMe}
+          disabled={locating}
+          className="gap-2 h-10 px-4 md:h-11 md:px-5 md:text-sm"
+        >
+          {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}
+          {locating ? "Localizando..." : "Mi ubicación"}
         </Button>
         <Button
           type="button"
@@ -534,6 +581,12 @@ export function LocationPicker({ onLocationChange, initialLocation, municipio }:
           </Button>
         )}
       </div>
+
+      {geoError && (
+        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          {geoError}
+        </div>
+      )}
 
       {isDrawing && (
         <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">

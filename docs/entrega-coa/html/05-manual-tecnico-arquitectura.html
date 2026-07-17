@@ -342,10 +342,6 @@ ejecuta como funciones serverless en demanda.</p>
 <td><strong>Nodemailer</strong></td>
 <td>Envío de correos (SMTP)</td>
 </tr>
-<tr>
-<td><strong>Cloudflare Turnstile</strong></td>
-<td>Captcha en formulario público</td>
-</tr>
 </tbody>
 </table>
 <h3 id="base-de-datos">2.3 Base de datos</h3>
@@ -401,10 +397,10 @@ tablas.</li>
 │  └────────────────────────────────────────────────────┘    │
 └────────────────────────────────────────────────────────────┘
              ↓                ↓
-   ┌──────────┐ ┌────────────────────┐
-   │ SMTP     │ │  Cloudflare        │
-   │ correos  │ │  Turnstile captcha │
-   └──────────┘ └────────────────────┘</code></pre>
+   ┌──────────┐
+   │ SMTP     │
+   │ correos  │
+   └──────────┘</code></pre>
 <hr />
 <h2 id="estructura-del-proyecto">4. Estructura del proyecto</h2>
 <pre><code>agro-360/
@@ -494,7 +490,8 @@ class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb3-
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>router<span class="op">.</span><span class="fu">push</span>(<span class="vs">`/exito?radicado=</span><span class="sc">${</span>radicadoOficial<span class="sc">}</span><span class="vs">`</span>)</span></code></pre></div>
 <p>El endpoint <code>/api/caracterizaciones</code> (servidor): 1. Si hay
 JWT de asesor: asigna <code>asesor_id = user.id</code>. 2. Si es
-público: valida Cloudflare Turnstile. 3. Inserta en cascada:
+público: valida el payload del request en backend. 3. Inserta en
+cascada:
 <code>beneficiarios</code> → <code>predios</code> → sub-tablas →
 <code>visitas</code> → <code>caracterizaciones</code>. 4. Sube
 fotos/firmas a Supabase Storage. 5. Genera <code>radicado_oficial</code>
@@ -550,10 +547,7 @@ para claves públicas.</li>
 RLS, <strong>no exponer</strong>.</li>
 <li>SMTP, API keys externas — solo en servidor.</li>
 </ul>
-<h3 id="captcha">6.3 Captcha</h3>
-<p>Formulario público (sin login) requiere Cloudflare Turnstile.
-Validación server-side en <code>/api/caracterizaciones</code>.</p>
-<h3 id="sanitización">6.4 Sanitización</h3>
+<h3 id="sanitización">6.3 Sanitización</h3>
 <ul>
 <li><strong>Zod</strong> valida formas en cliente y servidor.</li>
 <li><strong>Supabase client</strong> parametriza queries (protección SQL
@@ -584,8 +578,8 @@ caracterización (asesor autenticado)</h3>
 caracterización (agricultor sin login)</h3>
 <pre><code>1. Agricultor abre /formulario
 2. Completa el formulario (no se auto-llena nombre técnico)
-3. Acepta autorizaciones + Captcha Turnstile en paso 9
-4. Envía → POST /api/caracterizaciones (sin JWT, valida captcha)
+3. Acepta autorizaciones en paso 9
+4. Envía → POST /api/caracterizaciones (sin JWT, valida payload en backend)
 5. Servidor procesa con asesor_id = null
 6. Si proporcionó correo, recibe credenciales de acceso</code></pre>
 <h3 id="flujo-de-cambio-de-estado">7.3 Flujo de cambio de estado</h3>

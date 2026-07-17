@@ -28,6 +28,7 @@ export default function MapaPage() {
   const { user, profile, loading: authLoading, isAuthenticated } = useAuth()
   const [mounted, setMounted] = useState(false)
   const [markers, setMarkers] = useState<MapMarker[]>([])
+  const [tipo, setTipo] = useState<'reales' | 'aproximadas' | 'todos'>('reales')
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -44,7 +45,7 @@ export default function MapaPage() {
 
     const loadPredios = async () => {
       try {
-        const response = await fetch('/api/admin/caracterizaciones')
+        const response = await fetch(`/api/admin/mapa?tipo=${tipo}`)
         if (!response.ok) {
           console.log("[Mapa] Error loading predios:", response.status)
           return
@@ -107,7 +108,7 @@ export default function MapaPage() {
     }
 
     loadPredios()
-  }, [user?.id, isAuthenticated])
+  }, [user?.id, isAuthenticated, tipo])
 
   if (authLoading) {
     return (
@@ -134,6 +135,18 @@ export default function MapaPage() {
   return (
     <AppLayout>
       <div className="relative flex-1 min-h-0 overflow-hidden rounded-xl border border-border">
+        <div className="absolute left-3 top-3 z-[1000] flex rounded-lg border border-border bg-card/95 p-1 shadow-md backdrop-blur">
+          {([['reales', 'Reales'], ['aproximadas', 'Aproximadas'], ['todos', 'Todas']] as const).map(([val, label]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setTipo(val)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${tipo === val ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <MapViewer markers={markers} role={profile?.rol as any} />
       </div>
     </AppLayout>

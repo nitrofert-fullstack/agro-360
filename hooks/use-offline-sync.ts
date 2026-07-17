@@ -17,7 +17,10 @@ export function useOfflineSync(isAsesor: boolean) {
     try {
       const count = await countPendingForms()
       setPendingCount(count)
-    } catch {}
+    } catch (err) {
+      // Best-effort: si falla el conteo (p. ej. IndexedDB no disponible), lo dejamos en 0.
+      console.warn('[use-offline-sync] refreshCount falló:', err)
+    }
   }, [])
 
   const syncPending = useCallback(async () => {
@@ -29,6 +32,7 @@ export function useOfflineSync(isAsesor: boolean) {
     setIsSyncing(true)
     let synced = 0
     let failed = 0
+    let lastError = ''
 
     for (const form of forms) {
       try {
@@ -44,10 +48,13 @@ export function useOfflineSync(isAsesor: boolean) {
           await deletePendingForm(form.id!)
           synced++
         } else {
+          const detail = await res.text().catch(() => '')
+          lastError = `HTTP ${res.status}${detail ? `: ${detail.slice(0, 120)}` : ''}`
           await incrementRetry(form.id!)
           failed++
         }
-      } catch {
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : 'error de red'
         await incrementRetry(form.id!)
         failed++
       }
@@ -62,7 +69,7 @@ export function useOfflineSync(isAsesor: boolean) {
     }
     if (failed > 0) {
       toast.error(
-        `${failed} formulario${failed > 1 ? 's' : ''} no se pudieron sincronizar. Usa el botón para reintentar.`,
+        `${failed} formulario${failed > 1 ? 's' : ''} no se pudieron sincronizar${lastError ? ` (${lastError})` : ''}. Reintenta cuando mejore la señal.`,
         { duration: 8000 }
       )
     }

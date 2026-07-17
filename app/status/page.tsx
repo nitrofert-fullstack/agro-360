@@ -77,7 +77,7 @@ export default function StatusPage() {
     status.healthCheck
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
+    <main className="min-h-screen bg-background p-4 md:p-6">
       <div className="mx-auto max-w-2xl space-y-6">
         <motion.div variants={fadeUp} initial="hidden" animate="visible" className="space-y-2 text-center">
           <h1 className="text-3xl font-bold">Sistema de Verificación</h1>
@@ -191,7 +191,7 @@ export default function StatusPage() {
           </motion.div>
         )}
       </div>
-    </div>
+    </main>
   )
 }
 

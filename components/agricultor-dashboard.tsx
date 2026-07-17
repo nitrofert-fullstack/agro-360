@@ -41,14 +41,14 @@ interface VisitaResumen {
 interface PredioCompleto { id: string; predio: Predio; visita: VisitaResumen }
 
 const estadoConfig: Record<string, { label: string; badge: string; cardBorder: string }> = {
-  INICIADO:           { label: "Iniciado",          badge: "bg-slate-500/10 text-slate-600 border-slate-500/20",  cardBorder: "border-l-slate-400" },
-  REVISADO:           { label: "En Revisión",        badge: "bg-blue-500/10 text-blue-600 border-blue-500/20",    cardBorder: "border-l-blue-500" },
-  EN_ESTUDIO_CREDITO: { label: "En Estudio",         badge: "bg-purple-500/10 text-purple-600 border-purple-500/20", cardBorder: "border-l-purple-500" },
-  APROBADO:           { label: "Viable",             badge: "bg-green-500/10 text-green-600 border-green-500/20", cardBorder: "border-l-green-500" },
-  CANCELADO:          { label: "No Viable",          badge: "bg-red-500/10 text-red-600 border-red-500/20",       cardBorder: "border-l-red-500" },
-  SINCRONIZADO:       { label: "Registrado",         badge: "bg-slate-500/10 text-slate-600 border-slate-500/20", cardBorder: "border-l-slate-400" },
-  EN_REVISION:        { label: "Revisado (leg.)",     badge: "bg-blue-500/10 text-blue-600 border-blue-500/20",    cardBorder: "border-l-blue-500" },
-  RECHAZADO:          { label: "Rechazado",           badge: "bg-red-500/10 text-red-600 border-red-500/20",       cardBorder: "border-l-red-500" },
+  INICIADO:           { label: "Iniciado",          badge: "bg-status-neutral/10 text-status-neutral border-status-neutral/20",  cardBorder: "border-l-status-neutral" },
+  REVISADO:           { label: "En Revisión",        badge: "bg-status-info/10 text-status-info border-status-info/20",    cardBorder: "border-l-status-info" },
+  EN_ESTUDIO_CREDITO: { label: "En Estudio",         badge: "bg-status-review/10 text-status-review border-status-review/20", cardBorder: "border-l-status-review" },
+  APROBADO:           { label: "Viable",             badge: "bg-status-success/10 text-status-success border-status-success/20", cardBorder: "border-l-status-success" },
+  CANCELADO:          { label: "No Viable",          badge: "bg-status-danger/10 text-status-danger border-status-danger/20",       cardBorder: "border-l-status-danger" },
+  SINCRONIZADO:       { label: "Registrado",         badge: "bg-status-neutral/10 text-status-neutral border-status-neutral/20", cardBorder: "border-l-status-neutral" },
+  EN_REVISION:        { label: "Revisado (leg.)",     badge: "bg-status-info/10 text-status-info border-status-info/20",    cardBorder: "border-l-status-info" },
+  RECHAZADO:          { label: "Rechazado",           badge: "bg-status-danger/10 text-status-danger border-status-danger/20",       cardBorder: "border-l-status-danger" },
 }
 
 function fmtFecha(raw: unknown, fallback = 'N/A'): string {
@@ -146,8 +146,8 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
   if (error) return (
     <div className="flex min-h-[60vh] items-center justify-center">
       <div className="flex flex-col items-center gap-3 text-center">
-        <XCircle className="h-10 w-10 text-red-500" />
-        <p className="text-sm text-red-600 font-medium">{error}</p>
+        <XCircle className="h-10 w-10 text-destructive" />
+        <p className="text-sm text-destructive font-medium">{error}</p>
         <button
           className="text-xs text-muted-foreground underline underline-offset-2"
           onClick={() => { setError(null); setIsLoading(true); loadPredios() }}
@@ -197,9 +197,9 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
         {/* KPIs */}
         <motion.div variants={staggerItem} className="grid grid-cols-3 gap-2 sm:gap-3">
           {[
-            { label: 'Viables',     value: viables,   icon: CheckCircle2, color: 'text-green-500',  border: 'border-l-green-500',  bg: 'bg-green-500/5' },
-            { label: 'En Revisión', value: revision,  icon: Eye,          color: 'text-blue-500',   border: 'border-l-blue-500',   bg: 'bg-blue-500/5' },
-            { label: 'No Viables',  value: noViables, icon: XCircle,      color: 'text-red-500',    border: 'border-l-red-500',    bg: 'bg-red-500/5' },
+            { label: 'Viables',     value: viables,   icon: CheckCircle2, color: 'text-status-success',  border: 'border-l-status-success',  bg: 'bg-status-success/5' },
+            { label: 'En Revisión', value: revision,  icon: Eye,          color: 'text-status-info',   border: 'border-l-status-info',   bg: 'bg-status-info/5' },
+            { label: 'No Viables',  value: noViables, icon: XCircle,      color: 'text-status-danger',    border: 'border-l-status-danger',    bg: 'bg-status-danger/5' },
           ].map(({ label, value, icon: Icon, color, border, bg }) => (
             <Card key={label} className={`border-l-4 ${border} ${bg} border-border/60`} style={{boxShadow:'var(--shadow-sm)'}}>
               <CardContent className="p-3 sm:p-4">
@@ -232,7 +232,7 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
               <Card className="border-l-4 border-l-green-500 bg-card/80 border-border/60 overflow-hidden flex flex-col flex-1 min-h-0" style={{boxShadow:'var(--shadow-md)'}}>
                 <CardHeader className="pb-2 pt-3 px-4 shrink-0">
                   <CardTitle className="flex items-center gap-2 text-sm">
-                    <MapPin className="h-4 w-4 text-green-600" />
+                    <MapPin className="h-4 w-4 text-primary" />
                     Mis Terrenos en el Mapa
                     <Badge variant="outline" className="ml-auto text-xs">{prediosConCoords.length} con ubicación</Badge>
                   </CardTitle>

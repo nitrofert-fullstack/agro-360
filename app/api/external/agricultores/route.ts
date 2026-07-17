@@ -1,9 +1,20 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import { rateLimit } from '@/lib/rate-limit'
 
 const LIMITE_MAX = 100
 const LIMITE_DEFAULT = 50
+
+function formatTelefono(tel: string | null | undefined): string | null {
+  if (!tel) return null
+  const digits = tel.replace(/\D/g, '')
+  // Número colombiano: 10 dígitos que empiezan con 3
+  if (digits.length === 10 && digits.startsWith('3')) return `+57${digits}`
+  // Ya tiene código de país (12 dígitos: 57 + 10)
+  if (digits.length === 12 && digits.startsWith('57')) return `+${digits}`
+  return tel
+}
 
 function unauthorized() {
   return NextResponse.json(
@@ -18,6 +29,9 @@ function badRequest(message: string) {
 
 export async function GET(request: Request) {
   // ── 1. Autenticación por API Key ───────────────────────────────────────────
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || request.headers.get('x-real-ip')
+    || 'unknown'
   const apiKey = request.headers.get('x-api-key')
   const validKey = process.env.EXTERNAL_API_KEY
 
@@ -29,6 +43,9 @@ export async function GET(request: Request) {
   }
   if (!apiKey || apiKey !== validKey) {
     return unauthorized()
+  }
+  if (!rateLimit(`external-api:${ip}`, 60, 60_000)) {
+    return NextResponse.json({ error: 'Demasiadas solicitudes. Intenta de nuevo en un minuto.' }, { status: 429 })
   }
 
   // ── 2. Parámetros ──────────────────────────────────────────────────────────
@@ -101,7 +118,11 @@ export async function GET(request: Request) {
         orderBy: { created_at: 'desc' },
         include: {
           beneficiarios: true,
-          predios: true,
+          predios: {
+            include: {
+              area_productiva: true,
+            },
+          },
           visitas: true,
         },
       }),
@@ -121,7 +142,7 @@ export async function GET(request: Request) {
         tipo_documento:       c.beneficiarios.tipo_documento,
         numero_documento:     c.beneficiarios.numero_documento,
         correo:               c.beneficiarios.correo ?? null,
-        telefono:             c.beneficiarios.telefono ?? null,
+        telefono:             formatTelefono(c.beneficiarios.telefono),
         genero:               c.beneficiarios.genero ?? null,
         edad:                 c.beneficiarios.edad ?? null,
         fecha_nacimiento:     c.beneficiarios.fecha_nacimiento ?? null,
@@ -144,6 +165,21 @@ export async function GET(request: Request) {
         longitud:             c.predios.longitud                    ? Number(c.predios.longitud)                    : null,
         cultivos_existentes:  c.predios.cultivos_existentes ?? null,
       },
+
+      sistema_productivo: c.predios.area_productiva.map(ap => ({
+        sistema:                   ap.sistema_productivo ?? null,
+        cultivo:                   ap.caracterizacion_cultivo ?? null,
+        cantidad_produccion:       ap.cantidad_produccion ?? null,
+        estado_cultivo:            ap.estado_cultivo ?? null,
+        tiene_infraestructura:     ap.tiene_infraestructura_procesamiento ?? null,
+        estructuras:               ap.estructuras ?? null,
+        interesado_programa:       ap.interesado_programa ?? null,
+        donde_comercializa:        ap.donde_comercializa ?? null,
+        ingreso_mensual_ventas:    ap.ingreso_mensual_ventas ? Number(ap.ingreso_mensual_ventas) : null,
+        sistema_interes:           ap.sistema_productivo_interes ?? null,
+        hectareas_siembra_nueva:   ap.hectareas_siembra_nueva ? Number(ap.hectareas_siembra_nueva) : null,
+        hectareas_renovacion:      ap.hectareas_renovacion ? Number(ap.hectareas_renovacion) : null,
+      })),
 
       visita: {
         fecha:             c.visitas.fecha_visita,

@@ -9,7 +9,7 @@ import { scaleIn, staggerContainer, staggerItem, celebrationVariants } from "@/l
 
 export default function SignUpSuccessPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <motion.div variants={scaleIn} initial="hidden" animate="visible" className="w-full max-w-md">
         <Card className="text-center">
           <CardHeader>
@@ -49,6 +49,6 @@ export default function SignUpSuccessPage() {
           </motion.div>
         </Card>
       </motion.div>
-    </div>
+    </main>
   )
 }

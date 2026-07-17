@@ -8,7 +8,7 @@
 
 ## 1. Resumen ejecutivo
 
-Agro360 es una aplicación web construida sobre **Next.js 16 (App Router)**, **React 19**, **TypeScript** y **Supabase** como backend como servicio (BaaS). Los datos se capturan en el navegador del asesor y se envían directamente al servidor en tiempo real mediante un endpoint serverless. No existe almacenamiento local ni modo offline.
+Agro360 es una aplicación web construida sobre **Next.js 16 (App Router)**, **React 19**, **TypeScript** y **Supabase** como backend como servicio (BaaS). Los datos se capturan en el navegador del asesor y se envían al servidor mediante endpoints serverless. La aplicación incorpora soporte **offline-first** con almacenamiento temporal en IndexedDB y sincronización diferida.
 
 El frontend se despliega en **Vercel** (edge network + serverless functions). No hay servidor Node persistente — todo se ejecuta como funciones serverless en demanda.
 
@@ -38,7 +38,6 @@ El frontend se despliega en **Vercel** (edge network + serverless functions). No
 | **Supabase** | Auth + PostgreSQL + Storage + RLS |
 | **Vercel** | Hosting, edge functions, CDN |
 | **Nodemailer** | Envío de correos (SMTP) |
-| **Cloudflare Turnstile** | Captcha en formulario público |
 
 ### 2.3 Base de datos
 
@@ -91,9 +90,9 @@ Ver **Diccionario de Datos** (`08-diccionario-datos.md`) para esquema completo.
 └────────────────────────────────────────────────────────────┘
              ↓                ↓
    ┌──────────┐ ┌────────────────────┐
-   │ SMTP     │ │  Cloudflare        │
-   │ correos  │ │  Turnstile captcha │
-   └──────────┘ └────────────────────┘
+   │ SMTP     │
+   │ correos  │
+   └──────────┘
 ```
 
 ---
@@ -180,7 +179,7 @@ agro-360/
 
 ### 5.1 Envío directo al servidor
 
-El formulario envía los datos directamente al servidor al completar el paso 9. No hay almacenamiento local intermedio:
+El formulario envía los datos directamente al servidor al completar el paso 9 cuando hay conectividad. Si no hay red, la app conserva un borrador local y sincroniza después:
 
 ```typescript
 // components/characterization-form-complete.tsx
@@ -194,12 +193,11 @@ router.push(`/exito?radicado=${radicadoOficial}`)
 
 El endpoint `/api/caracterizaciones` (servidor):
 1. Si hay JWT de asesor: asigna `asesor_id = user.id`.
-2. Si es público: valida Cloudflare Turnstile.
-3. Inserta en cascada: `beneficiarios` → `predios` → sub-tablas → `visitas` → `caracterizaciones`.
-4. Sube fotos/firmas a Supabase Storage.
-5. Genera `radicado_oficial` (`RAD-000XXX`).
-6. Si el beneficiario tiene correo: crea cuenta con rol `agricultor` y envía correo con credenciales.
-7. Retorna `{ radicadoOficial }`.
+2. Inserta en cascada: `beneficiarios` → `predios` → sub-tablas → `visitas` → `caracterizaciones`.
+3. Sube fotos/firmas a Supabase Storage.
+4. Genera `radicado_oficial` (`RAD-000XXX`).
+5. Si el beneficiario tiene correo: crea cuenta con rol `agricultor` y envía correo con credenciales.
+6. Retorna `{ radicadoOficial }`.
 
 ### 5.2 Autenticación
 
@@ -242,21 +240,17 @@ Endpoints sensibles (admin) usan `SUPABASE_SERVICE_ROLE_KEY` solo en el servidor
 - `SUPABASE_SERVICE_ROLE_KEY` solo en servidor — bypasea RLS, **no exponer**.
 - SMTP, API keys externas — solo en servidor.
 
-### 6.3 Captcha
-
-Formulario público (sin login) requiere Cloudflare Turnstile. Validación server-side en `/api/caracterizaciones`.
-
-### 6.4 Sanitización
+### 6.3 Sanitización
 
 - **Zod** valida formas en cliente y servidor.
 - **Supabase client** parametriza queries (protección SQL injection automática).
 - **React** escapa contenido por defecto (protección XSS).
 
-### 6.5 HTTPS
+### 6.4 HTTPS
 
 Vercel fuerza HTTPS en todos los entornos. Los cookies de sesión son `Secure` + `HttpOnly` + `SameSite=Lax`.
 
-### 6.6 Cache-Control
+### 6.5 Cache-Control
 
 Rutas protegidas (`/admin`, `/dashboard`, `/mapa`, `/profile`, `/settings`) llevan `Cache-Control: no-store` para evitar caché en bfcache del navegador (ver `next.config.mjs`).
 
@@ -280,8 +274,8 @@ Rutas protegidas (`/admin`, `/dashboard`, `/mapa`, `/profile`, `/settings`) llev
 ```
 1. Agricultor abre /formulario
 2. Completa el formulario (no se auto-llena nombre técnico)
-3. Acepta autorizaciones + Captcha Turnstile en paso 9
-4. Envía → POST /api/caracterizaciones (sin JWT, valida captcha)
+3. Acepta autorizaciones en paso 9
+4. Envía → POST /api/caracterizaciones (sin JWT)
 5. Servidor procesa con asesor_id = null
 6. Si proporcionó correo, recibe credenciales de acceso
 ```

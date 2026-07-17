@@ -152,7 +152,7 @@ def doc01():
          "evaluación crediticia por analista y consulta de resultados por el productor.")
     p(d, "El sistema fue construido sobre Next.js 16, React 19, TypeScript y Supabase (PostgreSQL + Auth + Storage), "
          "desplegado en Vercel con funciones serverless. Incluye formulario de 9 pasos, generación de PDF, "
-         "notificaciones por correo, captcha, firmas digitales y exportación CSV.")
+         "notificaciones por correo, firmas digitales y exportación CSV.")
     h1(d, "3. Lista de Entregables")
     tabla(d, ["N°","Entregable","Estado"], [
         ["01","Documento maestro de entrega técnica","Entregado"],
@@ -220,7 +220,7 @@ def doc02():
         ["RF11","El formulario captura fotos del beneficiario, documento y predio","Alta","Implementado"],
         ["RF12","El formulario captura la firma digital del productor","Alta","Implementado"],
         ["RF13","El asesor puede ubicar el predio en mapa y dibujar su polígono","Media","Implementado"],
-        ["RF14","El sistema implementa captcha para formularios sin sesión","Alta","Implementado"],
+        ["RF14","El sistema implementa protección anti-bot para formularios sin sesión","Alta","Implementado"],
         ["RF15","El administrador puede filtrar, buscar y paginar caracterizaciones","Alta","Implementado"],
         ["RF16","El sistema permite editar una caracterización ya registrada","Media","Implementado"],
         ["RF17","El sistema muestra estadísticas en el panel de administración","Media","Implementado"],
@@ -293,7 +293,7 @@ def doc03():
         ["HU018","Agricultor","Crear nueva caracterización si la anterior fue rechazada",
          "El botón aparece cuando estado = CANCELADO/RECHAZADO. La anterior queda histórica."],
         ["HU019","Público","Llenar el formulario sin login para registrar mi predio",
-         "El formulario público requiere captcha en paso 9. Genera radicado inmediato."],
+         "El formulario público puede ser enviado por cualquier persona. Genera radicado inmediato."],
         ["HU020","Agricultor","Registrarme con mi número de documento para acceder al sistema",
          "La página /registro crea cuenta con rol agricultor. Requiere doc único."],
     ])
@@ -305,7 +305,7 @@ def doc04():
     casos = [
         ("CU01","Registrar Caracterización","Asesor / Público","Sistema Agro360",
          "Ninguno","RF01–RF13",
-         "1. Actor abre /formulario.\n2. Completa 9 pasos.\n3. Envía en paso 9.\n4. Sistema valida captcha (si público).\n5. Sistema inserta datos en BD.\n6. Sistema genera radicado RAD-000XXX.\n7. Sistema envía correo al beneficiario.\n8. Muestra pantalla de confirmación.",
+         "1. Actor abre /formulario.\n2. Completa 9 pasos.\n3. Envía en paso 9.\n4. Sistema inserta datos en BD.\n5. Sistema genera radicado RAD-000XXX.\n6. Sistema envía correo al beneficiario.\n7. Muestra pantalla de confirmación.",
          "Radicado oficial generado, datos en BD, correo enviado."),
         ("CU02","Autenticar Usuario","Todos los roles","Supabase Auth",
          "Credenciales válidas","RF07",
@@ -348,7 +348,7 @@ def doc05():
     h1(d, "Reglas de Negocio — Agro360")
     tabla(d, ["ID","Regla","Alcance","Consecuencia de incumplimiento"], [
         ["RN001","Solo usuarios con rol 'asesor' o 'admin' y sesión activa pueden crear caracterizaciones con asignación de asesor_id","Módulo Formulario","El campo asesor_id queda null; la caracterización se crea sin asesor asignado"],
-        ["RN002","El formulario público puede ser enviado por cualquier persona sin autenticación","Módulo Formulario","El captcha Turnstile valida que es un humano; sin captcha válido el envío es rechazado"],
+        ["RN002","El formulario público puede ser enviado por cualquier persona sin autenticación","Módulo Formulario","El endpoint /api/caracterizaciones valida los datos del payload; los envíos no válidos son rechazados con HTTP 400"],
         ["RN003","Cada caracterización tiene exactamente un beneficiario, un predio y una visita asociados","Modelo de datos","Error de integridad referencial si se intenta insertar sin las FKs requeridas"],
         ["RN004","El estado inicial de toda caracterización nueva es INICIADO","Estados","El sistema asigna INICIADO automáticamente; no es seleccionable manualmente"],
         ["RN005","Las transiciones de estado siguen la matriz: INICIADO→REVISADO (asesor/admin), REVISADO→EN_ESTUDIO_CREDITO (analista/admin), EN_ESTUDIO→APROBADO/CANCELADO (analista/admin), cualquier→cualquier (solo admin)","Estados","El API rechaza transiciones no autorizadas con HTTP 403"],
@@ -358,7 +358,7 @@ def doc05():
         ["RN009","Las fotos se comprimen automáticamente si superan 10MB a calidad 0.8 / máx 1600px","Archivos","Sin compresión el servidor puede rechazar el payload por tamaño"],
         ["RN010","La firma digital es obligatoria para completar el formulario","Formulario","El paso 8 no avanza si no hay firma guardada"],
         ["RN011","La autorización de datos personales y de aviso de privacidad son obligatorias","Formulario","El paso 9 no permite enviar si estas autorizaciones no están marcadas"],
-        ["RN012","El captcha Cloudflare Turnstile solo aplica cuando no hay JWT de asesor en la solicitud","Seguridad","Sin captcha válido el endpoint /api/caracterizaciones retorna 400"],
+        ["RN012","La validación de payload en el endpoint público es obligatoria y se aplica siempre","Seguridad","Si la validación falla, /api/caracterizaciones retorna 400"],
         ["RN013","Un agricultor solo puede ver sus propias caracterizaciones, identificadas por numero_documento","Privacidad","RLS en Supabase bloquea acceso a datos de otros beneficiarios"],
         ["RN014","Las claves de servicio (SUPABASE_SERVICE_ROLE_KEY) solo se usan en el servidor","Seguridad","Exponer al cliente bypasearía RLS y comprometería todos los datos"],
         ["RN015","Las contraseñas temporales generadas al invitar usuarios tienen formato AgroXXXXXXXX!","Usuarios","La contraseña debe tener ≥ 8 caracteres; el usuario debe cambiarla en el primer acceso"],
@@ -421,7 +421,6 @@ def doc07():
         ["Storage","Supabase Storage","—","S3-compatible para fotos/firmas"],
         ["Hosting","Vercel","—","Edge + serverless functions"],
         ["Correos","Nodemailer","—","SMTP transaccional"],
-        ["Captcha","Cloudflare Turnstile","—","Anti-bot en formulario público"],
     ])
     h1(d, "3. Principios Arquitectónicos")
     for pr in [
@@ -467,7 +466,7 @@ def doc08():
         "└───────────────┬──────────────────────────────────────────┘\n"
         "                │\n"
         "    ┌───────────┴──────────┐\n"
-        "    │ SMTP (correos)       │  Cloudflare Turnstile (captcha)\n"
+        "    │ SMTP (correos)       │\n"
         "    └──────────────────────┘"
     )
     d.add_paragraph(diagram).style.font.name = "Courier New"
@@ -481,7 +480,6 @@ def doc08():
         ["Supabase Storage","PaaS","Buckets S3-compatible para fotos y firmas."],
         ["Vercel","PaaS","Deploy automático desde Git. Edge CDN + funciones Node 20."],
         ["Nodemailer","Librería","Envío de correos transaccionales vía SMTP."],
-        ["Cloudflare Turnstile","SaaS","Captcha para formulario público sin login."],
     ])
     guardar(d, "08-diagrama-arquitectura.docx")
 
@@ -494,7 +492,7 @@ def doc09():
         ["Frontend + API","Vercel","Pro","Hosting SSR, funciones serverless, CDN global"],
         ["Base de datos","Supabase","Pro","PostgreSQL 15, Auth, Storage, RLS"],
         ["Repositorio","GitHub","Private repo","CI/CD: cada push a main redespliega en Vercel"],
-        ["DNS / CDN","Cloudflare","Free","DNS, HTTPS, protección DDoS, Turnstile captcha"],
+        ["DNS / CDN","Cloudflare","Free","DNS, HTTPS, protección DDoS"],
         ["Correos","SMTP externo","SendGrid / SES","Envío de notificaciones transaccionales"],
     ])
     h1(d, "Flujo de CI/CD")
@@ -682,8 +680,7 @@ def doc13():
     h2(d, "Variables de entorno requeridas")
     for v in ["NEXT_PUBLIC_SUPABASE_URL","NEXT_PUBLIC_SUPABASE_ANON_KEY",
               "SUPABASE_SERVICE_ROLE_KEY","DATABASE_URL","NEXT_PUBLIC_APP_URL",
-              "SMTP_HOST","SMTP_USER","SMTP_PASS","SMTP_FROM",
-              "NEXT_PUBLIC_TURNSTILE_SITE_KEY","TURNSTILE_SECRET_KEY"]:
+              "SMTP_HOST","SMTP_USER","SMTP_PASS","SMTP_FROM"]:
         li(d, v)
     h2(d, "Scripts disponibles")
     tabla(d, ["Comando","Descripción"], [
@@ -776,8 +773,6 @@ def doc16():
         ["DATABASE_URL","postgresql://postgres.xxx:6543/postgres?pgbouncer=true","Sí (Prisma)"],
         ["DIRECT_URL","postgresql://postgres.xxx:5432/postgres","Sí (Prisma migrations)"],
         ["NEXT_PUBLIC_APP_URL","https://agro360.tudominio.com","Sí"],
-        ["NEXT_PUBLIC_TURNSTILE_SITE_KEY","0x4AAAAAAA...","Sí (producción)"],
-        ["TURNSTILE_SECRET_KEY","0x4AAAAAAA... (SECRETO)","Sí (producción)"],
         ["SMTP_HOST","smtp.gmail.com","Sí"],
         ["SMTP_PORT","587","Sí"],
         ["SMTP_USER","noreply@tudominio.com","Sí"],
@@ -834,8 +829,8 @@ def doc18():
         ["PT001","Formulario","Envío completo como asesor autenticado",
          "1.Login asesor\n2.Abrir /formulario\n3.Completar 9 pasos\n4.Enviar",
          "Radicado generado, datos en BD, correo al beneficiario","Pass"],
-        ["PT002","Formulario","Envío público con captcha",
-         "1.Sin login, abrir /formulario\n2.Completar\n3.Resolver captcha\n4.Enviar",
+        ["PT002","Formulario","Envío público sin sesión",
+         "1.Sin login, abrir /formulario\n2.Completar\n3.Enviar",
          "Radicado generado, asesor_id=null","Pass"],
         ["PT003","Formulario","Validación paso obligatorio vacío",
          "1.Abrir /formulario\n2.No llenar campos requeridos\n3.Intentar avanzar",
@@ -887,7 +882,7 @@ def doc19():
          "ejecutadas. Las evidencias se adjuntan físicamente o se referencian con URL.")
     tabla(d, ["ID Prueba","Descripción","Fecha","Ejecutado por","Evidencia","Resultado"], [
         ["PT001","Envío formulario asesor","Abril 2026",EMPRESA,"Captura radicado generado","Pass"],
-        ["PT002","Envío público captcha","Abril 2026",EMPRESA,"Captura radicado + asesor_id null","Pass"],
+        ["PT002","Envío público sin sesión","Abril 2026",EMPRESA,"Captura radicado + asesor_id null","Pass"],
         ["PT004","Login admin","Abril 2026",EMPRESA,"Captura dashboard admin","Pass"],
         ["PT008","Invitar usuario","Abril 2026",EMPRESA,"Captura correo recibido","Pass"],
         ["PT010","RLS acceso cruzado","Abril 2026",EMPRESA,"Captura error 403 en Supabase logs","Pass"],
@@ -952,7 +947,7 @@ def doc21():
         ["6","Área productiva","Cultivos, sistema productivo, comercialización, ingresos ventas"],
         ["7","Información financiera","Ingresos, egresos, activos, pasivos"],
         ["8","Fotos y firma","Foto beneficiario, documento (frontal/trasera), predio, firma digital"],
-        ["9","Autorizaciones y envío","Consentimientos legales, captcha (público), botón Enviar"],
+        ["9","Autorizaciones y envío","Consentimientos legales, botón Enviar"],
     ])
     h1(d, "4. Estados de la Caracterización")
     tabla(d, ["Estado","Significado"], [
@@ -997,7 +992,7 @@ def doc22():
     h1(d, "4. Variables de Entorno Críticas")
     p(d, "Las siguientes variables son gestionadas en Vercel → Settings → Environment Variables. "
          "Nunca commitearlas al repositorio.")
-    for v in ["SUPABASE_SERVICE_ROLE_KEY","DATABASE_URL","SMTP_PASS","TURNSTILE_SECRET_KEY"]:
+    for v in ["SUPABASE_SERVICE_ROLE_KEY","DATABASE_URL","SMTP_PASS"]:
         li(d, v)
     h1(d, "5. Respaldo y Recuperación")
     for paso in [
@@ -1040,7 +1035,7 @@ def doc23():
     for paso in [
         "1. POST /api/caracterizaciones con payload JSON.",
         "2. Si hay JWT de asesor: asignar asesor_id = user.id.",
-        "3. Si es público: validar captcha Turnstile.",
+        "3. Si es público: validar payload del request en backend.",
         "4. Insertar en cascada: visitas → beneficiarios → predios → sub-tablas → caracterizaciones.",
         "5. Subir fotos y firma a Supabase Storage.",
         "6. Generar radicado_oficial (RAD-000XXX).",
@@ -1096,7 +1091,7 @@ def doc25():
         ["XSS","React escapa contenido por defecto. No se usa dangerouslySetInnerHTML."],
         ["CSRF","Cookies SameSite=Lax + validación de origin en Next.js"],
         ["Exposición de claves","Variables sensibles solo en servidor (NEXT_PUBLIC_* = público conscientemente)"],
-        ["Bots / spam en formulario","Cloudflare Turnstile captcha en formulario público"],
+        ["Bots / spam en formulario","Validación de payload en backend + rate limiting en endpoints públicos"],
         ["Fuerza bruta en login","Rate limiting de Supabase Auth + cooldown en intentos"],
         ["Acceso a admin sin autorización","Doble capa: middleware proxy.ts + verificación de rol en cada endpoint"],
         ["Datos en tránsito","HTTPS forzado por Vercel en todos los ambientes"],
@@ -1119,7 +1114,6 @@ def doc25():
         "SUPABASE_SERVICE_ROLE_KEY: solo en servidor. Bypasea RLS — nunca exponer al cliente.",
         "DATABASE_URL: solo en servidor. Acceso directo a PostgreSQL.",
         "SMTP_PASS: solo en servidor. Credencial SMTP para envío de correos.",
-        "TURNSTILE_SECRET_KEY: solo en servidor. Validación de captcha.",
         "NEXT_PUBLIC_SUPABASE_ANON_KEY: pública pero con RLS. No permite acceso admin.",
     ]:
         li(d, nota)
@@ -1170,7 +1164,6 @@ def doc27():
         ["Base de datos + Auth + Storage","Supabase","Pro (recomendado)","supabase.com"],
         ["Repositorio de código","GitHub","Private","github.com"],
         ["Correo transaccional","SMTP externo (Gmail/SendGrid/SES)","Según volumen","—"],
-        ["Captcha anti-bot","Cloudflare Turnstile","Free","cloudflare.com/products/turnstile"],
     ])
     h1(d, "2. Especificaciones Técnicas")
     tabla(d, ["Componente","Especificación"], [
@@ -1266,7 +1259,7 @@ def doc30():
         ["0.9.0","Marzo 2026","Feature","Registro de agricultores vía /api/registro-agricultor.", EMPRESA],
         ["0.8.0","Febrero 2026","Feature","Fotos del documento de identidad (frontal y trasera) en paso 8.", EMPRESA],
         ["0.8.0","Febrero 2026","Feature","Contacto secundario en datos del beneficiario.", EMPRESA],
-        ["0.7.0","Febrero 2026","Feature","Formulario público con captcha Cloudflare Turnstile.", EMPRESA],
+        ["0.7.0","Febrero 2026","Feature","Formulario público accesible sin autenticación.", EMPRESA],
         ["0.6.0","Enero 2026","Feature","Dashboard del agricultor con QR de verificación.", EMPRESA],
         ["0.5.0","Enero 2026","Feature","Módulo de administración: usuarios, estadísticas, cambio de estado.", EMPRESA],
         ["0.4.0","Diciembre 2025","Feature","Exportación a PDF (jsPDF) y CSV.", EMPRESA],
@@ -1322,7 +1315,7 @@ def doc32():
         ["8","Cambio de estado según matriz de transiciones","☐ Sí  ☐ No",""],
         ["9","Exportación PDF y CSV","☐ Sí  ☐ No",""],
         ["10","Captura de fotos y firma digital","☐ Sí  ☐ No",""],
-        ["11","Formulario público con captcha","☐ Sí  ☐ No",""],
+        ["11","Formulario público sin sesión","☐ Sí  ☐ No",""],
         ["12","Recuperación de contraseña","☐ Sí  ☐ No",""],
         ["13","Mapa con ubicación del predio","☐ Sí  ☐ No",""],
         ["14","Estadísticas de administración","☐ Sí  ☐ No",""],
@@ -1354,7 +1347,6 @@ def doc33():
         "☐  Auth Site URL y Redirect URLs correctas en Supabase.",
         "☐  Usuario admin creado y contraseña cambiada.",
         "☐  SMTP funcionando (correo de prueba exitoso).",
-        "☐  Captcha Turnstile activo y verificado.",
         "☐  /api/health responde { status: ok }.",
         "☐  Respaldos automáticos habilitados en Supabase.",
         "☐  Documentación entregada al operador.",

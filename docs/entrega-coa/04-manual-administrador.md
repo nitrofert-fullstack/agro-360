@@ -208,7 +208,6 @@ Variables requeridas (ver **Guía de Instalación** para detalles):
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave pública de Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | Clave admin de Supabase (NO exponer al cliente) |
 | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` | Configuración correo saliente |
-| `TURNSTILE_SECRET_KEY` | Captcha Cloudflare |
 | `NEXT_PUBLIC_APP_URL` | URL pública de la app |
 
 **⚠️ Nunca commitear claves al repositorio.** Usar Vercel → Settings → Environment Variables.

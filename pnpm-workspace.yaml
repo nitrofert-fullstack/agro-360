@@ -1,2 +1,6 @@
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true
+  sharp: true
 ignoredBuiltDependencies:
   - sharp

@@ -29,6 +29,15 @@
   --chart-3: oklch(0.6 0.2 60);
   --chart-4: oklch(0.5 0.2 30);
   --chart-5: oklch(0.5 0.15 280);
+
+  /* Estados semánticos (badges, KPIs, gráficas) — texto legible sobre tinte /10 en claro */
+  --status-neutral: oklch(0.50 0.02 250);
+  --status-info: oklch(0.50 0.15 240);
+  --status-warning: oklch(0.52 0.14 70);
+  --status-success: oklch(0.45 0.18 145);
+  --status-danger: oklch(0.55 0.22 27);
+  --status-review: oklch(0.50 0.18 300);
+
   --radius: 0.875rem;
 
   /* Sombras verde-tintadas */
@@ -75,6 +84,15 @@
   --chart-3: oklch(0.7 0.2 60);
   --chart-4: oklch(0.55 0.2 30);
   --chart-5: oklch(0.6 0.15 280);
+
+  /* Estados semánticos — más claros para contraste sobre superficies oscuras */
+  --status-neutral: oklch(0.72 0.02 250);
+  --status-info: oklch(0.72 0.14 240);
+  --status-warning: oklch(0.80 0.14 75);
+  --status-success: oklch(0.65 0.18 145);
+  --status-danger: oklch(0.70 0.19 27);
+  --status-review: oklch(0.72 0.16 300);
+
   --sidebar: oklch(0.14 0.01 250);
   --sidebar-foreground: oklch(0.95 0 0);
   --sidebar-primary: oklch(0.65 0.18 145);
@@ -119,6 +137,12 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-status-neutral: var(--status-neutral);
+  --color-status-info: var(--status-info);
+  --color-status-warning: var(--status-warning);
+  --color-status-success: var(--status-success);
+  --color-status-danger: var(--status-danger);
+  --color-status-review: var(--status-review);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -300,4 +324,24 @@
 }
 .animate-slide-up {
   animation: slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Transición entre pasos del formulario (reemplaza framer-motion en la ruta
+   pública /formulario). El key={currentStep} remonta el div y re-dispara la
+   animación; --step-dir (±1) da el sentido del deslizamiento. */
+@keyframes step-in {
+  from { opacity: 0; transform: translateX(calc(var(--step-dir, 1) * 12px)); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-step {
+  animation: step-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Pop del ícono de éxito */
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.7); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.animate-pop {
+  animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }

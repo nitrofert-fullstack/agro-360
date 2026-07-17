@@ -25,7 +25,6 @@ Ambos servicios tienen planes gratuitos suficientes para piloto. Para producció
 - Cuenta en [Vercel](https://vercel.com/) (plan mínimo Hobby; recomendado Pro).
 - Cuenta en [GitHub](https://github.com/) (para alojar el repositorio privado).
 - Credenciales SMTP para correo saliente (Gmail, SendGrid, AWS SES u otro).
-- Cuenta en [Cloudflare Turnstile](https://www.cloudflare.com/products/turnstile/) (captcha).
 
 ### 2.2 Software local (solo para desarrollo o primer deploy manual)
 
@@ -140,14 +139,7 @@ Opción B — desde la UI una vez desplegada la app:
 
 ## 4. Configuración de servicios externos
 
-### 4.1 Cloudflare Turnstile
-
-1. Cuenta Cloudflare → **Turnstile** → **Add site**.
-2. Domain: el dominio de la app (y `localhost` para dev).
-3. Obtener **Site Key** → `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
-4. Obtener **Secret Key** → `TURNSTILE_SECRET_KEY`.
-
-### 4.2 SMTP (correo saliente)
+### 4.1 SMTP (correo saliente)
 
 Cualquier proveedor SMTP es válido. Ejemplo Gmail (contraseña de aplicación):
 
@@ -173,10 +165,6 @@ SUPABASE_SERVICE_ROLE_KEY=ey...   # SECRETO, solo en servidor
 
 # --- App ---
 NEXT_PUBLIC_APP_URL=https://agro360.tudominio.com
-
-# --- Captcha (REQUERIDAS en producción) ---
-NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAAA...
-TURNSTILE_SECRET_KEY=0x4AAAAAAA...
 
 # --- SMTP (REQUERIDAS para correos) ---
 SMTP_HOST=smtp.gmail.com
@@ -260,7 +248,7 @@ Copiar las variables del punto 5 en un archivo `.env.local` en la raíz.
 pnpm dev
 ```
 
-La app se abre en `http://localhost:3000`.
+La app se abre en `http://localhost:4001`.
 
 ### 7.4 Build local
 
@@ -351,7 +339,6 @@ ALTER TABLE caracterizaciones DROP COLUMN IF EXISTS nueva_columna;
 - [ ] Auth Site URL y Redirect URLs correctas en Supabase.
 - [ ] Usuario admin creado.
 - [ ] SMTP funcionando (probar con correo de invitación).
-- [ ] Turnstile captcha funcionando.
 - [ ] `/status` responde OK.
 - [ ] Respaldos automáticos habilitados en Supabase.
 - [ ] Documentación entregada al operador.

@@ -64,7 +64,9 @@ function parsePoligono(raw: any): [number, number][] | undefined {
   try {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
     if (Array.isArray(parsed) && parsed.length >= 3) return parsed as [number, number][]
-  } catch { }
+  } catch (err) {
+    console.warn('[parsePoligono] JSON inválido:', err)
+  }
   return undefined
 }
 

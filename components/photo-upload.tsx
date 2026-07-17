@@ -14,9 +14,78 @@ export interface PhotoUploadProps {
   required?: boolean
   className?: string
   guideType?: "documento" | "persona"
+  /** Estampa fecha/hora + coordenadas GPS sobre la imagen (evidencia de caracterización) */
+  stampMetadata?: boolean
 }
 
-function resizeImage(file: File, maxWidth: number, maxHeight: number, quality: number): Promise<string> {
+/** Obtiene la ubicación actual del dispositivo. Devuelve null si no hay permiso/soporte. */
+function getGeolocation(): Promise<{ lat: number; lng: number } | null> {
+  return new Promise((resolve) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      resolve(null)
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    )
+  })
+}
+
+/** Fecha y hora completas en formato local (es-CO) para el sello. */
+function fechaSello(): string {
+  return new Date().toLocaleString("es-CO", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  })
+}
+
+/** Dibuja una barra inferior con fecha/hora y coordenadas sobre la imagen. */
+function stampImage(dataUrl: string, opts: { fecha: string; lat: number | null; lng: number | null }): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext("2d")
+      if (!ctx) { resolve(dataUrl); return }
+      ctx.drawImage(img, 0, 0)
+
+      const line1 = opts.fecha
+      const line2 = opts.lat != null && opts.lng != null
+        ? `Lat ${opts.lat.toFixed(6)}, Lng ${opts.lng.toFixed(6)}`
+        : "Ubicación GPS no disponible"
+
+      const fontSize = Math.max(14, Math.round(canvas.width * 0.03))
+      const pad = Math.round(fontSize * 0.5)
+      const lineH = Math.round(fontSize * 1.25)
+      const barH = lineH * 2 + pad * 2
+
+      ctx.fillStyle = "rgba(0,0,0,0.55)"
+      ctx.fillRect(0, canvas.height - barH, canvas.width, barH)
+
+      ctx.fillStyle = "#ffffff"
+      ctx.font = `${fontSize}px system-ui, -apple-system, sans-serif`
+      ctx.textBaseline = "top"
+      ctx.fillText(line1, pad, canvas.height - barH + pad)
+      ctx.fillText(line2, pad, canvas.height - barH + pad + lineH)
+
+      const out = canvas.toDataURL("image/jpeg", 0.85)
+      canvas.width = 0
+      canvas.height = 0
+      resolve(out)
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
+}
+
+// Decodifica y redimensiona el archivo a un <canvas> UNA sola vez. Antes se
+// re-decodificaba la imagen completa hasta 6 veces (una por cada calidad),
+// bloqueando el hilo principal 1-2s en Android gama baja.
+function fileToCanvas(file: File, maxWidth: number, maxHeight: number): Promise<HTMLCanvasElement> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -41,11 +110,7 @@ function resizeImage(file: File, maxWidth: number, maxHeight: number, quality: n
         const ctx = canvas.getContext('2d')
         if (!ctx) { reject(new Error('No canvas context')); return }
         ctx.drawImage(img, 0, 0, width, height)
-        const dataUrl = canvas.toDataURL('image/jpeg', quality)
-        // Libera el buffer del canvas antes de que el GC lo recoja
-        canvas.width = 0
-        canvas.height = 0
-        resolve(dataUrl)
+        resolve(canvas)
       }
       img.onerror = reject
       img.src = e.target?.result as string
@@ -62,16 +127,21 @@ function estimateSizeMB(dataUrl: string): number {
 }
 
 async function compressImage(file: File): Promise<{ dataUrl: string; sizeMB: number; warn: boolean }> {
-  // Try progressively lower quality until ≤2MB (ideal) or give up at 0.4
+  // Decodifica + redimensiona UNA vez; luego solo varía la calidad del JPEG
+  // (operación barata) sobre el mismo canvas hasta bajar de 2MB.
+  const canvas = await fileToCanvas(file, 1280, 1280)
   const qualities = [0.85, 0.75, 0.65, 0.55, 0.45, 0.4]
   let dataUrl = ''
+  let sizeMB = 0
   for (const q of qualities) {
-    dataUrl = await resizeImage(file, 1280, 1280, q)
-    const sizeMB = estimateSizeMB(dataUrl)
-    if (sizeMB <= 2) return { dataUrl, sizeMB, warn: false }
+    dataUrl = canvas.toDataURL('image/jpeg', q)
+    sizeMB = estimateSizeMB(dataUrl)
+    if (sizeMB <= 2) break
   }
-  const sizeMB = estimateSizeMB(dataUrl)
-  return { dataUrl, sizeMB, warn: true }
+  // Libera el buffer del canvas
+  canvas.width = 0
+  canvas.height = 0
+  return { dataUrl, sizeMB, warn: sizeMB > 2 }
 }
 
 export function PhotoUpload({
@@ -81,6 +151,7 @@ export function PhotoUpload({
   required = false,
   className,
   guideType,
+  stampMetadata = false,
 }: PhotoUploadProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentPhoto)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -154,10 +225,15 @@ export function PhotoUpload({
       if (!ctx) return
 
       ctx.drawImage(video, 0, 0)
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+      let dataUrl = canvas.toDataURL('image/jpeg', 0.85)
       // Libera el buffer del canvas antes de que el GC lo recoja
       canvas.width = 0
       canvas.height = 0
+
+      if (stampMetadata) {
+        const geo = await getGeolocation()
+        dataUrl = await stampImage(dataUrl, { fecha: fechaSello(), lat: geo?.lat ?? null, lng: geo?.lng ?? null })
+      }
 
       setPreviewUrl(dataUrl)
       onPhotoCapture(dataUrl)
@@ -169,7 +245,7 @@ export function PhotoUpload({
     } finally {
       setIsProcessing(false)
     }
-  }, [onPhotoCapture, stopCamera])
+  }, [onPhotoCapture, stopCamera, stampMetadata])
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -199,8 +275,14 @@ export function PhotoUpload({
         return
       }
 
-      setPreviewUrl(dataUrl)
-      onPhotoCapture(dataUrl)
+      let finalUrl = dataUrl
+      if (stampMetadata) {
+        const geo = await getGeolocation()
+        finalUrl = await stampImage(dataUrl, { fecha: fechaSello(), lat: geo?.lat ?? null, lng: geo?.lng ?? null })
+      }
+
+      setPreviewUrl(finalUrl)
+      onPhotoCapture(finalUrl)
 
       if (warn) {
         setSizeWarning(`Imagen optimizada: ${sizeMB.toFixed(1)}MB (ideal <2MB). Se subirá igual.`)
@@ -211,7 +293,7 @@ export function PhotoUpload({
     } finally {
       setIsProcessing(false)
     }
-  }, [onPhotoCapture])
+  }, [onPhotoCapture, stampMetadata])
 
   const handleRemove = useCallback(() => {
     setPreviewUrl(null)

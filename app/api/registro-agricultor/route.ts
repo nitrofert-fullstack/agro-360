@@ -23,22 +23,24 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { email, password, nombre_completo, telefono, numero_documento } = body
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
+    const normalizedDocumento = typeof numero_documento === 'string' ? numero_documento.trim() : ''
 
-    if (!email || !password || !nombre_completo) {
+    if (!normalizedEmail || !password || !nombre_completo) {
       return NextResponse.json({ error: 'Correo, contraseña y nombre son requeridos' }, { status: 400 })
     }
-    if (!numero_documento) {
+    if (!normalizedDocumento) {
       return NextResponse.json({ error: 'El número de documento es requerido' }, { status: 400 })
     }
     if (typeof password !== 'string' || password.length < 8) {
       return NextResponse.json({ error: 'La contraseña debe tener al menos 8 caracteres' }, { status: 400 })
     }
 
-    const emailCheck = emailSchema.safeParse(email)
+    const emailCheck = emailSchema.safeParse(normalizedEmail)
     if (!emailCheck.success) {
       return NextResponse.json({ error: emailCheck.error.issues[0].message }, { status: 400 })
     }
-    const docCheck = numeroDocumentoSchema.safeParse(numero_documento)
+    const docCheck = numeroDocumentoSchema.safeParse(normalizedDocumento)
     if (!docCheck.success) {
       return NextResponse.json({ error: docCheck.error.issues[0].message }, { status: 400 })
     }
@@ -48,7 +50,12 @@ export async function POST(request: Request) {
     }
 
     const existingProfile = await prisma.profiles.findFirst({
-      where:  { email },
+      where: {
+        OR: [
+          { email: normalizedEmail },
+          { numero_documento: normalizedDocumento },
+        ],
+      },
       select: { id: true },
     })
 
@@ -63,10 +70,10 @@ export async function POST(request: Request) {
     const adminClient = createAdminClient(supabaseUrl, serviceRoleKey)
 
     const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       password,
       email_confirm: true,
-      user_metadata: { nombre_completo, telefono: telefono || null, rol: 'agricultor', numero_documento },
+      user_metadata: { nombre_completo, telefono: telefono || null, rol: 'agricultor', numero_documento: normalizedDocumento },
     })
 
     if (createErr) {
@@ -81,17 +88,22 @@ export async function POST(request: Request) {
 
     if (!newUser?.user) throw new Error('No se pudo crear el usuario')
 
-    await prisma.profiles.create({
-      data: {
-        id:              newUser.user.id,
-        email,
-        nombre_completo,
-        telefono:        telefono || null,
-        rol:             'agricultor',
-        activo:          true,
-        numero_documento,
-      },
-    }).catch(err => console.error('[RegistroAgricultor] Error creando perfil:', err))
+    try {
+      await prisma.profiles.create({
+        data: {
+          id:              newUser.user.id,
+          email:           normalizedEmail,
+          nombre_completo,
+          telefono:        telefono || null,
+          rol:             'agricultor',
+          activo:          true,
+          numero_documento: normalizedDocumento,
+        },
+      })
+    } catch (profileErr) {
+      await adminClient.auth.admin.deleteUser(newUser.user.id)
+      throw profileErr
+    }
 
     return NextResponse.json({
       exito:   true,

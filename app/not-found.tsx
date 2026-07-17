@@ -8,7 +8,7 @@ import { staggerContainer, staggerItem, celebrationVariants } from "@/lib/animat
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/30 p-4">
+    <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/30 p-4">
       <motion.div
         variants={staggerContainer}
         initial="hidden"
@@ -57,6 +57,6 @@ export default function NotFound() {
           </Button>
         </motion.div>
       </motion.div>
-    </div>
+    </main>
   )
 }

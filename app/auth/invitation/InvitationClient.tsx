@@ -121,7 +121,7 @@ export default function InvitationPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <motion.div variants={scaleIn} initial="hidden" animate="visible" className="w-full max-w-md">
       <Card>
         <CardHeader className="text-center">
@@ -288,6 +288,6 @@ export default function InvitationPage() {
         </CardFooter>
       </Card>
       </motion.div>
-    </div>
+    </main>
   )
 }

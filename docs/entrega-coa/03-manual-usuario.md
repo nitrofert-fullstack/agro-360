@@ -185,7 +185,6 @@ El formulario se divide en 9 pasos. Es obligatorio completar cada paso para avan
 - **Autorización de aviso de privacidad** (obligatoria).
 - **Autorización de consulta de centrales de riesgo** (opcional).
 - **Autorización de uso de imagen** (opcional).
-- **Captcha** (Cloudflare Turnstile — solo si no hay sesión de asesor).
 - **Botón "Enviar"** — envía los datos al servidor y genera el radicado oficial.
 
 ---

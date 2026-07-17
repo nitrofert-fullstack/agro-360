@@ -265,9 +265,6 @@ Hobby; recomendado Pro).</li>
 repositorio privado).</li>
 <li>Credenciales SMTP para correo saliente (Gmail, SendGrid, AWS SES u
 otro).</li>
-<li>Cuenta en <a
-href="https://www.cloudflare.com/products/turnstile/">Cloudflare
-Turnstile</a> (captcha).</li>
 </ul>
 <h3 id="software-local-solo-para-desarrollo-o-primer-deploy-manual">2.2
 Software local (solo para desarrollo o primer deploy manual)</h3>
@@ -418,18 +415,7 @@ class="sourceCode sql"><code class="sourceCode sql"><span id="cb2-1"><a href="#c
 <hr />
 <h2 id="configuración-de-servicios-externos">4. Configuración de
 servicios externos</h2>
-<h3 id="cloudflare-turnstile">4.1 Cloudflare Turnstile</h3>
-<ol type="1">
-<li>Cuenta Cloudflare → <strong>Turnstile</strong> → <strong>Add
-site</strong>.</li>
-<li>Domain: el dominio de la app (y <code>localhost</code> para
-dev).</li>
-<li>Obtener <strong>Site Key</strong> →
-<code>NEXT_PUBLIC_TURNSTILE_SITE_KEY</code>.</li>
-<li>Obtener <strong>Secret Key</strong> →
-<code>TURNSTILE_SECRET_KEY</code>.</li>
-</ol>
-<h3 id="smtp-correo-saliente">4.2 SMTP (correo saliente)</h3>
+<h3 id="smtp-correo-saliente">4.1 SMTP (correo saliente)</h3>
 <p>Cualquier proveedor SMTP es válido. Ejemplo Gmail (contraseña de
 aplicación):</p>
 <ul>
@@ -453,10 +439,6 @@ SUPABASE_SERVICE_ROLE_KEY=ey...   # SECRETO, solo en servidor
 
 # --- App ---
 NEXT_PUBLIC_APP_URL=https://agro360.tudominio.com
-
-# --- Captcha (REQUERIDAS en producción) ---
-NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAAA...
-TURNSTILE_SECRET_KEY=0x4AAAAAAA...
 
 # --- SMTP (REQUERIDAS para correos) ---
 SMTP_HOST=smtp.gmail.com
@@ -621,8 +603,6 @@ correctas en Supabase.</label></li>
 <li><label><input type="checkbox" />Usuario admin creado.</label></li>
 <li><label><input type="checkbox" />SMTP funcionando (probar con correo
 de invitación).</label></li>
-<li><label><input type="checkbox" />Turnstile captcha
-funcionando.</label></li>
 <li><label><input type="checkbox" /><code>/status</code> responde
 OK.</label></li>
 <li><label><input type="checkbox" />Respaldos automáticos habilitados en

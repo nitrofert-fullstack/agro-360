@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
+
+type CountRow = { label: string | null; total: bigint | number }
+type MonthRow = { month: Date; total: bigint | number }
 
 export async function GET() {
   try {
@@ -20,104 +24,126 @@ export async function GET() {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
-    const [caracs, predios, beneficiarios, visitas, asesoresProfiles] = await Promise.all([
-      prisma.caracterizaciones.findMany({
-        select: { estado: true, created_at: true },
-        take: 2000,
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth() - 11, 1)
+
+    const [
+      totalRegistros,
+      estadoRows,
+      municipioRows,
+      departamentoRows,
+      generoRows,
+      promedios,
+      totalPredios,
+      totalBeneficiarios,
+      conAsesor,
+      sinAsesor,
+      asesorCountRows,
+      asesoresProfiles,
+      porMesRows,
+    ] = await Promise.all([
+      prisma.caracterizaciones.count(),
+      prisma.caracterizaciones.groupBy({
+        by: ['estado'],
+        _count: { _all: true },
       }),
-      prisma.predios.findMany({
-        select: { municipio: true, departamento: true, area_total_hectareas: true },
-        take: 2000,
+      prisma.predios.groupBy({
+        by: ['municipio'],
+        _count: { _all: true },
+        orderBy: { _count: { municipio: 'desc' } },
+        take: 8,
       }),
-      prisma.beneficiarios.findMany({
-        select: { genero: true, edad: true, personas_a_cargo: true },
-        take: 2000,
+      prisma.predios.groupBy({
+        by: ['departamento'],
+        _count: { _all: true },
+        orderBy: { _count: { departamento: 'desc' } },
+        take: 6,
       }),
-      prisma.visitas.findMany({
-        select: { asesor_id: true, created_at: true },
-        take: 2000,
+      prisma.beneficiarios.groupBy({
+        by: ['genero'],
+        _count: { _all: true },
+      }),
+      prisma.$queryRaw<Array<{ edad: number | null; personas_a_cargo: number | null; hectareas: number | null }>>(
+        Prisma.sql`
+          select
+            (select avg(edad)::float8 from beneficiarios where edad is not null) as edad,
+            (select avg(personas_a_cargo)::float8 from beneficiarios where personas_a_cargo is not null) as personas_a_cargo,
+            (select avg(area_total_hectareas)::float8 from predios where area_total_hectareas is not null) as hectareas
+        `
+      ),
+      prisma.predios.count(),
+      prisma.beneficiarios.count(),
+      prisma.visitas.count({ where: { asesor_id: { not: null } } }),
+      prisma.visitas.count({ where: { asesor_id: null } }),
+      prisma.visitas.groupBy({
+        by: ['asesor_id'],
+        _count: { _all: true },
       }),
       prisma.profiles.findMany({
         where: { rol: { in: ['asesor', 'admin'] }, activo: true },
         select: { id: true, nombre_completo: true, rol: true },
       }),
+      prisma.$queryRaw<MonthRow[]>(Prisma.sql`
+        select
+          date_trunc('month', created_at)::date as month,
+          count(*)::bigint as total
+        from caracterizaciones
+        where created_at >= ${monthStart}
+        group by 1
+        order by 1 asc
+      `),
     ])
 
-    // Por estado
-    const porEstado: Record<string, number> = {}
-    for (const c of caracs) {
-      const key = (c.estado || 'INICIADO').toUpperCase()
-      porEstado[key] = (porEstado[key] || 0) + 1
-    }
+    const toNumber = (value: bigint | number | null | undefined) => Number(value ?? 0)
+    const round = (value: number | null | undefined) =>
+      value == null || Number.isNaN(value) ? null : Math.round(value * 10) / 10
+
+    const porEstado = Object.fromEntries(
+      estadoRows.map((row) => [
+        (row.estado || 'INICIADO').toUpperCase(),
+        row._count._all,
+      ])
+    )
 
     // Por mes — últimos 12
-    const now = new Date()
     const porMes: { mes: string; total: number }[] = []
     for (let i = 11; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       porMes.push({ mes: key, total: 0 })
     }
-    for (const c of caracs) {
-      if (!c.created_at) continue
-      const d = new Date(c.created_at)
+    for (const row of porMesRows) {
+      const d = new Date(row.month)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const item = porMes.find(m => m.mes === key)
-      if (item) item.total++
+      if (item) item.total = toNumber(row.total)
     }
 
-    // Por municipio — top 8
-    const muniCount: Record<string, number> = {}
-    for (const p of predios) {
-      const key = p.municipio || 'Sin municipio'
-      muniCount[key] = (muniCount[key] || 0) + 1
-    }
-    const porMunicipio = Object.entries(muniCount)
-      .sort((a, b) => b[1] - a[1]).slice(0, 8)
-      .map(([municipio, total]) => ({ municipio, total }))
+    const porMunicipio = municipioRows.map((row) => ({
+      municipio: row.municipio || 'Sin municipio',
+      total: row._count._all,
+    }))
 
-    // Por departamento — top 6
-    const deptCount: Record<string, number> = {}
-    for (const p of predios) {
-      const key = p.departamento || 'Sin departamento'
-      deptCount[key] = (deptCount[key] || 0) + 1
-    }
-    const porDepartamento = Object.entries(deptCount)
-      .sort((a, b) => b[1] - a[1]).slice(0, 6)
-      .map(([departamento, total]) => ({ departamento, total }))
+    const porDepartamento = departamentoRows.map((row) => ({
+      departamento: row.departamento || 'Sin departamento',
+      total: row._count._all,
+    }))
 
-    // Por género
-    const generoCount: Record<string, number> = {}
-    for (const b of beneficiarios) {
-      const key = b.genero || 'No especificado'
-      generoCount[key] = (generoCount[key] || 0) + 1
-    }
-    const porGenero = Object.entries(generoCount).map(([genero, total]) => ({ genero, total }))
-
-    // Promedios
-    const edades    = beneficiarios.map(b => b.edad).filter((e): e is number => e != null)
-    const personas  = beneficiarios.map(b => b.personas_a_cargo).filter((p): p is number => p != null)
-    const hectareas = predios.map(p => Number(p.area_total_hectareas)).filter((h): h is number => !isNaN(h) && h != null)
-
-    const avg = (arr: number[]) =>
-      arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10 : null
-
-    const conAsesor = visitas.filter(v => v.asesor_id).length
-    const sinAsesor = visitas.filter(v => !v.asesor_id).length
+    const porGenero = generoRows.map((row) => ({
+      genero: row.genero || 'No especificado',
+      total: row._count._all,
+    }))
 
     // Por asesor — conteo de visitas por asesor_id, con nombre del perfil
-    const asesorCount: Record<string, number> = {}
-    for (const v of visitas) {
-      const key = v.asesor_id || '__sin_asesor__'
-      asesorCount[key] = (asesorCount[key] || 0) + 1
-    }
     const profileMap = new Map(asesoresProfiles.map(p => [p.id, p.nombre_completo || 'Sin nombre']))
-    const porAsesor = Object.entries(asesorCount)
-      .map(([id, total]) => ({
-        nombre: id === '__sin_asesor__' ? 'Sin asesor' : (profileMap.get(id) || 'Asesor desconocido'),
-        total,
+    const porAsesor = asesorCountRows
+      .map((row) => ({
+        nombre: row.asesor_id ? (profileMap.get(row.asesor_id) || 'Asesor desconocido') : 'Sin asesor',
+        total: row._count._all,
       }))
       .sort((a, b) => b.total - a.total)
+
+    const promedioRow = promedios[0] ?? { edad: null, personas_a_cargo: null, hectareas: null }
 
     const response = NextResponse.json({
       porEstado,
@@ -126,11 +152,15 @@ export async function GET() {
       porDepartamento,
       porGenero,
       porAsesor,
-      totalRegistros: caracs.length,
+      totalRegistros,
       promedios: {
-        edad:          avg(edades),
-        personasACargo: avg(personas),
-        hectareas:     avg(hectareas),
+        edad:          round(promedioRow.edad),
+        personasACargo: round(promedioRow.personas_a_cargo),
+        hectareas:     round(promedioRow.hectareas),
+      },
+      totales: {
+        predios: totalPredios,
+        beneficiarios: totalBeneficiarios,
       },
       asignacion: { conAsesor, sinAsesor },
     })

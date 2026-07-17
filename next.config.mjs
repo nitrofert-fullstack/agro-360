@@ -17,6 +17,17 @@ const withPWA = withPWAInit({
         options: { cacheName: 'google-fonts', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 } },
       },
       {
+        // Tiles de mapa de CDNs externos (OSM/Carto/OpenTopo/ArcGIS/NASA GIBS).
+        // DEBE ir antes de la regla genérica de imágenes: los tiles terminan en
+        // .png/.jpg y si no, un paneo del mapa desaloja los iconos de la app.
+        urlPattern: /^https:\/\/([a-z0-9-]+\.)?(tile\.openstreetmap\.org|basemaps\.cartocdn\.com|tile\.opentopomap\.org|server\.arcgisonline\.com|gibs\.earthdata\.nasa\.gov)\/.*/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'map-tiles-external',
+          expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 7 },
+        },
+      },
+      {
         urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
         handler: 'CacheFirst',
         options: { cacheName: 'images', expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 } },
@@ -39,7 +50,7 @@ const withPWA = withPWAInit({
         // Cachear otros endpoints de solo lectura
         urlPattern: /\/api\/.*/i,
         handler: 'NetworkFirst',
-        options: { cacheName: 'api-cache', networkTimeoutSeconds: 10, expiration: { maxEntries: 50, maxAgeSeconds: 60 * 5 } },
+        options: { cacheName: 'api-cache', networkTimeoutSeconds: 3, expiration: { maxEntries: 50, maxAgeSeconds: 60 * 5 } },
       },
     ],
   },

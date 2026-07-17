@@ -38,7 +38,7 @@ cp .env.example .env.local   # editar con tus credenciales
 
 # 3. Levantar servidor de desarrollo
 pnpm dev
-# → http://localhost:3000
+# → http://localhost:4001
 ```
 
 ### Scripts disponibles
@@ -64,8 +64,6 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=ey...
 SUPABASE_SERVICE_ROLE_KEY=ey...         # Secreto, solo servidor
 NEXT_PUBLIC_APP_URL=https://tu-dominio
-NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x...
-TURNSTILE_SECRET_KEY=0x...
 SMTP_HOST=smtp.tu-proveedor.com
 SMTP_PORT=587
 SMTP_USER=noreply@tu-dominio
@@ -116,8 +114,8 @@ Ver [manual técnico](docs/entrega-coa/05-manual-tecnico-arquitectura.md) para a
 
 ## Flujos principales
 
-- **Asesor autenticado** → `/formulario` → guarda en IndexedDB → botón Sincronizar → `POST /api/sync` → datos en Supabase.
-- **Agricultor sin login** → `/formulario` con Turnstile → `POST /api/sync-public` → creación de cuenta con credenciales temporales.
+- **Asesor autenticado** → `/formulario` → trabaja con soporte offline en IndexedDB → `POST /api/caracterizaciones` al recuperar conexión.
+- **Agricultor sin login** → `/formulario` → `POST /api/caracterizaciones` → creación de cuenta con credenciales temporales si aplica.
 - **Agricultor autenticado** → `/dashboard` → ve su caracterización, estado y QR.
 - **Admin** → `/admin` → gestión total de usuarios y caracterizaciones.
 - **Analista** → cambia estado `EN_ESTUDIO_CREDITO` → `APROBADO` / `CANCELADO`.
@@ -179,7 +177,6 @@ Consultar [diccionario de datos](docs/entrega-coa/08-diccionario-datos.md) para 
 - **JWT** en cookies `HttpOnly`, `Secure`, `SameSite=Lax`.
 - **Doble capa de auth**: middleware `proxy.ts` (servidor) + `AuthContext` (cliente).
 - **Claves de servicio** (`SUPABASE_SERVICE_ROLE_KEY`) solo en endpoints del servidor.
-- **Captcha** (Cloudflare Turnstile) en formulario público.
 - **HTTPS** forzado por Vercel.
 
 ---

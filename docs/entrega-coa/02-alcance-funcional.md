@@ -97,7 +97,6 @@ El sistema cubre el **ciclo completo** de una caracterización:
 - Autorización de aviso de privacidad (obligatoria).
 - Autorización de consulta de centrales de riesgo (opcional).
 - Autorización de uso de imagen (opcional).
-- Captcha Cloudflare Turnstile (si no hay sesión de asesor).
 - Envío al servidor.
 
 ### 3.3 Módulo de Dashboard del Asesor
@@ -183,7 +182,6 @@ Transiciones permitidas por rol:
 - Row Level Security (RLS) en todas las tablas.
 - Cookies HttpOnly + Secure.
 - Middleware de protección de rutas.
-- Captcha en formulario público.
 - Validación server-side de todos los inputs.
 - Separación de claves públicas y de servicio.
 
@@ -200,7 +198,6 @@ Transiciones permitidas por rol:
 | Storage | Supabase Storage (S3-compatible) |
 | Hosting | Vercel (serverless + edge) |
 | Correos | Nodemailer vía SMTP |
-| Captcha | Cloudflare Turnstile |
 | Mapas | Leaflet + OpenStreetMap |
 
 Ver **Manual Técnico y de Arquitectura** para detalles.

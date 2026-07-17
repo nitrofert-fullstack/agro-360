@@ -71,7 +71,7 @@ export default function DashboardPage() {
         .from('visitas')
         .select(`id,radicado_local,radicado_oficial,fecha_visita,nombre_tecnico,created_at,
           caracterizaciones!id_visita(id_beneficiario,estado,beneficiarios!id_beneficiario(nombres,apellidos))`)
-        .or(`asesor_id.eq.${user.id},asesor_id.is.null`)
+        .eq('asesor_id', user.id)
         .order('created_at', { ascending: false })
         .limit(200)
       if (!isMounted()) return
@@ -165,7 +165,7 @@ export default function DashboardPage() {
           </motion.div>
 
           {/* KPIs — mismo border-l-4 que estadísticas */}
-          <motion.div variants={staggerItem} className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <motion.div variants={staggerItem} className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {[
               { label: 'Viables',     value: viables,   icon: CheckCircle2, color: 'text-green-500',  border: 'border-l-green-500',  bg: 'bg-green-500/5' },
               { label: 'En Revisión', value: revision,  icon: Clock3,       color: 'text-blue-500',   border: 'border-l-blue-500',   bg: 'bg-blue-500/5' },
