@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { LocationPicker } from "./location-picker"
 import { SignaturePad } from "./signature-pad"
 import { PhotoUpload } from "./photo-upload"
@@ -42,6 +43,7 @@ import {
   ChevronsUpDown,
   WifiOff,
   CloudUpload,
+  ClipboardCheck,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ThemeToggle } from "./theme-toggle"
@@ -105,8 +107,9 @@ const tiposTenencia = [
   "Usufructo",
 ]
 
-// Pasos del formulario
-const steps = [
+// Pasos del formulario (numeración absoluta y estable; el paso 9 "Concepto" solo
+// se muestra a asesores/admins — ver `steps` dentro del componente, que filtra ALL_STEPS)
+const ALL_STEPS = [
   { id: 1, title: "Datos Visita", icon: User, description: "Información del técnico y visita" },
   { id: 2, title: "Beneficiario", icon: User, description: "Datos personales del productor" },
   { id: 3, title: "Predio", icon: MapPin, description: "Ubicación y tenencia del predio" },
@@ -115,8 +118,10 @@ const steps = [
   { id: 6, title: "Área Productiva", icon: Sprout, description: "Producción y comercialización" },
   { id: 7, title: "Info. Financiera", icon: Wallet, description: "Ingresos, egresos y activos" },
   { id: 8, title: "Fotos y Firma", icon: Camera, description: "Evidencia fotográfica y firma" },
-  { id: 9, title: "Autorización", icon: FileCheck, description: "Consentimiento y envío" },
+  { id: 9, title: "Concepto", icon: ClipboardCheck, description: "Concepto técnico del asesor" },
+  { id: 10, title: "Autorización", icon: FileCheck, description: "Consentimiento y envío" },
 ]
+const LAST_STEP_ID = ALL_STEPS[ALL_STEPS.length - 1].id
 
 // Tipos
 interface FormData {
@@ -142,6 +147,12 @@ interface FormData {
     correo: string
     ocupacionPrincipal: string
     asociacion: string
+    viveEnPredio: string
+    trabajaPredio: boolean
+    familiaParticipaLabores: boolean
+    interesAsociarse: boolean
+    interesAsociarseVecinos: boolean
+    experienciaAgropecuaria: string
   }
   // 2b. Contacto secundario / acudiente
   contactoSecundario: {
@@ -167,11 +178,12 @@ interface FormData {
     poligono?: [number, number][]
     tipoUbicacion?: 'punto' | 'poligono'
     altitudMsnm: number | null
-    viveEnPredio: string
     tieneVivienda: boolean
     areaTotalHectareas: number | null
     areaProductivaHectareas: number | null
     cultivosExistentes: string
+    viaAcceso: string
+    cultivoYaEnPredio: string
   }
   // 4. Caracterización del predio
   caracterizacion: {
@@ -185,6 +197,8 @@ interface FormData {
     coberturaCultivos: boolean
     coberturaPastos: boolean
     coberturaRastrojo: boolean
+    distanciaCabeceraTiempo: string
+    distanciaCapitalTiempo: string
   }
   // 5. Abastecimiento de agua
   abastecimientoAgua: {
@@ -237,6 +251,15 @@ interface FormData {
     firmaProductorUrl: string
     fotoDocFrontalUrl: string
     fotoDocTraseraUrl: string
+    // Una sola ubicación para todas las fotos del paso (EXIF de la primera foto con GPS, o GPS del dispositivo si ninguna trae metadatos)
+    ubicacionFotoLat: number | null
+    ubicacionFotoLng: number | null
+  }
+  // 9. Concepto técnico (solo asesor/admin)
+  concepto: {
+    continuarProceso: string
+    vocacionAgricola: string
+    cultivoZonaCercana: string
   }
   // 10. Autorizaciones
   autorizaciones: {
@@ -270,6 +293,12 @@ const initialFormData: FormData = {
     correo: "",
     ocupacionPrincipal: "",
     asociacion: "",
+    viveEnPredio: "",
+    trabajaPredio: false,
+    familiaParticipaLabores: false,
+    interesAsociarse: false,
+    interesAsociarseVecinos: false,
+    experienciaAgropecuaria: "",
   },
   contactoSecundario: {
     nombre: "",
@@ -291,11 +320,12 @@ const initialFormData: FormData = {
     latitud: 7.1254,
     longitud: -73.1198,
     altitudMsnm: null,
-    viveEnPredio: "",
     tieneVivienda: false,
     areaTotalHectareas: null,
     areaProductivaHectareas: null,
     cultivosExistentes: "",
+    viaAcceso: "",
+    cultivoYaEnPredio: "",
   },
   caracterizacion: {
     rutaAcceso: "",
@@ -308,6 +338,8 @@ const initialFormData: FormData = {
     coberturaCultivos: false,
     coberturaPastos: false,
     coberturaRastrojo: false,
+    distanciaCabeceraTiempo: "",
+    distanciaCapitalTiempo: "",
   },
   abastecimientoAgua: {
     nacimientoManantial: false,
@@ -355,6 +387,13 @@ const initialFormData: FormData = {
     firmaProductorUrl: "",
     fotoDocFrontalUrl: "",
     fotoDocTraseraUrl: "",
+    ubicacionFotoLat: null,
+    ubicacionFotoLng: null,
+  },
+  concepto: {
+    continuarProceso: "",
+    vocacionAgricola: "",
+    cultivoZonaCercana: "",
   },
   autorizaciones: {
     autorizacionDatosPersonales: false,
@@ -418,6 +457,9 @@ export function CharacterizationFormComplete({
   const router = useRouter()
   const { user, profile, isAuthenticated } = useAuth()
   const isAsesor = isAuthenticated && (profile?.rol === 'asesor' || profile?.rol === 'admin')
+  // Paso "Concepto" (id 9) solo visible para asesores/admins; se filtra de la
+  // lista de pasos visibles pero conserva su id absoluto para validateStep/renderStep.
+  const steps = isAsesor ? ALL_STEPS : ALL_STEPS.filter((s) => s.id !== 9)
   // El sync global lo maneja AutoSync (layout). Aquí solo necesitamos isOnline y el conteo
   // para el banner del formulario, sin crear una segunda instancia que cause envíos dobles.
   const { isOnline, pendingCount, isSyncing, syncPending, refreshCount } = useOfflineSync(false)
@@ -438,6 +480,7 @@ export function CharacterizationFormComplete({
         areaProductiva:     { ...initialFormData.areaProductiva,     ...(initialData.areaProductiva     ?? {}) },
         infoFinanciera:     { ...initialFormData.infoFinanciera,     ...(initialData.infoFinanciera     ?? {}) },
         archivos:           { ...initialFormData.archivos,           ...(initialData.archivos           ?? {}) },
+        concepto:           { ...initialFormData.concepto,           ...(initialData.concepto           ?? {}) },
         autorizaciones:     { ...initialFormData.autorizaciones,     ...(initialData.autorizaciones     ?? {}) },
         observaciones:      initialData.observaciones ?? initialFormData.observaciones,
       } as FormData
@@ -692,7 +735,10 @@ export function CharacterizationFormComplete({
           stepErrors['archivos.firmaProductorUrl'] = 'La firma del productor es requerida'
         break
 
-      case 9: // Autorizacion
+      case 9: // Concepto (solo asesor) — ningún campo es obligatorio
+        break
+
+      case 10: // Autorizacion
         if (!formData.autorizaciones.autorizacionDatosPersonales) stepErrors['autorizaciones.autorizacionDatosPersonales'] = 'Debe autorizar el tratamiento de datos personales'
         if (!formData.autorizaciones.autorizacionAvisoPrivacidad) stepErrors['autorizaciones.autorizacionAvisoPrivacidad'] = 'Debe confirmar que ha leído la Política de Tratamiento de Datos'
         if (!formData.autorizaciones.autorizacionConsultaCrediticia) stepErrors['autorizaciones.autorizacionConsultaCrediticia'] = 'Debe autorizar la consulta a centrales de riesgo'
@@ -703,6 +749,9 @@ export function CharacterizationFormComplete({
   }
 
   // Navegación con validacion
+  // NOTA: `currentStep` es siempre el id absoluto del paso (1-10, ver ALL_STEPS).
+  // `steps` es la lista visible (filtra el paso 9 "Concepto" si !isAsesor), así que
+  // la navegación avanza/retrocede según la posición de currentStep DENTRO de `steps`.
   const nextStep = () => {
     const stepErrors = validateStep(currentStep)
     if (Object.keys(stepErrors).length > 0) {
@@ -712,18 +761,29 @@ export function CharacterizationFormComplete({
     }
     setShowErrors(false)
     setErrors({})
-    if (currentStep < steps.length) { setStepDirection(1); setCurrentStep(currentStep + 1) }
+    const idx = steps.findIndex((s) => s.id === currentStep)
+    if (idx >= 0 && idx < steps.length - 1) {
+      setStepDirection(1)
+      setCurrentStep(steps[idx + 1].id)
+    }
   }
 
   const prevStep = () => {
     setShowErrors(false)
-    if (currentStep > 1) { setStepDirection(-1); setCurrentStep(currentStep - 1) }
+    const idx = steps.findIndex((s) => s.id === currentStep)
+    if (idx > 0) {
+      setStepDirection(-1)
+      setCurrentStep(steps[idx - 1].id)
+    }
   }
 
   // Navegar a un paso específico (desde la barra de progreso)
   const goToStep = (targetStep: number) => {
+    const idxCurrent = steps.findIndex((s) => s.id === currentStep)
+    const idxTarget = steps.findIndex((s) => s.id === targetStep)
+    if (idxTarget === -1) return
     // Siempre permite ir hacia atrás
-    if (targetStep <= currentStep) {
+    if (idxTarget <= idxCurrent) {
       setStepDirection(-1)
       setShowErrors(false)
       setErrors({})
@@ -731,14 +791,15 @@ export function CharacterizationFormComplete({
       return
     }
     setStepDirection(1)
-    // Para ir adelante, validar todos los pasos intermedios
-    for (let s = currentStep; s < targetStep; s++) {
-      const stepErrors = validateStep(s)
+    // Para ir adelante, validar todos los pasos visibles intermedios
+    for (let i = idxCurrent; i < idxTarget; i++) {
+      const s = steps[i]
+      const stepErrors = validateStep(s.id)
       if (Object.keys(stepErrors).length > 0) {
         setErrors(stepErrors)
         setShowErrors(true)
-        setCurrentStep(s)
-        toast.error(`Completa el paso ${s}: ${steps[s - 1].title}`, {
+        setCurrentStep(s.id)
+        toast.error(`Completa el paso: ${s.title}`, {
           description: 'Debes llenar los campos requeridos antes de avanzar',
         })
         return
@@ -749,14 +810,15 @@ export function CharacterizationFormComplete({
     setCurrentStep(targetStep)
   }
 
-  // Validar pasos del formulario hasta maxStep (inclusive)
-  const validateAllSteps = (maxStep = steps.length): { valid: boolean; firstErrorStep: number; errors: ValidationErrors } => {
+  // Validar pasos del formulario (visibles) hasta maxStepId (inclusive, id absoluto)
+  const validateAllSteps = (maxStepId = LAST_STEP_ID): { valid: boolean; firstErrorStep: number; errors: ValidationErrors } => {
     const allErrors: ValidationErrors = {}
     let firstErrorStep = 0
-    for (let s = 1; s <= maxStep; s++) {
-      const stepErrors = validateStep(s)
+    for (const s of steps) {
+      if (s.id > maxStepId) continue
+      const stepErrors = validateStep(s.id)
       if (Object.keys(stepErrors).length > 0 && firstErrorStep === 0) {
-        firstErrorStep = s
+        firstErrorStep = s.id
       }
       Object.assign(allErrors, stepErrors)
     }
@@ -769,8 +831,9 @@ export function CharacterizationFormComplete({
     setShowErrors(true)
     if (validation.firstErrorStep > 0) {
       setCurrentStep(validation.firstErrorStep)
+      const stepTitle = steps.find((s) => s.id === validation.firstErrorStep)?.title || ''
       toast.error(
-        `Hay campos sin completar en el paso ${validation.firstErrorStep}: ${steps[validation.firstErrorStep - 1].title}`,
+        `Hay campos sin completar en el paso: ${stepTitle}`,
         { description: 'Completa todos los campos requeridos antes de enviar', duration: 5000 }
       )
     }
@@ -850,6 +913,12 @@ export function CharacterizationFormComplete({
           genero: formData.beneficiario.genero || undefined,
           personasACargo: formData.beneficiario.personasACargo ?? undefined,
           asociacion: formData.beneficiario.asociacion || undefined,
+          viveEnPredio: formData.beneficiario.viveEnPredio || undefined,
+          trabajaPredio: formData.beneficiario.trabajaPredio,
+          familiaParticipaLabores: formData.beneficiario.familiaParticipaLabores,
+          interesAsociarse: formData.beneficiario.interesAsociarse,
+          interesAsociarseVecinos: formData.beneficiario.interesAsociarseVecinos,
+          experienciaAgropecuaria: formData.beneficiario.experienciaAgropecuaria || undefined,
           // Contacto secundario
           nombreContactoSecundario: formData.contactoSecundario.nombre || undefined,
           telefonoSecundario: formData.contactoSecundario.telefono || undefined,
@@ -876,9 +945,10 @@ export function CharacterizationFormComplete({
           codigoCatastral: formData.predio.codigoCatastral,
           coordenadaX: formData.predio.coordenadaX,
           coordenadaY: formData.predio.coordenadaY,
-          viveEnPredio: formData.predio.viveEnPredio,
           tieneVivienda: formData.predio.tieneVivienda,
           cultivosExistentes: formData.predio.cultivosExistentes,
+          viaAcceso: formData.predio.viaAcceso || undefined,
+          cultivoYaEnPredio: formData.predio.cultivoYaEnPredio || undefined,
         },
 
         // 4. Caracterizacion del predio (tabla caracterizacion_predio)
@@ -893,6 +963,8 @@ export function CharacterizationFormComplete({
           coberturaCultivos: formData.caracterizacion.coberturaCultivos,
           coberturaPastos: formData.caracterizacion.coberturaPastos,
           coberturaRastrojo: formData.caracterizacion.coberturaRastrojo,
+          distanciaCabeceraTiempo: formData.caracterizacion.distanciaCabeceraTiempo || undefined,
+          distanciaCapitalTiempo: formData.caracterizacion.distanciaCapitalTiempo || undefined,
         },
 
         // 5. Agua y riesgos (tablas abastecimiento_agua y riesgos_predio)
@@ -969,9 +1041,18 @@ export function CharacterizationFormComplete({
           firmaProductorUrl: formData.archivos.firmaProductorUrl,
           fotoDocFrontalUrl: formData.archivos.fotoDocFrontalUrl,
           fotoDocTraseraUrl: formData.archivos.fotoDocTraseraUrl,
+          ubicacionFotoLat: formData.archivos.ubicacionFotoLat,
+          ubicacionFotoLng: formData.archivos.ubicacionFotoLng,
         },
 
-        // 9. Autorizacion
+        // 9. Concepto tecnico (solo asesor) — tabla concepto_visita
+        concepto: isAsesor ? {
+          continuarProceso: formData.concepto.continuarProceso || undefined,
+          vocacionAgricola: formData.concepto.vocacionAgricola || undefined,
+          cultivoZonaCercana: formData.concepto.cultivoZonaCercana || undefined,
+        } : undefined,
+
+        // 10. Autorizacion
         autorizacion: {
           autorizaTratamientoDatos: formData.autorizaciones.autorizacionDatosPersonales,
           autorizaConsultaCrediticia: formData.autorizaciones.autorizacionConsultaCrediticia,
@@ -1088,6 +1169,16 @@ export function CharacterizationFormComplete({
       setIsSubmitting(false)
       submitLock.current = false
     }
+  }
+
+  // Ubicación compartida de las fotos del paso 8: una sola para todas (EXIF de la
+  // primera foto que la traiga, o GPS del dispositivo si ninguna trae metadatos).
+  const ubicacionFotoShared = formData.archivos.ubicacionFotoLat != null && formData.archivos.ubicacionFotoLng != null
+    ? { lat: formData.archivos.ubicacionFotoLat, lng: formData.archivos.ubicacionFotoLng }
+    : null
+  const handleFotoLocationResolved = (loc: { lat: number; lng: number }) => {
+    updateField("archivos", "ubicacionFotoLat", loc.lat)
+    updateField("archivos", "ubicacionFotoLng", loc.lng)
   }
 
   // Renderizar paso actual
@@ -1397,6 +1488,120 @@ export function CharacterizationFormComplete({
                 />
               </div>
 
+              {/* Vínculo con el predio y participación familiar */}
+              <div className="rounded-lg border border-border/50 bg-muted/20 p-4 space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="viveEnPredio">¿Vive en el Predio?</Label>
+                    <Select
+                      value={formData.beneficiario.viveEnPredio}
+                      onValueChange={(value) => updateField("beneficiario", "viveEnPredio", value)}
+                    >
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder="Seleccione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Cerca">Cerca</SelectItem>
+                        <SelectItem value="No">No</SelectItem>
+                        <SelectItem value="Si">Sí</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="experienciaAgropecuaria">Experiencia Agropecuaria</Label>
+                    <Select
+                      value={formData.beneficiario.experienciaAgropecuaria}
+                      onValueChange={(value) => updateField("beneficiario", "experienciaAgropecuaria", value)}
+                    >
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder="Seleccione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Sí, actualmente desarrollo la misma actividad productiva.">Sí, actualmente desarrollo la misma actividad productiva.</SelectItem>
+                        <SelectItem value="Sí, actualmente desarrollo otra actividad agropecuaria diferente.">Sí, actualmente desarrollo otra actividad agropecuaria diferente.</SelectItem>
+                        <SelectItem value="Sí, antes desarrollé la misma actividad productiva solicitada, aunque actualmente no la realizo.">Sí, antes desarrollé la misma actividad productiva solicitada, aunque actualmente no la realizo.</SelectItem>
+                        <SelectItem value="Sí, tengo experiencia agropecuaria previa, pero en una actividad diferente a la solicitada.">Sí, tengo experiencia agropecuaria previa, pero en una actividad diferente a la solicitada.</SelectItem>
+                        <SelectItem value="No tengo experiencia ni dedicación previa en actividades agrícolas o pecuarias.">No tengo experiencia ni dedicación previa en actividades agrícolas o pecuarias.</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>¿Trabaja directamente en el predio?</Label>
+                    <RadioGroup
+                      className="flex gap-4"
+                      value={formData.beneficiario.trabajaPredio ? "si" : "no"}
+                      onValueChange={(value) => updateField("beneficiario", "trabajaPredio", value === "si")}
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="si" id="trabajaPredioSi" />
+                        <Label htmlFor="trabajaPredioSi" className="font-normal">Sí</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="no" id="trabajaPredioNo" />
+                        <Label htmlFor="trabajaPredioNo" className="font-normal">No</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>¿Los miembros de su núcleo familiar participan en las labores del predio?</Label>
+                    <RadioGroup
+                      className="flex gap-4"
+                      value={formData.beneficiario.familiaParticipaLabores ? "si" : "no"}
+                      onValueChange={(value) => updateField("beneficiario", "familiaParticipaLabores", value === "si")}
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="si" id="familiaParticipaSi" />
+                        <Label htmlFor="familiaParticipaSi" className="font-normal">Sí</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="no" id="familiaParticipaNo" />
+                        <Label htmlFor="familiaParticipaNo" className="font-normal">No</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Si no está asociado, ¿tiene interés en asociarse?</Label>
+                    <RadioGroup
+                      className="flex gap-4"
+                      value={formData.beneficiario.interesAsociarse ? "si" : "no"}
+                      onValueChange={(value) => updateField("beneficiario", "interesAsociarse", value === "si")}
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="si" id="interesAsociarseSi" />
+                        <Label htmlFor="interesAsociarseSi" className="font-normal">Sí</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="no" id="interesAsociarseNo" />
+                        <Label htmlFor="interesAsociarseNo" className="font-normal">No</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>¿Le gustaría asociarse con sus vecinos?</Label>
+                    <RadioGroup
+                      className="flex gap-4"
+                      value={formData.beneficiario.interesAsociarseVecinos ? "si" : "no"}
+                      onValueChange={(value) => updateField("beneficiario", "interesAsociarseVecinos", value === "si")}
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="si" id="interesVecinosSi" />
+                        <Label htmlFor="interesVecinosSi" className="font-normal">Sí</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="no" id="interesVecinosNo" />
+                        <Label htmlFor="interesVecinosNo" className="font-normal">No</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                </div>
+              </div>
+
               {/* Contacto secundario / Acudiente */}
               <div className="rounded-lg border border-border/50 bg-muted/20 p-4 space-y-4">
                 <div className="flex items-center gap-2">
@@ -1651,18 +1856,20 @@ export function CharacterizationFormComplete({
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="viveEnPredio">¿Vive en el Predio?</Label>
+                  <Label htmlFor="viaAcceso">Vía de Acceso al Predio</Label>
                   <Select
-                    value={formData.predio.viveEnPredio}
-                    onValueChange={(value) => updateField("predio", "viveEnPredio", value)}
+                    value={formData.predio.viaAcceso}
+                    onValueChange={(value) => updateField("predio", "viaAcceso", value)}
                   >
                     <SelectTrigger className="h-11">
                       <SelectValue placeholder="Seleccione" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Cerca">Cerca</SelectItem>
-                      <SelectItem value="No">No</SelectItem>
-                      <SelectItem value="Si">Sí</SelectItem>
+                      <SelectItem value="Pavimentada hasta el predio o muy cerca. Acceso todo el año">Pavimentada hasta el predio o muy cerca. Acceso todo el año</SelectItem>
+                      <SelectItem value="Destapada.">Destapada.</SelectItem>
+                      <SelectItem value="Destapada, en invierno puede presentar algunas dificultades">Destapada, en invierno puede presentar algunas dificultades</SelectItem>
+                      <SelectItem value="Trocha vehicular. Solo ingresan vehículos altos o 4x4">Trocha vehicular. Solo ingresan vehículos altos o 4x4</SelectItem>
+                      <SelectItem value="Camino de herradura: Solo acceso por moto, caballo, a pie o vía fluvial; frecuentes restricciones.">Camino de herradura: Solo acceso por moto, caballo, a pie o vía fluvial; frecuentes restricciones.</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1684,6 +1891,22 @@ export function CharacterizationFormComplete({
                   placeholder="Descripción de los cultivos actuales en el predio"
                   rows={3}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cultivoYaEnPredio">¿El cultivo/actividad de interés ya se realiza en el predio?</Label>
+                <Select
+                  value={formData.predio.cultivoYaEnPredio}
+                  onValueChange={(value) => updateField("predio", "cultivoYaEnPredio", value)}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Seleccione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Sí, actualmente se realiza.">Sí, actualmente se realiza.</SelectItem>
+                    <SelectItem value="No, pero ya se ha realizado antes.">No, pero ya se ha realizado antes.</SelectItem>
+                    <SelectItem value="No, sería una actividad nueva para el productor.">No, sería una actividad nueva para el productor.</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Mapa de ubicación */}
@@ -1811,6 +2034,45 @@ export function CharacterizationFormComplete({
                     </SelectContent>
                   </Select>
                   {errors['caracterizacion.topografia'] && <p role="alert" className="text-sm text-red-500">{errors['caracterizacion.topografia']}</p>}
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="distanciaCabeceraTiempo">Tiempo a la Cabecera Municipal</Label>
+                  <Select
+                    value={formData.caracterizacion.distanciaCabeceraTiempo}
+                    onValueChange={(value) => updateField("caracterizacion", "distanciaCabeceraTiempo", value)}
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Seleccione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Entre 15 y 30 minutos">Entre 15 y 30 minutos</SelectItem>
+                      <SelectItem value="Entre 31 y 60 minutos">Entre 31 y 60 minutos</SelectItem>
+                      <SelectItem value="Entre 1 y 2 horas">Entre 1 y 2 horas</SelectItem>
+                      <SelectItem value="Entre 2 y 3 horas">Entre 2 y 3 horas</SelectItem>
+                      <SelectItem value="Más de 3 horas">Más de 3 horas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="distanciaCapitalTiempo">Tiempo a la Capital del Departamento</Label>
+                  <Select
+                    value={formData.caracterizacion.distanciaCapitalTiempo}
+                    onValueChange={(value) => updateField("caracterizacion", "distanciaCapitalTiempo", value)}
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Seleccione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Menos de 1 hora">Menos de 1 hora</SelectItem>
+                      <SelectItem value="Entre 1 y 2 horas">Entre 1 y 2 horas</SelectItem>
+                      <SelectItem value="Entre 2 y 4 horas">Entre 2 y 4 horas</SelectItem>
+                      <SelectItem value="Entre 4 y 6 horas">Entre 4 y 6 horas</SelectItem>
+                      <SelectItem value="Más de 6 horas">Más de 6 horas</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -2345,6 +2607,8 @@ export function CharacterizationFormComplete({
                   label="Foto del Productor"
                   guideType="persona"
                   stampMetadata
+                  sharedLocation={ubicacionFotoShared}
+                  onLocationResolved={handleFotoLocationResolved}
                 />
               </div>
 
@@ -2357,6 +2621,8 @@ export function CharacterizationFormComplete({
                     currentPhoto={formData.archivos.foto1Url}
                     label="Foto 1"
                     stampMetadata
+                    sharedLocation={ubicacionFotoShared}
+                    onLocationResolved={handleFotoLocationResolved}
                   />
                 </div>
                 <div className="space-y-3">
@@ -2366,6 +2632,8 @@ export function CharacterizationFormComplete({
                     currentPhoto={formData.archivos.foto2Url}
                     label="Foto 2"
                     stampMetadata
+                    sharedLocation={ubicacionFotoShared}
+                    onLocationResolved={handleFotoLocationResolved}
                   />
                 </div>
               </div>
@@ -2412,6 +2680,75 @@ export function CharacterizationFormComplete({
         )
 
       case 9:
+        return (
+          <Card className="border-border/50 bg-card/95 backdrop-blur-md">
+            <CardHeader className="border-b border-border/30 bg-muted/30">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <ClipboardCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Concepto Técnico</CardTitle>
+                  <CardDescription>Evaluación del asesor sobre el proceso</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-6">
+              <div className="space-y-2">
+                <Label htmlFor="continuarProceso">¿Se recomienda continuar con el proceso?</Label>
+                <Select
+                  value={formData.concepto.continuarProceso}
+                  onValueChange={(value) => updateField("concepto", "continuarProceso", value)}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Seleccione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Sí, continuar.">Sí, continuar.</SelectItem>
+                    <SelectItem value="Continuar, pero con validación adicional.">Continuar, pero con validación adicional.</SelectItem>
+                    <SelectItem value="No continuar por información insuficiente.">No continuar por información insuficiente.</SelectItem>
+                    <SelectItem value="No continuar por alertas evidentes.">No continuar por alertas evidentes.</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vocacionAgricola">Vocación / experiencia agrícola observada</Label>
+                <Select
+                  value={formData.concepto.vocacionAgricola}
+                  onValueChange={(value) => updateField("concepto", "vocacionAgricola", value)}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Seleccione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Sí, se dedica actualmente a actividades agrícolas">Sí, se dedica actualmente a actividades agrícolas</SelectItem>
+                    <SelectItem value="Sí, se dedica actualmente a actividades pecuarias">Sí, se dedica actualmente a actividades pecuarias</SelectItem>
+                    <SelectItem value="Sí, ha trabajado antes en actividades agrícolas, aunque actualmente no las desarrolla">Sí, ha trabajado antes en actividades agrícolas, aunque actualmente no las desarrolla</SelectItem>
+                    <SelectItem value="Tiene experiencia agrícola, pero en un cultivo diferente al solicitado.">Tiene experiencia agrícola, pero en un cultivo diferente al solicitado.</SelectItem>
+                    <SelectItem value="No tiene experiencia agrícola">No tiene experiencia agrícola</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cultivoZonaCercana">¿El cultivo/actividad se observa en la zona cercana?</Label>
+                <Select
+                  value={formData.concepto.cultivoZonaCercana}
+                  onValueChange={(value) => updateField("concepto", "cultivoZonaCercana", value)}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Seleccione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Sí, se observa en predios cercanos.">Sí, se observa en predios cercanos.</SelectItem>
+                    <SelectItem value="No se observa en la zona cercana.">No se observa en la zona cercana.</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        )
+
+      case 10:
         return (
           <Card className="border-border/50 bg-card/95 backdrop-blur-md">
             <CardHeader className="border-b border-border/30 bg-muted/30">
@@ -2676,6 +3013,9 @@ export function CharacterizationFormComplete({
     )
   }
 
+  // Posición (1-based) de currentStep dentro de la lista de pasos visibles `steps`
+  const currentStepIndex = Math.max(0, steps.findIndex((s) => s.id === currentStep))
+
   return (
     <div
       className="animate-fade-up min-h-screen bg-background"
@@ -2692,9 +3032,9 @@ export function CharacterizationFormComplete({
           {/* Paso actual — centro */}
           <div className="flex items-center gap-1.5 text-sm min-w-0">
             <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">
-              {currentStep}
+              {currentStepIndex + 1}
             </span>
-            <span className="text-foreground font-medium truncate max-w-[140px] sm:max-w-none">{steps[currentStep - 1].title}</span>
+            <span className="text-foreground font-medium truncate max-w-[140px] sm:max-w-none">{steps[currentStepIndex]?.title}</span>
             <span className="text-muted-foreground text-xs shrink-0">/ {steps.length}</span>
           </div>
 
@@ -2725,13 +3065,13 @@ export function CharacterizationFormComplete({
           {/* Móvil: barra compacta (< 768px) */}
           <div className="flex md:hidden items-center gap-3 py-1.5">
             <span className="text-xs text-muted-foreground whitespace-nowrap">
-              {currentStep}/{steps.length}
+              {currentStepIndex + 1}/{steps.length}
             </span>
             <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
               <div
                 className="h-full rounded-full"
                 style={{
-                  width: `${(currentStep / steps.length) * 100}%`,
+                  width: `${((currentStepIndex + 1) / steps.length) * 100}%`,
                   background: 'oklch(0.45 0.18 145)',
                   boxShadow: '0 0 8px oklch(0.45 0.18 145 / 0.5)',
                   transition: 'width 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -2739,7 +3079,7 @@ export function CharacterizationFormComplete({
               />
             </div>
             <span className="text-xs font-medium text-foreground whitespace-nowrap">
-              {steps[currentStep - 1]?.title}
+              {steps[currentStepIndex]?.title}
             </span>
           </div>
 
@@ -2870,7 +3210,7 @@ export function CharacterizationFormComplete({
             Anterior
           </Button>
 
-          {currentStep < steps.length ? (
+          {currentStepIndex < steps.length - 1 ? (
             <Button onClick={nextStep} className="gap-2 min-h-[48px] text-sm sm:px-8 sm:text-base" style={{boxShadow: 'var(--shadow-md)'}}>
               Siguiente
               <ChevronRight className="h-4 w-4" />

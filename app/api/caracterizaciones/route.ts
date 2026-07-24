@@ -260,6 +260,12 @@ export async function POST(request: Request) {
       telefono_secundario: c.beneficiario?.telefonoSecundario || null,
       parentesco_contacto_secundario: c.beneficiario?.parentescoContactoSecundario || null,
       asociacion: c.beneficiario?.asociacion || null,
+      vive_en_predio: c.beneficiario?.viveEnPredio || null,
+      trabaja_predio: c.beneficiario?.trabajaPredio ?? null,
+      familia_participa_labores: c.beneficiario?.familiaParticipaLabores ?? null,
+      interes_asociarse: c.beneficiario?.interesAsociarse ?? null,
+      interes_asociarse_vecinos: c.beneficiario?.interesAsociarseVecinos ?? null,
+      experiencia_agropecuaria: c.beneficiario?.experienciaAgropecuaria || null,
     }
 
     const { data: benefResult, error: benefErr } = await adminClient
@@ -317,11 +323,12 @@ export async function POST(request: Request) {
         longitud: c.predio?.longitud ?? null,
         poligono: c.predio?.poligono ?? null,
         altitud_msnm: c.predio?.altitudMsnm ?? null,
-        vive_en_predio: c.predio?.viveEnPredio || null,
         tiene_vivienda: c.predio?.tieneVivienda ?? false,
         area_total_hectareas: c.predio?.areaTotalHectareas ?? null,
         area_productiva_hectareas: c.predio?.areaProductivaHectareas ?? null,
         cultivos_existentes: c.predio?.cultivosExistentes || null,
+        via_acceso: c.predio?.viaAcceso || null,
+        cultivo_ya_en_predio: c.predio?.cultivoYaEnPredio || null,
       })
       .select('id')
       .single()
@@ -374,6 +381,8 @@ export async function POST(request: Request) {
           cobertura_cultivos:  c.caracterizacion.coberturaCultivos ?? false,
           cobertura_pastos:    c.caracterizacion.coberturaPastos ?? false,
           cobertura_rastrojo:  c.caracterizacion.coberturaRastrojo ?? false,
+          distancia_cabecera_tiempo: c.caracterizacion.distanciaCabeceraTiempo || null,
+          distancia_capital_tiempo:  c.caracterizacion.distanciaCapitalTiempo || null,
         },
       })
     }
@@ -510,6 +519,8 @@ export async function POST(request: Request) {
         firma_productor_url: firmaUrl,
         foto_doc_frontal_url: fotoDocFrontalUrl,
         foto_doc_trasera_url: fotoDocTraseraUrl,
+        ubicacion_foto_lat: c.archivos?.ubicacionFotoLat ?? null,
+        ubicacion_foto_lng: c.archivos?.ubicacionFotoLng ?? null,
         autorizacion_datos_personales: c.autorizaciones?.autorizacionDatosPersonales ?? c.autorizacion?.autorizaTratamientoDatos ?? false,
         autorizacion_consulta_crediticia: c.autorizaciones?.autorizacionConsultaCrediticia ?? c.autorizacion?.autorizaConsultaCrediticia ?? false,
         autorizacion_aviso_privacidad: c.autorizaciones?.autorizacionAvisoPrivacidad ?? c.autorizacion?.autorizaAvisoPrivacidad ?? false,
@@ -533,6 +544,25 @@ export async function POST(request: Request) {
         )
       }
       throw new Error(`Error creando caracterización: ${caracErr.message}`)
+    }
+
+    // === 11b. CONCEPTO TÉCNICO (solo si el asesor lo diligenció) ===
+    if (c.concepto && (c.concepto.continuarProceso || c.concepto.vocacionAgricola || c.concepto.cultivoZonaCercana)) {
+      const { data: caracRow } = await adminClient
+        .from('caracterizaciones')
+        .select('id')
+        .eq('id_visita', visitaId)
+        .maybeSingle()
+      if (caracRow) {
+        await adminClient.from('concepto_visita').insert({
+          id_caracterizacion: caracRow.id,
+          continuar_proceso: c.concepto.continuarProceso || null,
+          vocacion_agricola: c.concepto.vocacionAgricola || null,
+          cultivo_zona_cercana: c.concepto.cultivoZonaCercana || null,
+        }).then(({ error }) => {
+          if (error) console.warn('[API] Error creando concepto_visita (no bloquea):', error.message)
+        })
+      }
     }
 
     // === 12. Crear cuenta + email al agricultor (si tiene correo) ===

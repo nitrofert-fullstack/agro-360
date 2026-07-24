@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { CharacterizationFormComplete } from "@/components/characterization-form-complete"
 import { useAuth } from "@/hooks/use-auth"
@@ -15,12 +15,26 @@ export default function EditarFormularioPage() {
     const [initialData, setInitialData] = useState<any>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const profileWaitExpired = useRef(false)
+    const [profileWaitTick, setProfileWaitTick] = useState(0)
 
     useEffect(() => {
         if (authLoading) return
         if (!isAuthenticated) {
             router.push("/auth/login")
             return
+        }
+        // `profile` se carga en segundo plano tras la sesión (ver auth-context.tsx) y puede
+        // seguir null aquí aunque authLoading ya sea false. Esperamos a que llegue antes de
+        // decidir acceso — de lo contrario un asesor/admin legítimo podría ser expulsado a
+        // /unauthorized por una carrera. Si tras 5s sigue sin llegar (perfil inexistente/error),
+        // se continúa igual tratándolo como no privilegiado.
+        if (!profile && !profileWaitExpired.current) {
+            const timer = setTimeout(() => {
+                profileWaitExpired.current = true
+                setProfileWaitTick(t => t + 1)
+            }, 5000)
+            return () => clearTimeout(timer)
         }
 
         const loadData = async () => {
@@ -75,6 +89,12 @@ export default function EditarFormularioPage() {
                         correo: serverData.beneficiario?.correo || "",
                         ocupacionPrincipal: serverData.beneficiario?.ocupacion_principal || "",
                         asociacion: serverData.beneficiario?.asociacion || "",
+                        viveEnPredio: serverData.beneficiario?.vive_en_predio || serverData.predio?.vive_en_predio || "",
+                        trabajaPredio: serverData.beneficiario?.trabaja_predio ?? false,
+                        familiaParticipaLabores: serverData.beneficiario?.familia_participa_labores ?? false,
+                        interesAsociarse: serverData.beneficiario?.interes_asociarse ?? false,
+                        interesAsociarseVecinos: serverData.beneficiario?.interes_asociarse_vecinos ?? false,
+                        experienciaAgropecuaria: serverData.beneficiario?.experiencia_agropecuaria || "",
                     },
                     contactoSecundario: {
                         nombre: serverData.beneficiario?.nombre_contacto_secundario || "",
@@ -103,11 +123,12 @@ export default function EditarFormularioPage() {
                             return undefined
                         })(),
                         altitudMsnm: serverData.predio?.altitud_msnm != null ? Number(serverData.predio.altitud_msnm) : null,
-                        viveEnPredio: serverData.predio?.vive_en_predio || "",
                         tieneVivienda: serverData.predio?.tiene_vivienda ?? false,
                         areaTotalHectareas: serverData.predio?.area_total_hectareas != null ? Number(serverData.predio.area_total_hectareas) : null,
                         areaProductivaHectareas: serverData.predio?.area_productiva_hectareas != null ? Number(serverData.predio.area_productiva_hectareas) : null,
                         cultivosExistentes: serverData.predio?.cultivos_existentes || "",
+                        viaAcceso: serverData.predio?.via_acceso || "",
+                        cultivoYaEnPredio: serverData.predio?.cultivo_ya_en_predio || "",
                     },
                     caracterizacion: {
                         rutaAcceso: serverData.caracterizacionPredio?.ruta_acceso || "",
@@ -120,6 +141,8 @@ export default function EditarFormularioPage() {
                         coberturaCultivos: serverData.caracterizacionPredio?.cobertura_cultivos ?? false,
                         coberturaPastos: serverData.caracterizacionPredio?.cobertura_pastos ?? false,
                         coberturaRastrojo: serverData.caracterizacionPredio?.cobertura_rastrojo ?? false,
+                        distanciaCabeceraTiempo: serverData.caracterizacionPredio?.distancia_cabecera_tiempo || "",
+                        distanciaCapitalTiempo: serverData.caracterizacionPredio?.distancia_capital_tiempo || "",
                     },
                     abastecimientoAgua: {
                         nacimientoManantial: serverData.abastecimientoAgua?.nacimiento_manantial ?? false,
@@ -167,6 +190,8 @@ export default function EditarFormularioPage() {
                         firmaProductorUrl: serverData.caracterizacion?.firma_productor_url || "",
                         fotoDocFrontalUrl: serverData.caracterizacion?.foto_doc_frontal_url || "",
                         fotoDocTraseraUrl: serverData.caracterizacion?.foto_doc_trasera_url || "",
+                        ubicacionFotoLat: serverData.caracterizacion?.ubicacion_foto_lat != null ? Number(serverData.caracterizacion.ubicacion_foto_lat) : null,
+                        ubicacionFotoLng: serverData.caracterizacion?.ubicacion_foto_lng != null ? Number(serverData.caracterizacion.ubicacion_foto_lng) : null,
                     },
                     autorizaciones: {
                         autorizacionDatosPersonales: serverData.caracterizacion?.autorizacion_datos_personales ?? true,
@@ -175,6 +200,11 @@ export default function EditarFormularioPage() {
                         autorizacionUsoImagen: serverData.caracterizacion?.autorizacion_uso_imagen ?? false,
                     },
                     observaciones: serverData.caracterizacion?.observaciones || "",
+                    concepto: {
+                        continuarProceso: serverData.conceptoVisita?.continuar_proceso || "",
+                        vocacionAgricola: serverData.conceptoVisita?.vocacion_agricola || "",
+                        cultivoZonaCercana: serverData.conceptoVisita?.cultivo_zona_cercana || "",
+                    },
                 }
 
                 setInitialData(mappedData)
@@ -186,7 +216,7 @@ export default function EditarFormularioPage() {
         }
 
         loadData()
-    }, [id, authLoading, isAuthenticated, router])
+    }, [id, authLoading, isAuthenticated, router, profile, profileWaitTick])
 
     if (authLoading || isLoading) {
         return (

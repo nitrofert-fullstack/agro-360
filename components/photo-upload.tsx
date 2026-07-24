@@ -16,6 +16,13 @@ export interface PhotoUploadProps {
   guideType?: "documento" | "persona"
   /** Estampa fecha/hora + coordenadas GPS sobre la imagen (evidencia de caracterización) */
   stampMetadata?: boolean
+  /**
+   * Ubicación ya resuelta para todo el formulario (una sola para todas las fotos).
+   * Si viene definida, se usa directamente y no se vuelve a consultar EXIF/GPS.
+   */
+  sharedLocation?: { lat: number; lng: number } | null
+  /** Notifica al padre la ubicación resuelta (EXIF de la foto o GPS del dispositivo) para reutilizarla en el resto de fotos. */
+  onLocationResolved?: (loc: { lat: number; lng: number }) => void
 }
 
 /** Obtiene la ubicación actual del dispositivo. Devuelve null si no hay permiso/soporte. */
@@ -31,6 +38,40 @@ function getGeolocation(): Promise<{ lat: number; lng: number } | null> {
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     )
   })
+}
+
+/** Lee coordenadas GPS de los metadatos EXIF del archivo (fotos ya tomadas antes/subidas de galería). */
+async function getExifGps(file: File): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const exifr = (await import('exifr')).default
+    const gps = await exifr.gps(file)
+    if (gps && typeof gps.latitude === 'number' && typeof gps.longitude === 'number') {
+      return { lat: gps.latitude, lng: gps.longitude }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Resuelve la ubicación de una foto: si ya hay una ubicación compartida para
+ * el formulario, la reutiliza (una sola ubicación para todas las fotos). Si
+ * no, intenta leerla de los metadatos EXIF del archivo (foto tomada hace
+ * rato / subida de galería); si el archivo no trae GPS (p. ej. se acaba de
+ * capturar con la cámara del navegador), cae a la geolocalización actual del
+ * dispositivo.
+ */
+async function resolveLocation(
+  file: File | undefined,
+  sharedLocation: { lat: number; lng: number } | null | undefined
+): Promise<{ lat: number; lng: number } | null> {
+  if (sharedLocation) return sharedLocation
+  if (file) {
+    const exifLoc = await getExifGps(file)
+    if (exifLoc) return exifLoc
+  }
+  return getGeolocation()
 }
 
 /** Fecha y hora completas en formato local (es-CO) para el sello. */
@@ -152,6 +193,8 @@ export function PhotoUpload({
   className,
   guideType,
   stampMetadata = false,
+  sharedLocation = null,
+  onLocationResolved,
 }: PhotoUploadProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentPhoto)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -231,7 +274,10 @@ export function PhotoUpload({
       canvas.height = 0
 
       if (stampMetadata) {
-        const geo = await getGeolocation()
+        // Foto recién capturada con la cámara: no trae EXIF GPS, se usa la ubicación
+        // compartida del formulario o, si aún no hay una, el GPS actual del dispositivo.
+        const geo = await resolveLocation(undefined, sharedLocation)
+        if (geo) onLocationResolved?.(geo)
         dataUrl = await stampImage(dataUrl, { fecha: fechaSello(), lat: geo?.lat ?? null, lng: geo?.lng ?? null })
       }
 
@@ -245,7 +291,7 @@ export function PhotoUpload({
     } finally {
       setIsProcessing(false)
     }
-  }, [onPhotoCapture, stopCamera, stampMetadata])
+  }, [onPhotoCapture, stopCamera, stampMetadata, sharedLocation, onLocationResolved])
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -277,7 +323,10 @@ export function PhotoUpload({
 
       let finalUrl = dataUrl
       if (stampMetadata) {
-        const geo = await getGeolocation()
+        // Foto ya existente (subida de galería): primero se intenta leer su GPS de EXIF
+        // (ubicación de cuando se tomó); si no trae, se cae al GPS actual del dispositivo.
+        const geo = await resolveLocation(file, sharedLocation)
+        if (geo) onLocationResolved?.(geo)
         finalUrl = await stampImage(dataUrl, { fecha: fechaSello(), lat: geo?.lat ?? null, lng: geo?.lng ?? null })
       }
 
@@ -293,7 +342,7 @@ export function PhotoUpload({
     } finally {
       setIsProcessing(false)
     }
-  }, [onPhotoCapture, stampMetadata])
+  }, [onPhotoCapture, stampMetadata, sharedLocation, onLocationResolved])
 
   const handleRemove = useCallback(() => {
     setPreviewUrl(null)

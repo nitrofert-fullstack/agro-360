@@ -57,7 +57,7 @@ export async function GET(
     }
 
     // ── Datos relacionados en paralelo ──────────────────────────────────────
-    const [beneficiario, predio, infoFinanciera] = await Promise.all([
+    const [beneficiario, predio, infoFinanciera, conceptoVisita] = await Promise.all([
       prisma.beneficiarios.findUnique({ where: { id: carac.id_beneficiario } }),
       prisma.predios.findUnique({
         where: { id: carac.id_predio },
@@ -72,6 +72,7 @@ export async function GET(
         where:   { id_beneficiario: carac.id_beneficiario },
         orderBy: { created_at: 'desc' },
       }),
+      prisma.concepto_visita.findUnique({ where: { id_caracterizacion: carac.id } }),
     ])
 
     return NextResponse.json({
@@ -84,6 +85,7 @@ export async function GET(
       riesgosPredio:         predio?.riesgos_predio?.[0]      ?? null,
       areaProductiva:        predio?.area_productiva?.[0]     ?? null,
       infoFinanciera,
+      conceptoVisita,
     })
   } catch (err) {
     console.error('[API] Error en caracterizacion/[id]:', err)

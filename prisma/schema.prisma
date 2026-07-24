@@ -45,6 +45,12 @@ model beneficiarios {
   personas_a_cargo               Int?
   fecha_nacimiento               DateTime? @db.Date
   asociacion                     String?
+  vive_en_predio                 String?   @db.VarChar
+  trabaja_predio                 Boolean?
+  familia_participa_labores      Boolean?
+  interes_asociarse              Boolean?
+  interes_asociarse_vecinos      Boolean?
+  experiencia_agropecuaria       String?
 
   visitas                visitas?               @relation(fields: [id_visita], references: [id], onDelete: Cascade)
   predios                predios[]
@@ -78,6 +84,8 @@ model predios {
   created_at                DateTime? @default(now()) @db.Timestamptz(6)
   updated_at                DateTime? @default(now()) @db.Timestamptz(6)
   poligono                  Json?
+  via_acceso                String?
+  cultivo_ya_en_predio      String?
 
   beneficiarios          beneficiarios          @relation(fields: [id_beneficiario], references: [id], onDelete: Cascade)
   caracterizacion_predio caracterizacion_predio?
@@ -103,6 +111,8 @@ model caracterizacion_predio {
   cobertura_rastrojo  Boolean?
   created_at          DateTime? @default(now()) @db.Timestamptz(6)
   updated_at          DateTime? @default(now()) @db.Timestamptz(6)
+  distancia_cabecera_tiempo String? @db.VarChar
+  distancia_capital_tiempo  String? @db.VarChar
 
   predios predios @relation(fields: [id_predio], references: [id], onDelete: Cascade)
 }
@@ -196,10 +206,26 @@ model caracterizaciones {
   estado                          String?   @db.VarChar
   autorizacion_aviso_privacidad   Boolean?
   autorizacion_uso_imagen         Boolean?
+  ubicacion_foto_lat              Decimal?
+  ubicacion_foto_lng              Decimal?
 
   visitas       visitas       @relation(fields: [id_visita],       references: [id], onDelete: Cascade)
   beneficiarios beneficiarios @relation(fields: [id_beneficiario], references: [id], onDelete: Cascade)
   predios       predios       @relation(fields: [id_predio],       references: [id], onDelete: Cascade)
+  concepto_visita concepto_visita?
+}
+
+// ─── concepto_visita ─────────────────────────────────────────────────────────
+model concepto_visita {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id_caracterizacion   String    @unique @db.Uuid
+  continuar_proceso    String?
+  vocacion_agricola    String?
+  cultivo_zona_cercana String?
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @default(now()) @db.Timestamptz(6)
+
+  caracterizaciones caracterizaciones @relation(fields: [id_caracterizacion], references: [id], onDelete: Cascade)
 }
 
 // ─── profiles ────────────────────────────────────────────────────────────────

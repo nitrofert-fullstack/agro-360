@@ -33,6 +33,7 @@ export function LegalDocumentModal({
   beneficiarioFirma,
 }: LegalDocumentModalProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const isPdf = documentUrl.toLowerCase().endsWith('.pdf')
 
   const iframeSrc = (() => {
     const params = new URLSearchParams()
@@ -43,6 +44,15 @@ export function LegalDocumentModal({
     const qs = params.toString()
     return qs ? `${documentUrl}?${qs}` : documentUrl
   })()
+
+  // Los PDF no se previsualizan de forma confiable en iframe (bloqueos de conexión en algunos hostings);
+  // se abren directo en una pestaña nueva y el modal no llega a mostrarse.
+  useEffect(() => {
+    if (open && isPdf) {
+      window.open(iframeSrc, '_blank', 'noopener,noreferrer')
+      onOpenChange(false)
+    }
+  }, [open, isPdf, iframeSrc, onOpenChange])
 
   // Envía la firma al iframe vía postMessage una vez que cargue
   useEffect(() => {
@@ -55,6 +65,8 @@ export function LegalDocumentModal({
     iframe.addEventListener('load', send)
     return () => iframe.removeEventListener('load', send)
   }, [open, beneficiarioFirma, iframeSrc])
+
+  if (isPdf) return null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

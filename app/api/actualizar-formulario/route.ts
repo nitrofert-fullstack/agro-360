@@ -118,6 +118,12 @@ export async function POST(request: Request) {
           telefono_secundario:             datos.beneficiario.telefonoSecundario || null,
           parentesco_contacto_secundario:  datos.beneficiario.parentescoContactoSecundario || null,
           asociacion:                      datos.beneficiario.asociacion || null,
+          vive_en_predio:                  datos.beneficiario.viveEnPredio || null,
+          trabaja_predio:                  datos.beneficiario.trabajaPredio ?? null,
+          familia_participa_labores:       datos.beneficiario.familiaParticipaLabores ?? null,
+          interes_asociarse:               datos.beneficiario.interesAsociarse ?? null,
+          interes_asociarse_vecinos:       datos.beneficiario.interesAsociarseVecinos ?? null,
+          experiencia_agropecuaria:        datos.beneficiario.experienciaAgropecuaria || null,
           updated_at:                      new Date(),
         },
       })
@@ -143,9 +149,10 @@ export async function POST(request: Request) {
           altitud_msnm:              datos.predio.altitudMsnm ?? null,
           direccion:                 datos.predio.direccion || null,
           codigo_catastral:          datos.predio.codigoCatastral || null,
-          vive_en_predio:            datos.predio.viveEnPredio || null,
           tiene_vivienda:            datos.predio.tieneVivienda ?? null,
           cultivos_existentes:       datos.predio.cultivosExistentes || null,
+          via_acceso:                datos.predio.viaAcceso || null,
+          cultivo_ya_en_predio:      datos.predio.cultivoYaEnPredio || null,
           updated_at:                new Date(),
         },
       })
@@ -176,6 +183,8 @@ export async function POST(request: Request) {
           cobertura_cultivos:  datos.caracterizacion.coberturaCultivos ?? false,
           cobertura_pastos:    datos.caracterizacion.coberturaPastos ?? false,
           cobertura_rastrojo:  datos.caracterizacion.coberturaRastrojo ?? false,
+          distancia_cabecera_tiempo: datos.caracterizacion.distanciaCabeceraTiempo || null,
+          distancia_capital_tiempo:  datos.caracterizacion.distanciaCapitalTiempo || null,
           updated_at:          new Date(),
         }),
         upsertByPredio('abastecimiento_agua', {
@@ -239,6 +248,27 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
+
+    // ── 9b. Concepto técnico (solo si el asesor lo diligenció) ─────────────
+    // Tabla nueva sin modelo Prisma todavía generado: se usa el cliente admin
+    // de Supabase directamente (igual que /api/caracterizaciones para esta tabla).
+    if (datos.concepto && (datos.concepto.continuarProceso || datos.concepto.vocacionAgricola || datos.concepto.cultivoZonaCercana)) {
+      const { data: existingConcepto } = await storageClient
+        .from('concepto_visita')
+        .select('id')
+        .eq('id_caracterizacion', carac.id)
+        .maybeSingle()
+      const conceptoData = {
+        continuar_proceso: datos.concepto.continuarProceso || null,
+        vocacion_agricola: datos.concepto.vocacionAgricola || null,
+        cultivo_zona_cercana: datos.concepto.cultivoZonaCercana || null,
+      }
+      if (existingConcepto) {
+        await storageClient.from('concepto_visita').update(conceptoData).eq('id', existingConcepto.id)
+      } else {
+        await storageClient.from('concepto_visita').insert({ id_caracterizacion: carac.id, ...conceptoData })
+      }
+    }
     const timestamp = Date.now()
     const prefix    = datos.beneficiario?.numeroDocumento || visitaId.substring(0, 8)
 
@@ -264,6 +294,8 @@ export async function POST(request: Request) {
         ...(firmaUrl           && { firma_productor_url:    firmaUrl           }),
         ...(fotoDocFrontalUrl  && { foto_doc_frontal_url:   fotoDocFrontalUrl  }),
         ...(fotoDocTraseraUrl  && { foto_doc_trasera_url:   fotoDocTraseraUrl  }),
+        ...(datos.archivos?.ubicacionFotoLat != null && { ubicacion_foto_lat: datos.archivos.ubicacionFotoLat }),
+        ...(datos.archivos?.ubicacionFotoLng != null && { ubicacion_foto_lng: datos.archivos.ubicacionFotoLng }),
       },
     })
 

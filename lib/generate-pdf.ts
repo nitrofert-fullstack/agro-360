@@ -388,7 +388,9 @@ export function pdfFromFormData(
     latitud: p?.latitud,
     longitud: p?.longitud,
     cultivosExistentes: p?.cultivosExistentes,
-    viveEnPredio: p?.viveEnPredio,
+    // viveEnPredio se movió de `predio` a `beneficiario` (2026-07-22); se mantiene el
+    // fallback a p?.viveEnPredio por compatibilidad con datos/objetos legado en memoria.
+    viveEnPredio: b?.viveEnPredio ?? p?.viveEnPredio,
     topografia: c?.topografia,
     rutaAcceso: c?.rutaAcceso,
     distanciaKm: c?.distanciaKm,
