@@ -125,9 +125,12 @@ export async function GET(request: Request) {
         include: {
           caracterizacion_predio: true,
           area_productiva:        true,
+          abastecimiento_agua:    true,
+          riesgos_predio:         true,
         },
       },
       visitas: true,
+      concepto_visita: true,
     } satisfies Prisma.caracterizacionesInclude
 
     const [data, total] = await Promise.all([
@@ -157,6 +160,8 @@ export async function GET(request: Request) {
         visita:                 visitas ?? null,
         caracterizacion_predio: predios?.caracterizacion_predio ?? null,
         area_productiva:        (predios?.area_productiva ?? [])[0] ?? null,
+        abastecimiento_agua:    (predios?.abastecimiento_agua ?? [])[0] ?? null,
+        riesgos_predio:         (predios?.riesgos_predio ?? [])[0] ?? null,
         informacion_financiera: (beneficiarios?.informacion_financiera ?? [])[0] ?? null,
         asesor:                 asesorProfile,
       }

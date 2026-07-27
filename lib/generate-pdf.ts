@@ -28,12 +28,17 @@ export interface PDFCaracterizacion {
   longitud?: number | null
   cultivosExistentes?: string
   viveEnPredio?: string | boolean | null
+  viaAcceso?: string
+  cultivoYaEnPredio?: string
+  asociacion?: string
   // Caracterizacion predio
   topografia?: string
   tipoSuelo?: string
   rutaAcceso?: string
   distanciaKm?: number | null
   tiempoAcceso?: string
+  distanciaCabeceraTiempo?: string
+  distanciaCapitalTiempo?: string
   temperaturaCelsius?: number | null
   mesesLluvia?: string
   coberturaBosque?: boolean
@@ -67,6 +72,20 @@ export interface PDFCaracterizacion {
   autorizaUsoImagen?: boolean
   // Observaciones
   observaciones?: string
+  // Núcleo familiar / vínculo con el predio (2026-07-22)
+  trabajaPredio?: boolean | null
+  familiaParticipaLabores?: boolean | null
+  interesAsociarse?: boolean | null
+  interesAsociarseVecinos?: boolean | null
+  experienciaAgropecuaria?: string
+  // Contacto secundario / acudiente
+  nombreContactoSecundario?: string
+  telefonoSecundario?: string
+  parentescoContactoSecundario?: string
+  // Concepto técnico del asesor (paso "Concepto", solo asesor/admin)
+  continuarProceso?: string
+  vocacionAgricola?: string
+  cultivoZonaCercana?: string
 }
 
 const estadoLabels: Record<string, string> = {
@@ -106,6 +125,8 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
 
   const money = (v: number | null | undefined) =>
     v != null ? `$${Number(v).toLocaleString('es-CO')}` : null
+
+  const siNo = (v: boolean | null | undefined) => (v == null ? null : v ? 'Sí' : 'No')
 
   const viveStr =
     typeof data.viveEnPredio === 'boolean'
@@ -204,8 +225,24 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
       ${field('Personas a cargo', data.personasACargo != null ? String(data.personasACargo) : null)}
       ${field('Municipio', data.municipio)}
       ${field('Vereda', data.vereda)}
+      ${field('¿Trabaja directamente en el predio?', siNo(data.trabajaPredio))}
+      ${field('¿Familia participa en labores del predio?', siNo(data.familiaParticipaLabores))}
+      ${field('¿Interés en asociarse?', siNo(data.interesAsociarse))}
+      ${field('¿Interés en asociarse con vecinos?', siNo(data.interesAsociarseVecinos))}
+      ${field('Experiencia agropecuaria', data.experienciaAgropecuaria)}
+      ${field('Asociación/cooperativa/federación', data.asociacion)}
     </div>
   </div>
+
+  ${data.nombreContactoSecundario || data.telefonoSecundario ? `
+  <h2>Contacto Secundario / Acudiente</h2>
+  <div class="section-box">
+    <div class="grid3">
+      ${field('Nombre', data.nombreContactoSecundario)}
+      ${field('Teléfono', data.telefonoSecundario)}
+      ${field('Parentesco', data.parentescoContactoSecundario)}
+    </div>
+  </div>` : ''}
 
   <h2>Datos del Predio</h2>
   <div class="section-box">
@@ -222,6 +259,8 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
       ${field('Coordenadas', data.latitud && data.longitud ? `${Number(data.latitud).toFixed(5)}, ${Number(data.longitud).toFixed(5)}` : null)}
       ${field('Vive en predio', viveStr)}
       ${field('Cultivos existentes', data.cultivosExistentes)}
+      ${field('Vía de acceso', data.viaAcceso)}
+      ${field('¿Cultivo/actividad ya se realiza en el predio?', data.cultivoYaEnPredio)}
     </div>
   </div>
 
@@ -234,6 +273,8 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
       ${field('Ruta de acceso', data.rutaAcceso)}
       ${field('Distancia', data.distanciaKm ? `${data.distanciaKm} km` : null)}
       ${field('Tiempo de acceso', data.tiempoAcceso)}
+      ${field('Tiempo a cabecera municipal', data.distanciaCabeceraTiempo)}
+      ${field('Tiempo a capital del departamento', data.distanciaCapitalTiempo)}
       ${field('Temperatura', data.temperaturaCelsius ? `${data.temperaturaCelsius} °C` : null)}
       ${field('Meses lluvia', data.mesesLluvia)}
     </div>
@@ -271,6 +312,16 @@ export function generateCaracterizacionPDF(data: PDFCaracterizacion): void {
       ${field('Activos totales', money(data.activosTotales))}
       ${field('Activos agropecuarios', money(data.activosAgropecuaria))}
       ${field('Pasivos totales', money(data.pasivosTotales))}
+    </div>
+  </div>` : ''}
+
+  ${data.continuarProceso || data.vocacionAgricola || data.cultivoZonaCercana ? `
+  <h2>Concepto Técnico del Asesor</h2>
+  <div class="section-box">
+    <div class="grid2">
+      ${field('¿Continuar el proceso?', data.continuarProceso)}
+      ${field('Vocación agrícola del productor', data.vocacionAgricola)}
+      ${field('¿Cultivo/actividad en la zona cercana?', data.cultivoZonaCercana)}
     </div>
   </div>` : ''}
 
@@ -332,6 +383,8 @@ export function pdfFromFormData(
     infoFinanciera: any
     autorizaciones: any
     observaciones: string
+    contactoSecundario?: any
+    concepto?: any
   },
   radicado: string,
   estado = 'PENDIENTE_SINCRONIZACION'
@@ -391,12 +444,25 @@ export function pdfFromFormData(
     // viveEnPredio se movió de `predio` a `beneficiario` (2026-07-22); se mantiene el
     // fallback a p?.viveEnPredio por compatibilidad con datos/objetos legado en memoria.
     viveEnPredio: b?.viveEnPredio ?? p?.viveEnPredio,
+    viaAcceso: p?.viaAcceso,
+    cultivoYaEnPredio: p?.cultivoYaEnPredio,
+    trabajaPredio: b?.trabajaPredio,
+    familiaParticipaLabores: b?.familiaParticipaLabores,
+    interesAsociarse: b?.interesAsociarse,
+    interesAsociarseVecinos: b?.interesAsociarseVecinos,
+    experienciaAgropecuaria: b?.experienciaAgropecuaria,
+    asociacion: b?.asociacion,
+    nombreContactoSecundario: fd.contactoSecundario?.nombre,
+    telefonoSecundario: fd.contactoSecundario?.telefono,
+    parentescoContactoSecundario: fd.contactoSecundario?.parentesco,
     topografia: c?.topografia,
     rutaAcceso: c?.rutaAcceso,
     distanciaKm: c?.distanciaKm,
     tiempoAcceso: c?.tiempoAcceso,
     temperaturaCelsius: c?.temperaturaCelsius,
     mesesLluvia: c?.mesesLluvia,
+    distanciaCabeceraTiempo: c?.distanciaCabeceraTiempo,
+    distanciaCapitalTiempo: c?.distanciaCapitalTiempo,
     coberturaBosque: c?.coberturaBosque,
     coberturaCultivos: c?.coberturaCultivos,
     coberturaPastos: c?.coberturaPastos,
@@ -422,6 +488,9 @@ export function pdfFromFormData(
     autorizaAvisoPrivacidad: fd.autorizaciones?.autorizacionAvisoPrivacidad,
     autorizaUsoImagen: fd.autorizaciones?.autorizacionUsoImagen,
     observaciones: fd.observaciones,
+    continuarProceso: fd.concepto?.continuarProceso,
+    vocacionAgricola: fd.concepto?.vocacionAgricola,
+    cultivoZonaCercana: fd.concepto?.cultivoZonaCercana,
   }
 }
 
@@ -437,8 +506,9 @@ export function pdfFromServerData(server: {
   riesgosPredio: any
   areaProductiva: any
   infoFinanciera: any
+  conceptoVisita?: any
 }): PDFCaracterizacion {
-  const { visita, beneficiario, predio, caracterizacionPredio, abastecimientoAgua, riesgosPredio, areaProductiva, infoFinanciera } = server
+  const { visita, beneficiario, predio, caracterizacionPredio, abastecimientoAgua, riesgosPredio, areaProductiva, infoFinanciera, conceptoVisita } = server
 
   const nombre = beneficiario
     ? `${beneficiario.nombres ?? ''} ${beneficiario.apellidos ?? ''}`.trim() || 'Sin nombre'
@@ -487,12 +557,25 @@ export function pdfFromServerData(server: {
     latitud: predio?.latitud ? parseFloat(predio.latitud) : null,
     longitud: predio?.longitud ? parseFloat(predio.longitud) : null,
     cultivosExistentes: predio?.cultivos_existentes,
-    viveEnPredio: predio?.vive_en_predio,
+    viveEnPredio: beneficiario?.vive_en_predio ?? predio?.vive_en_predio,
+    viaAcceso: predio?.via_acceso,
+    cultivoYaEnPredio: predio?.cultivo_ya_en_predio,
+    trabajaPredio: beneficiario?.trabaja_predio,
+    familiaParticipaLabores: beneficiario?.familia_participa_labores,
+    interesAsociarse: beneficiario?.interes_asociarse,
+    interesAsociarseVecinos: beneficiario?.interes_asociarse_vecinos,
+    experienciaAgropecuaria: beneficiario?.experiencia_agropecuaria,
+    asociacion: beneficiario?.asociacion,
+    nombreContactoSecundario: beneficiario?.nombre_contacto_secundario,
+    telefonoSecundario: beneficiario?.telefono_secundario,
+    parentescoContactoSecundario: beneficiario?.parentesco_contacto_secundario,
     topografia: caracterizacionPredio?.topografia,
     tipoSuelo: caracterizacionPredio?.tipo_suelo,
     rutaAcceso: caracterizacionPredio?.ruta_acceso,
     distanciaKm: caracterizacionPredio?.distancia_km,
     tiempoAcceso: caracterizacionPredio?.tiempo_acceso,
+    distanciaCabeceraTiempo: caracterizacionPredio?.distancia_cabecera_tiempo,
+    distanciaCapitalTiempo: caracterizacionPredio?.distancia_capital_tiempo,
     temperaturaCelsius: caracterizacionPredio?.temperatura_celsius,
     mesesLluvia: caracterizacionPredio?.meses_lluvia,
     coberturaBosque: caracterizacionPredio?.cobertura_bosque,
@@ -520,5 +603,8 @@ export function pdfFromServerData(server: {
     autorizaAvisoPrivacidad: server.caracterizacion?.autorizacion_aviso_privacidad,
     autorizaUsoImagen: server.caracterizacion?.autorizacion_uso_imagen,
     observaciones: server.caracterizacion?.observaciones ?? visita?.observaciones,
+    continuarProceso: conceptoVisita?.continuar_proceso,
+    vocacionAgricola: conceptoVisita?.vocacion_agricola,
+    cultivoZonaCercana: conceptoVisita?.cultivo_zona_cercana,
   }
 }

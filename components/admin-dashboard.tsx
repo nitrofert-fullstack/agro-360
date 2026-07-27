@@ -79,6 +79,7 @@ import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import { staggerContainer, staggerItem, fadeUp } from "@/lib/animations"
 import { useVirtualizer } from "@tanstack/react-virtual"
+import { generateCaracterizacionPDF, pdfFromServerData } from "@/lib/generate-pdf"
 const chartFallback = () => (
   <div className="flex h-[220px] w-full items-center justify-center">
     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -140,6 +141,16 @@ interface CaracterizacionDB {
     genero: string | null
     personas_a_cargo: number | null
     ocupacion_principal: string | null
+    asociacion: string | null
+    vive_en_predio: string | null
+    trabaja_predio: boolean | null
+    familia_participa_labores: boolean | null
+    interes_asociarse: boolean | null
+    interes_asociarse_vecinos: boolean | null
+    experiencia_agropecuaria: string | null
+    nombre_contacto_secundario: string | null
+    telefono_secundario: string | null
+    parentesco_contacto_secundario: string | null
   } | null
   predio: {
     id: string
@@ -158,6 +169,8 @@ interface CaracterizacionDB {
     vive_en_predio: string | null
     tiene_vivienda: boolean | null
     cultivos_existentes: string | null
+    via_acceso: string | null
+    cultivo_ya_en_predio: string | null
     poligono: [number, number][] | null
   } | null
   visita: {
@@ -178,8 +191,29 @@ interface CaracterizacionDB {
     ruta_acceso: string | null
     distancia_km: number | null
     tiempo_acceso: string | null
+    distancia_cabecera_tiempo: string | null
+    distancia_capital_tiempo: string | null
     temperatura_celsius: number | null
     meses_lluvia: string | null
+  } | null
+  abastecimiento_agua: {
+    id: string
+    nacimiento_manantial: boolean | null
+    rio_quebrada: boolean | null
+    pozo: boolean | null
+    acueducto_rural: boolean | null
+    canal_distrito_riego: boolean | null
+    jaguey_reservorio: boolean | null
+    agua_lluvia: boolean | null
+    otra_fuente: string | null
+  } | null
+  riesgos_predio: {
+    id: string
+    inundacion: boolean | null
+    sequia: boolean | null
+    viento: boolean | null
+    helada: boolean | null
+    otros_riesgos: string | null
   } | null
   area_productiva: {
     id: string
@@ -201,6 +235,12 @@ interface CaracterizacionDB {
     activos_totales: number | null
     activos_agropecuaria: number | null
     pasivos_totales: number | null
+  } | null
+  concepto_visita: {
+    id: string
+    continuar_proceso: string | null
+    vocacion_agricola: string | null
+    cultivo_zona_cercana: string | null
   } | null
   asesor: {
     id: string
@@ -1036,208 +1076,21 @@ export function AdminDashboard() {
 
   const generatePDF = (cTyped: CaracterizacionDB) => {
     const c: any = cTyped
-    const nombre = getNombreCompleto(cTyped)
-    const fechaGen = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })
-    const estadoLabel = getEstadoConfig(c.estado).label
-
-    const field = (label: string, value: string | number | null | undefined) =>
-      value != null && value !== ''
-        ? `<div class="field"><span class="lbl">${label}:</span> <span class="val">${value}</span></div>`
-        : ''
-
-    const tag = (label: string, active: boolean | null | undefined) =>
-      active ? `<span class="tag">${label}</span>` : ''
-
-    const money = (v: number | null | undefined) =>
-      v != null ? `$${Number(v).toLocaleString('es-CO')}` : null
-
-    const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <title>Caracterizacion — ${nombre}</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#111;background:#fff}
-    .page{padding:14mm 12mm;max-width:210mm;margin:0 auto}
-    .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #16a34a;padding-bottom:10px;margin-bottom:14px}
-    .logo{font-size:18px;font-weight:900;color:#16a34a;letter-spacing:-0.5px}
-    .logo-sub{font-size:9px;color:#555;margin-top:2px}
-    .header-right{text-align:right}
-    .doc-title{font-size:12px;font-weight:700;text-transform:uppercase;color:#111;margin-bottom:3px}
-    .radicado{font-family:monospace;font-size:9.5px;color:#555}
-    .estado-badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:9px;font-weight:700;margin-top:3px;background:#dcfce7;color:#15803d}
-    h2{font-size:11px;font-weight:700;color:#15803d;border-left:3px solid #16a34a;padding:2px 0 2px 7px;margin:12px 0 7px;text-transform:uppercase;letter-spacing:0.4px}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:3px 18px}
-    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 12px}
-    .field{margin-bottom:4px;line-height:1.4}
-    .lbl{color:#555;font-size:9.5px}
-    .val{font-weight:600;font-size:10px;color:#111}
-    .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
-    .tag{padding:2px 7px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;font-size:9px;color:#15803d;font-weight:600}
-    .tag-blue{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
-    .tag-red{background:#fef2f2;border-color:#fecaca;color:#dc2626}
-    .section-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:5px;padding:8px 10px;margin-bottom:10px}
-    .divider{border:none;border-top:1px solid #e5e7eb;margin:10px 0}
-    .footer{margin-top:20px;border-top:1px solid #e5e7eb;padding-top:8px;display:flex;justify-content:space-between;color:#9ca3af;font-size:8.5px}
-    .auth-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}
-    .auth-item{padding:2px 8px;border-radius:4px;font-size:9px;font-weight:600}
-    .auth-ok{background:#dcfce7;color:#15803d}
-    .auth-no{background:#fee2e2;color:#dc2626}
-    @page{size:A4;margin:10mm}
-    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-  </style>
-</head>
-<body>
-<div class="page">
-
-  <!-- Header -->
-  <div class="header">
-    <div>
-      <div class="logo">Santander Agro360</div>
-      <div class="logo-sub">Sistema de Caracterizacion Agropecuaria — Santander, Colombia</div>
-    </div>
-    <div class="header-right">
-      <div class="doc-title">Ficha de Caracterizacion Predial</div>
-      <div class="radicado">Radicado: ${c.radicado_oficial || c.radicado_local}</div>
-      <div class="radicado">Generado: ${fechaGen}</div>
-      <div class="estado-badge">${estadoLabel}</div>
-    </div>
-  </div>
-
-  <!-- Beneficiario -->
-  <h2>Datos del Productor</h2>
-  <div class="section-box">
-    <div class="grid2">
-      ${field('Nombre completo', nombre)}
-      ${field('Tipo documento', c.beneficiario?.tipo_documento)}
-      ${field('Num. documento', c.beneficiario?.numero_documento)}
-      ${field('Edad', c.beneficiario?.edad ? `${c.beneficiario.edad} años` : null)}
-      ${field('Telefono', c.beneficiario?.telefono)}
-      ${field('Correo', c.beneficiario?.correo)}
-      ${field('Ocupacion', c.beneficiario?.ocupacion_principal)}
-      ${field('Municipio', c.predio?.municipio)}
-      ${field('Vereda', c.predio?.vereda)}
-    </div>
-  </div>
-
-  <!-- Predio -->
-  <h2>Datos del Predio</h2>
-  <div class="section-box">
-    <div class="grid3">
-      ${field('Nombre predio', c.predio?.nombre_predio)}
-      ${field('Departamento', c.predio?.departamento)}
-      ${field('Municipio', c.predio?.municipio)}
-      ${field('Vereda', c.predio?.vereda)}
-      ${field('Tipo tenencia', c.predio?.tipo_tenencia)}
-      ${field('Codigo catastral', c.predio?.codigo_catastral)}
-      ${field('Area total', c.predio?.area_total_hectareas ? `${c.predio.area_total_hectareas} ha` : null)}
-      ${field('Area productiva', c.predio?.area_productiva_hectareas ? `${c.predio.area_productiva_hectareas} ha` : null)}
-      ${field('Altitud', c.predio?.altitud_msnm ? `${c.predio.altitud_msnm} msnm` : null)}
-      ${field('Coordenadas', c.predio?.latitud && c.predio?.longitud ? `${parseFloat(String(c.predio.latitud)).toFixed(5)}, ${parseFloat(String(c.predio.longitud)).toFixed(5)}` : null)}
-      ${field('Vive en predio', c.predio?.vive_en_predio ? 'Si' : (c.predio?.vive_en_predio === false ? 'No' : null))}
-      ${field('Acceso vial', c.predio?.acceso_vial)}
-      ${field('Cultivos existentes', c.predio?.cultivos_existentes)}
-    </div>
-  </div>
-
-  <!-- Caracterizacion predio -->
-  ${c.caracterizacion_predio ? `
-  <h2>Caracterizacion del Predio</h2>
-  <div class="section-box">
-    <div class="grid3">
-      ${field('Topografia', c.caracterizacion_predio.topografia)}
-      ${field('Tipo suelo', c.caracterizacion_predio.tipo_suelo)}
-      ${field('Cobertura vegetal', [c.caracterizacion_predio.cobertura_bosque && 'Bosque', c.caracterizacion_predio.cobertura_cultivos && 'Cultivos', c.caracterizacion_predio.cobertura_pastos && 'Pastos', c.caracterizacion_predio.cobertura_rastrojo && 'Rastrojo'].filter(Boolean).join(', ') || null)}
-      ${field('Ruta acceso', c.caracterizacion_predio.ruta_acceso)}
-      ${field('Distancia', c.caracterizacion_predio.distancia_km ? `${c.caracterizacion_predio.distancia_km} km` : null)}
-      ${field('Tiempo acceso', c.caracterizacion_predio.tiempo_acceso)}
-      ${field('Temperatura', c.caracterizacion_predio.temperatura_celsius ? `${c.caracterizacion_predio.temperatura_celsius} °C` : null)}
-      ${field('Meses lluvia', c.caracterizacion_predio.meses_lluvia)}
-    </div>
-  </div>` : ''}
-
-  <!-- Agua y riesgos -->
-  ${c.predio?.fuente_agua ? `
-  <h2>Abastecimiento de Agua</h2>
-  <div class="section-box">${field('Fuente', c.predio.fuente_agua)}</div>` : ''}
-
-  <!-- Area productiva -->
-  ${c.area_productiva ? `
-  <h2>Area Productiva</h2>
-  <div class="section-box">
-    <div class="grid3">
-      ${field('Cultivo principal', c.area_productiva.cultivo_principal)}
-      ${field('Area cultivo', c.area_productiva.area_cultivo_principal ? `${c.area_productiva.area_cultivo_principal} ha` : null)}
-      ${field('Estado cultivo', c.area_productiva.estado_cultivo)}
-      ${field('Sistema productivo', c.area_productiva.sistema_productivo)}
-      ${field('Prod. estimada', c.area_productiva.produccion_estimada ? `${c.area_productiva.produccion_estimada} ton` : null)}
-      ${field('Destino produccion', c.area_productiva.destino_produccion)}
-      ${field('Donde comercializa', c.area_productiva.donde_comercializa)}
-      ${field('Ingreso mensual', money(c.area_productiva.ingreso_mensual_ventas))}
-      ${field('Caracterizacion cultivo', c.area_productiva.caracterizacion_cultivo)}
-    </div>
-  </div>` : ''}
-
-  <!-- Info financiera -->
-  ${c.informacion_financiera ? `
-  <h2>Informacion Financiera</h2>
-  <div class="section-box">
-    <div class="grid3">
-      ${field('Ingresos agropecuarios', money(c.informacion_financiera.ingresos_mensuales_agropecuaria))}
-      ${field('Otros ingresos', money(c.informacion_financiera.ingresos_mensuales_otros))}
-      ${field('Egresos mensuales', money(c.informacion_financiera.egresos_mensuales))}
-      ${field('Activos totales', money(c.informacion_financiera.activos_totales))}
-      ${field('Pasivos totales', money(c.informacion_financiera.pasivos_totales))}
-    </div>
-  </div>` : ''}
-
-  <!-- Registro -->
-  <h2>Datos del Registro</h2>
-  <div class="section-box">
-    <div class="grid3">
-      ${field('Tecnico / Asesor', c.visita?.nombre_tecnico || c.asesor?.nombre_completo)}
-      ${field('Correo asesor', c.asesor?.email)}
-      ${field('Fecha visita', fmtFecha(c.visita?.fecha_visita, 'No registrada'))}
-      ${field('Fecha registro', c.created_at ? new Date(c.created_at).toLocaleDateString('es-CO') : null)}
-      ${field('Radicado local', c.radicado_local)}
-      ${field('Radicado oficial', c.radicado_oficial)}
-    </div>
-  </div>
-
-  <!-- Autorizaciones -->
-  <h2>Autorizaciones</h2>
-  <div class="section-box">
-    <div class="auth-row">
-      <span class="auth-item ${c.autorizacion_datos_personales ? 'auth-ok' : 'auth-no'}">
-        ${c.autorizacion_datos_personales ? '✓' : '✗'} Tratamiento de datos personales
-      </span>
-      <span class="auth-item ${c.autorizacion_aviso_privacidad ? 'auth-ok' : 'auth-no'}">
-        ${c.autorizacion_aviso_privacidad ? '✓' : '✗'} Aviso de privacidad
-      </span>
-    </div>
-    ${c.observaciones ? `<div style="margin-top:8px">${field('Observaciones', c.observaciones)}</div>` : ''}
-  </div>
-
-  <div class="footer">
-    <span>Santander Agro360 — Sistema de Caracterizacion Agropecuaria</span>
-    <span>Documento generado el ${fechaGen}</span>
-  </div>
-</div>
-</body>
-</html>`
-
-    const win = window.open('', '_blank', 'width=900,height=700')
-    if (!win) {
-      toast.error('Permite las ventanas emergentes para generar el PDF')
-      return
-    }
-    win.document.write(html)
-    win.document.close()
-    win.focus()
-    setTimeout(() => {
-      win.print()
-    }, 500)
+    // Delega en el generador central (lib/generate-pdf.ts) para no mantener una
+    // plantilla HTML duplicada que se desincroniza cada vez que se agrega un campo.
+    const pdfData = pdfFromServerData({
+      visita: c.visita,
+      caracterizacion: c,
+      beneficiario: c.beneficiario,
+      predio: c.predio,
+      caracterizacionPredio: c.caracterizacion_predio,
+      abastecimientoAgua: c.abastecimiento_agua,
+      riesgosPredio: c.riesgos_predio,
+      areaProductiva: c.area_productiva,
+      infoFinanciera: c.informacion_financiera,
+      conceptoVisita: c.concepto_visita,
+    })
+    generateCaracterizacionPDF(pdfData)
   }
 
   // Paginación server-side: `usuarios` ya contiene solo la página actual
@@ -2190,6 +2043,58 @@ export function AdminDashboard() {
                     </CardContent>
                   </Card>
 
+                  <Card className="border-l-4 border-l-primary bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <User className="h-4 w-4 text-primary" />
+                        Vínculo con el Predio
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Trabaja directamente en el predio:</span>
+                        <span>{selectedCaracterizacion.beneficiario?.trabaja_predio == null ? 'No especificado' : selectedCaracterizacion.beneficiario.trabaja_predio ? 'Sí' : 'No'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Familia participa en labores:</span>
+                        <span>{selectedCaracterizacion.beneficiario?.familia_participa_labores == null ? 'No especificado' : selectedCaracterizacion.beneficiario.familia_participa_labores ? 'Sí' : 'No'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Interés en asociarse:</span>
+                        <span>{selectedCaracterizacion.beneficiario?.interes_asociarse == null ? 'No especificado' : selectedCaracterizacion.beneficiario.interes_asociarse ? 'Sí' : 'No'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Interés en asociarse con vecinos:</span>
+                        <span>{selectedCaracterizacion.beneficiario?.interes_asociarse_vecinos == null ? 'No especificado' : selectedCaracterizacion.beneficiario.interes_asociarse_vecinos ? 'Sí' : 'No'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Asociación/cooperativa:</span>
+                        <span className="text-right">{selectedCaracterizacion.beneficiario?.asociacion || 'No registrada'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Experiencia agropecuaria:</span>
+                        <span className="text-right">{selectedCaracterizacion.beneficiario?.experiencia_agropecuaria || 'No especificada'}</span>
+                      </div>
+                      {(selectedCaracterizacion.beneficiario?.nombre_contacto_secundario || selectedCaracterizacion.beneficiario?.telefono_secundario) && (
+                        <div className="mt-2 rounded-lg border border-border/50 bg-muted/20 p-2 space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contacto Secundario / Acudiente</p>
+                          <div className="flex justify-between gap-x-3">
+                            <span className="text-muted-foreground shrink-0">Nombre:</span>
+                            <span>{selectedCaracterizacion.beneficiario?.nombre_contacto_secundario || 'No registrado'}</span>
+                          </div>
+                          <div className="flex justify-between gap-x-3">
+                            <span className="text-muted-foreground shrink-0">Teléfono:</span>
+                            <span>{selectedCaracterizacion.beneficiario?.telefono_secundario || 'No registrado'}</span>
+                          </div>
+                          <div className="flex justify-between gap-x-3">
+                            <span className="text-muted-foreground shrink-0">Parentesco:</span>
+                            <span>{selectedCaracterizacion.beneficiario?.parentesco_contacto_secundario || 'No registrado'}</span>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
                   <Card className="border-l-4 border-l-orange-500 bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-base">
@@ -2324,6 +2229,14 @@ export function AdminDashboard() {
                         <span className="text-muted-foreground shrink-0">Cultivos:</span>
                         <span className="text-right">{selectedCaracterizacion.predio?.cultivos_existentes || 'No especificados'}</span>
                       </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Vía de acceso:</span>
+                        <span className="text-right">{selectedCaracterizacion.predio?.via_acceso || 'No especificada'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">¿Cultivo ya se realiza en el predio?:</span>
+                        <span className="text-right">{selectedCaracterizacion.predio?.cultivo_ya_en_predio || 'No especificado'}</span>
+                      </div>
                     </CardContent>
                   </Card>
 
@@ -2341,11 +2254,19 @@ export function AdminDashboard() {
                       </div>
                       <div className="flex justify-between gap-x-3">
                         <span className="text-muted-foreground shrink-0">Ruta de acceso:</span>
-                        <span className="text-right">{(selectedCaracterizacion.predio as any)?.acceso_vial || selectedCaracterizacion.caracterizacion_predio?.ruta_acceso || 'No especificada'}</span>
+                        <span className="text-right">{selectedCaracterizacion.caracterizacion_predio?.ruta_acceso || 'No especificada'}</span>
                       </div>
                       <div className="flex justify-between gap-x-3">
                         <span className="text-muted-foreground shrink-0">Distancia:</span>
-                        <span>{(selectedCaracterizacion.predio as any)?.distancia_cabecera ? `${(selectedCaracterizacion.predio as any).distancia_cabecera} km` : selectedCaracterizacion.caracterizacion_predio?.distancia_km ? `${selectedCaracterizacion.caracterizacion_predio.distancia_km} km` : 'No registrada'}</span>
+                        <span>{selectedCaracterizacion.caracterizacion_predio?.distancia_km ? `${selectedCaracterizacion.caracterizacion_predio.distancia_km} km` : 'No registrada'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Tiempo a cabecera municipal:</span>
+                        <span className="text-right">{selectedCaracterizacion.caracterizacion_predio?.distancia_cabecera_tiempo || 'No registrado'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Tiempo a capital del departamento:</span>
+                        <span className="text-right">{selectedCaracterizacion.caracterizacion_predio?.distancia_capital_tiempo || 'No registrado'}</span>
                       </div>
                       <div className="flex justify-between gap-x-3">
                         <span className="text-muted-foreground shrink-0">Temperatura:</span>
@@ -2353,11 +2274,82 @@ export function AdminDashboard() {
                       </div>
                       <div className="flex justify-between gap-x-3">
                         <span className="text-muted-foreground shrink-0">Vive en predio:</span>
-                        <span>{selectedCaracterizacion.predio?.vive_en_predio || 'No especificado'}</span>
+                        <span>{selectedCaracterizacion.beneficiario?.vive_en_predio || selectedCaracterizacion.predio?.vive_en_predio || 'No especificado'}</span>
                       </div>
                     </CardContent>
                   </Card>
                 </div>
+
+                {/* Fila 2b: Agua y Riesgos */}
+                {(selectedCaracterizacion.abastecimiento_agua || selectedCaracterizacion.riesgos_predio) && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {selectedCaracterizacion.abastecimiento_agua && (
+                      <Card className="border-l-4 border-l-cyan-500 bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Abastecimiento de Agua</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-wrap gap-2 text-sm">
+                          {[
+                            selectedCaracterizacion.abastecimiento_agua.nacimiento_manantial && 'Nacimiento/Manantial',
+                            selectedCaracterizacion.abastecimiento_agua.rio_quebrada && 'Río/Quebrada',
+                            selectedCaracterizacion.abastecimiento_agua.pozo && 'Pozo',
+                            selectedCaracterizacion.abastecimiento_agua.acueducto_rural && 'Acueducto Rural',
+                            selectedCaracterizacion.abastecimiento_agua.canal_distrito_riego && 'Canal Distrito Riego',
+                            selectedCaracterizacion.abastecimiento_agua.jaguey_reservorio && 'Jagüey/Reservorio',
+                            selectedCaracterizacion.abastecimiento_agua.agua_lluvia && 'Agua Lluvia',
+                            selectedCaracterizacion.abastecimiento_agua.otra_fuente,
+                          ].filter(Boolean).map((f, i) => (
+                            <Badge key={i} variant="outline" className="bg-primary/10 text-primary border-primary/20">{f}</Badge>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    )}
+                    {selectedCaracterizacion.riesgos_predio && (
+                      <Card className="border-l-4 border-l-red-500 bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Riesgos del Predio</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-wrap gap-2 text-sm">
+                          {[
+                            selectedCaracterizacion.riesgos_predio.inundacion && 'Inundación',
+                            selectedCaracterizacion.riesgos_predio.sequia && 'Sequía',
+                            selectedCaracterizacion.riesgos_predio.viento && 'Viento',
+                            selectedCaracterizacion.riesgos_predio.helada && 'Helada',
+                            selectedCaracterizacion.riesgos_predio.otros_riesgos,
+                          ].filter(Boolean).map((f, i) => (
+                            <Badge key={i} variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">{f}</Badge>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
+
+                {/* Concepto Técnico del Asesor */}
+                {selectedCaracterizacion.concepto_visita && (
+                  <Card className="border-l-4 border-l-indigo-500 bg-card/80 border-border/60" style={{boxShadow:'var(--shadow-sm)'}}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Shield className="h-4 w-4 text-indigo-500" />
+                        Concepto Técnico del Asesor
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">¿Continuar el proceso?:</span>
+                        <span className="text-right">{selectedCaracterizacion.concepto_visita.continuar_proceso || 'No especificado'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">Vocación agrícola:</span>
+                        <span className="text-right">{selectedCaracterizacion.concepto_visita.vocacion_agricola || 'No especificada'}</span>
+                      </div>
+                      <div className="flex justify-between gap-x-3">
+                        <span className="text-muted-foreground shrink-0">¿Cultivo en la zona cercana?:</span>
+                        <span className="text-right">{selectedCaracterizacion.concepto_visita.cultivo_zona_cercana || 'No especificado'}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Fila 3: Producción + Financiero */}
                 <div className="grid gap-4 md:grid-cols-2">

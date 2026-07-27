@@ -80,6 +80,7 @@ interface ServerData {
   riesgosPredio: any
   areaProductiva: any
   infoFinanciera: any
+  conceptoVisita?: any
 }
 
 function InfoRow({ label, value }: { label: string; value: string | number | null | undefined }) {
@@ -598,7 +599,7 @@ function ServerDetailView({
   onReload: () => Promise<void>
 }) {
   const router = useRouter()
-  const { visita, caracterizacion, beneficiario, predio, caracterizacionPredio, abastecimientoAgua, riesgosPredio, areaProductiva, infoFinanciera } = data
+  const { visita, caracterizacion, beneficiario, predio, caracterizacionPredio, abastecimientoAgua, riesgosPredio, areaProductiva, infoFinanciera, conceptoVisita } = data
 
   const nombre = beneficiario
     ? `${beneficiario.nombres || ''} ${beneficiario.apellidos || ''}`.trim() || "Sin nombre"
@@ -775,6 +776,14 @@ function ServerDetailView({
               <InfoRow label="Telefono" value={beneficiario?.telefono} />
               <InfoRow label="Correo" value={beneficiario?.correo} />
               <InfoRow label="Ocupacion principal" value={beneficiario?.ocupacion_principal} />
+              <InfoRow label="Asociación/cooperativa/federación" value={beneficiario?.asociacion} />
+              <InfoRow label="Experiencia agropecuaria" value={beneficiario?.experiencia_agropecuaria} />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <BooleanTag label="Trabaja directamente en el predio" active={beneficiario?.trabaja_predio} />
+              <BooleanTag label="Familia participa en labores del predio" active={beneficiario?.familia_participa_labores} />
+              <BooleanTag label="Interés en asociarse" active={beneficiario?.interes_asociarse} />
+              <BooleanTag label="Interés en asociarse con vecinos" active={beneficiario?.interes_asociarse_vecinos} />
             </div>
             {(beneficiario?.nombre_contacto_secundario || beneficiario?.telefono_secundario) && (
               <div className="mt-4 rounded-lg border border-border/50 bg-muted/20 p-3 space-y-2">
@@ -801,9 +810,11 @@ function ServerDetailView({
               <InfoRow label="Codigo catastral" value={predio?.codigo_catastral} />
               <InfoRow label="Area total (ha)" value={predio?.area_total_hectareas} />
               <InfoRow label="Area productiva (ha)" value={predio?.area_productiva_hectareas} />
-              <InfoRow label="Vive en predio" value={predio?.vive_en_predio} />
+              <InfoRow label="Vive en predio" value={beneficiario?.vive_en_predio ?? predio?.vive_en_predio} />
               <InfoRow label="Tiene vivienda" value={predio?.tiene_vivienda ? "Si" : "No"} />
               <InfoRow label="Cultivos existentes" value={predio?.cultivos_existentes} />
+              <InfoRow label="Vía de acceso" value={predio?.via_acceso} />
+              <InfoRow label="¿Cultivo/actividad ya se realiza en el predio?" value={predio?.cultivo_ya_en_predio} />
             </div>
           </SectionCard>
 
@@ -815,6 +826,8 @@ function ServerDetailView({
                 <InfoRow label="Ruta de acceso" value={caracterizacionPredio.ruta_acceso} />
                 <InfoRow label="Distancia (km)" value={caracterizacionPredio.distancia_km} />
                 <InfoRow label="Tiempo de acceso" value={caracterizacionPredio.tiempo_acceso} />
+                <InfoRow label="Tiempo a cabecera municipal" value={caracterizacionPredio.distancia_cabecera_tiempo} />
+                <InfoRow label="Tiempo a capital del departamento" value={caracterizacionPredio.distancia_capital_tiempo} />
                 <InfoRow label="Temperatura (°C)" value={caracterizacionPredio.temperatura_celsius} />
                 <InfoRow label="Meses de lluvia" value={caracterizacionPredio.meses_lluvia} />
               </div>
@@ -942,6 +955,19 @@ function ServerDetailView({
                     </div>
                   </div>
                 )}
+              </div>
+            </SectionCard>
+          </div>
+        )}
+
+        {/* Concepto Tecnico del Asesor */}
+        {conceptoVisita && (
+          <div className="mt-6">
+            <SectionCard title="Concepto Técnico del Asesor" icon={Shield} accent="border-l-indigo-500">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <InfoRow label="¿Continuar el proceso?" value={conceptoVisita.continuar_proceso} />
+                <InfoRow label="Vocación agrícola del productor" value={conceptoVisita.vocacion_agricola} />
+                <InfoRow label="¿Cultivo/actividad en la zona cercana?" value={conceptoVisita.cultivo_zona_cercana} />
               </div>
             </SectionCard>
           </div>
