@@ -292,7 +292,7 @@ export function MapViewer({
   const markerLayersRef = useRef<L.Layer[]>([])
   const ndviTileLayerRef = useRef<L.TileLayer | null>(null)
 
-  const [activeLayer, setActiveLayer] = useState<LayerType>(controlledLayer ?? "ndvi")
+  const [activeLayer, setActiveLayer] = useState<LayerType>(controlledLayer ?? "cartoLight")
   const [opacity, setOpacity] = useState(0.85)
 
   // Sync con controlledLayer externo
@@ -301,6 +301,10 @@ export function MapViewer({
   }, [controlledLayer])
   const [isLoading, setIsLoading] = useState(true)
   const [isMapReady, setIsMapReady] = useState(false)
+  // Refleja el evento nativo 'loading'/'load' de Leaflet en la capa activa —
+  // no reinventamos tracking propio de tiles, solo escuchamos lo que
+  // TileLayer ya emite.
+  const [tilesLoading, setTilesLoading] = useState(false)
   const [currentZoom, setCurrentZoom] = useState(initialZoom || 8)
   const [drawMode, setDrawMode] = useState<DrawMode>("none")
   const [isDrawing, setIsDrawing] = useState(false)
@@ -621,6 +625,8 @@ export function MapViewer({
         minZoom: 7,
         maxZoom: 18,
         preferCanvas: true, // renderiza vectores/marcadores en canvas (mucho más rápido que DOM)
+        wheelDebounceTime: 80,
+        wheelPxPerZoomLevel: 100,
       })
       
       if (!initialCenter) {
@@ -736,23 +742,85 @@ export function MapViewer({
       setCurrentZoom(map.getZoom())
 
       const ColorRemapTileLayer = createColorRemapTileLayer(L.default) as any
+      // Contador de fallos por capa: si una capa externa (ej. NASA GIBS) falla
+      // repetidamente (servidor caído, rate-limit, etc.), la desactivamos sola
+      // y volvemos a una capa base confiable — así el mapa nunca se queda
+      // gris/roto por un proveedor de terceros fallando.
+      const tileFailCounts: Record<string, number> = {}
+      const TILE_FAIL_THRESHOLD = 8
+      // Cadena de respaldo entre capas base: si la base activa falla repetido,
+      // probamos la siguiente de esta lista (en vez de quedarnos sin nada).
+      const BASE_FALLBACK_CHAIN: LayerType[] = ['cartoLight', 'cartoVoyager', 'osm', 'esriStreet', 'openTopo']
+
       Object.entries(layers).forEach(([key, config]) => {
         let layer: L.TileLayer
 
+        // updateWhenIdle: no dispara descargas de tiles a mitad del pan/zoom,
+        // solo cuando el usuario termina el gesto — evita pedir (y luego
+        // abortar) tiles que nunca se llegan a ver, y es la opción nativa
+        // de Leaflet para esto (por defecto ya es así en touch/mobile).
+        // crossOrigin: todos estos proveedores (OSM/Carto/ArcGIS/NASA GIBS)
+        // envían Access-Control-Allow-Origin: * → pedir en modo 'cors' da una
+        // respuesta REAL (status verdadero) en vez de "opaca" (status 0
+        // siempre, sin importar si la petición realmente falló). Sin esto,
+        // un fallo transitorio de red podía quedar cacheado como si fuera
+        // válido (CacheFirst + cacheableResponse:[0,200] no distinguía),
+        // dejando ese tile roto hasta que expirara el caché — la causa del
+        // "a veces carga, a veces no".
+        // keepBuffer: mantiene más filas/columnas de tiles fuera de vista
+        // renderizadas (default 2) — al hacer pan rápido se ve el tile ya
+        // listo en vez de un parche gris momentáneo mientras llega el nuevo.
+        // detectRetina: pide tiles @2x en pantallas retina cuando el proveedor
+        // lo soporta (Carto sí, vía {r} en la URL); en el resto Leaflet lo
+        // ignora sin romper nada.
         if (config.useColorRemap) {
           layer = new ColorRemapTileLayer(config.url, {
             attribution: config.attribution,
             opacity: key === activeLayer ? opacity : 0,
             maxZoom: config.maxZoom || 18,
+            updateWhenIdle: true,
+            crossOrigin: true,
+            keepBuffer: 4,
+            detectRetina: true,
           })
         } else {
           layer = L.default.tileLayer(config.url, {
             attribution: config.attribution,
             opacity: key === activeLayer ? opacity : 0,
             subdomains: (config as any).subdomains || 'abc',
+            updateWhenIdle: true,
+            crossOrigin: true,
+            keepBuffer: 4,
+            detectRetina: true,
           })
         }
-        
+
+        layer.on('tileerror', (e: any) => {
+          // Reintento inmediato: la mayoría de "no-response" son aborts por
+          // pan/zoom rápido, no fallos reales del proveedor — un retry corto
+          // recupera el tile sin intervención del usuario.
+          const img = e.tile as HTMLImageElement
+          if (img && !img.dataset.retried) {
+            img.dataset.retried = '1'
+            setTimeout(() => { img.src = img.src }, 500)
+            return
+          }
+
+          tileFailCounts[key] = (tileFailCounts[key] || 0) + 1
+          if (tileFailCounts[key] >= TILE_FAIL_THRESHOLD && key === activeLayer) {
+            if (config.category !== 'base') {
+              console.warn(`[map-viewer] Capa "${config.name}" fallando repetidamente, se desactiva y se vuelve a mapa base.`)
+              setActiveLayer('cartoLight')
+            } else {
+              const next = BASE_FALLBACK_CHAIN.find(k => k !== key)
+              if (next) {
+                console.warn(`[map-viewer] Capa base "${config.name}" fallando repetidamente, cambiando a "${layers[next].name}".`)
+                setActiveLayer(next)
+              }
+            }
+          }
+        })
+
         layersRef.current[key] = layer
         layer.addTo(map)
       })
@@ -1002,6 +1070,26 @@ export function MapViewer({
       layer.setOpacity(key === activeLayer ? opacity : 0)
     })
   }, [activeLayer, opacity])
+
+  // Loading nativo de Leaflet: escucha 'loading'/'load' de la capa activa.
+  // Si ya está en caché, Leaflet dispara 'load' casi al instante — no hay
+  // spinner de más. Si toca ir a red (ej. tras un zoom), se ve hasta que
+  // termine, en vez de dejar tiles grises/a medias mientras se resuelve.
+  useEffect(() => {
+    const layer = layersRef.current[activeLayer]
+    if (!layer) return
+
+    const onLoading = () => setTilesLoading(true)
+    const onLoad = () => setTilesLoading(false)
+
+    layer.on('loading', onLoading)
+    layer.on('load', onLoad)
+
+    return () => {
+      layer.off('loading', onLoading)
+      layer.off('load', onLoad)
+    }
+  }, [activeLayer, isMapReady])
 
   // Auto-setear selectedPredio cuando se pasan markerPosition + polygonCoords como props directos
   // (caso: modal de admin que no usa el array markers[])
@@ -1355,6 +1443,12 @@ export function MapViewer({
             </div>
           </div>
         )}
+        {!isLoading && tilesLoading && (
+          <div className="absolute top-3 right-3 z-[1001] flex items-center gap-2 rounded-full bg-background/90 border border-border px-3 py-1.5 shadow-md backdrop-blur-sm pointer-events-none">
+            <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span className="text-xs text-muted-foreground">Cargando...</span>
+          </div>
+        )}
       </div>
     )
   }
@@ -1370,6 +1464,14 @@ export function MapViewer({
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
             <span className="text-sm text-muted-foreground">Cargando mapa...</span>
           </div>
+        </div>
+      )}
+      {/* Badge de carga de tiles: no bloquea zoom/pan, solo avisa mientras la
+          capa activa termina de traer sus tiles (ej. tras cambiar de zoom) */}
+      {!isLoading && tilesLoading && (
+        <div className="absolute top-3 right-3 z-[1001] flex items-center gap-2 rounded-full bg-background/90 border border-border px-3 py-1.5 shadow-md backdrop-blur-sm pointer-events-none">
+          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <span className="text-xs text-muted-foreground">Cargando...</span>
         </div>
       )}
 

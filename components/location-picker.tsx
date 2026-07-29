@@ -160,6 +160,7 @@ export function LocationPicker({ onLocationChange, initialLocation, municipio }:
     lng: initialLocation?.longitud != null ? Number(initialLocation.longitud) || -73.1198 : -73.1198,
   })
   const [isMapReady, setIsMapReady] = useState(false)
+  const [tilesLoading, setTilesLoading] = useState(false)
   const [locating, setLocating] = useState(false)
   const [geoError, setGeoError] = useState<string | null>(null)
   const isInitializingRef = useRef(false)
@@ -225,12 +226,32 @@ export function LocationPicker({ onLocationChange, initialLocation, municipio }:
           maxBoundsViscosity: 1.0,
           minZoom: 8,
           maxZoom: 18,
+          wheelDebounceTime: 80,
+          wheelPxPerZoomLevel: 100,
         })
 
-        // Base layer
-        L.default.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        // Base layer. updateWhenIdle: solo pide tiles cuando el usuario
+        // termina el pan/zoom (no a mitad de gesto) — evita requests
+        // abortados y tiles a medias durante el movimiento.
+        const baseLayer = L.default.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution: "OpenStreetMap",
+          updateWhenIdle: true,
+          crossOrigin: true,
+          keepBuffer: 4,
+          detectRetina: true,
         }).addTo(map)
+
+        baseLayer.on('loading', () => setTilesLoading(true))
+        baseLayer.on('load', () => setTilesLoading(false))
+        baseLayer.on('tileerror', (e: any) => {
+          // Reintento único: la mayoría de fallos son aborts por pan/zoom
+          // rápido, no caídas reales del proveedor.
+          const img = e.tile as HTMLImageElement
+          if (img && !img.dataset.retried) {
+            img.dataset.retried = '1'
+            setTimeout(() => { img.src = img.src }, 500)
+          }
+        })
 
         // Add Santander bounds visualization
         L.default.rectangle(santanderBounds, {
@@ -594,10 +615,23 @@ export function LocationPicker({ onLocationChange, initialLocation, municipio }:
         </div>
       )}
 
-      <div
-        ref={mapRef}
-        className="h-[300px] md:h-[420px] w-full rounded-lg border border-border"
-      />
+      <div className="relative">
+        <div
+          ref={mapRef}
+          className="h-[300px] md:h-[420px] w-full rounded-lg border border-border"
+        />
+        {!isMapReady && (
+          <div className="absolute inset-0 z-[1000] flex items-center justify-center rounded-lg bg-background/80 backdrop-blur-sm pointer-events-none">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+        {isMapReady && tilesLoading && (
+          <div className="absolute top-2 right-2 z-[1000] flex items-center gap-2 rounded-full bg-background/90 border border-border px-3 py-1.5 shadow-md backdrop-blur-sm pointer-events-none">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            <span className="text-xs text-muted-foreground">Cargando mapa...</span>
+          </div>
+        )}
+      </div>
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
