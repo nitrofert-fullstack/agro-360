@@ -1330,7 +1330,7 @@ export function CharacterizationFormComplete({
                     value={formData.beneficiario.tipoDocumento}
                     onValueChange={(value) => updateField("beneficiario", "tipoDocumento", value)}
                   >
-                    <SelectTrigger className={`h-11 ${errors['beneficiario.tipoDocumento'] ? 'border-red-500' : ''}`}>
+                    <SelectTrigger id="tipoDocumento" className={`h-11 ${errors['beneficiario.tipoDocumento'] ? 'border-red-500' : ''}`}>
                       <SelectValue placeholder="Seleccione" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1422,7 +1422,7 @@ export function CharacterizationFormComplete({
                     value={formData.beneficiario.genero}
                     onValueChange={(value) => updateField("beneficiario", "genero", value)}
                   >
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger id="genero" className="h-11">
                       <SelectValue placeholder="Seleccione" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1497,7 +1497,7 @@ export function CharacterizationFormComplete({
                       value={formData.beneficiario.viveEnPredio}
                       onValueChange={(value) => updateField("beneficiario", "viveEnPredio", value)}
                     >
-                      <SelectTrigger className="h-11">
+                      <SelectTrigger id="viveEnPredio" className="h-11">
                         <SelectValue placeholder="Seleccione" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1513,7 +1513,7 @@ export function CharacterizationFormComplete({
                       value={formData.beneficiario.experienciaAgropecuaria}
                       onValueChange={(value) => updateField("beneficiario", "experienciaAgropecuaria", value)}
                     >
-                      <SelectTrigger className="h-11">
+                      <SelectTrigger id="experienciaAgropecuaria" className="h-11">
                         <SelectValue placeholder="Seleccione" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1861,7 +1861,7 @@ export function CharacterizationFormComplete({
                     value={formData.predio.viaAcceso}
                     onValueChange={(value) => updateField("predio", "viaAcceso", value)}
                   >
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger id="viaAcceso" className="h-11">
                       <SelectValue placeholder="Seleccione" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1898,7 +1898,7 @@ export function CharacterizationFormComplete({
                   value={formData.predio.cultivoYaEnPredio}
                   onValueChange={(value) => updateField("predio", "cultivoYaEnPredio", value)}
                 >
-                  <SelectTrigger className="h-11">
+                  <SelectTrigger id="cultivoYaEnPredio" className="h-11">
                     <SelectValue placeholder="Seleccione" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2024,7 +2024,7 @@ export function CharacterizationFormComplete({
                     value={formData.caracterizacion.topografia}
                     onValueChange={(value) => updateField("caracterizacion", "topografia", value)}
                   >
-                    <SelectTrigger className={`h-11 ${errors['caracterizacion.topografia'] ? 'border-red-500' : ''}`}>
+                    <SelectTrigger id="topografia" className={`h-11 ${errors['caracterizacion.topografia'] ? 'border-red-500' : ''}`}>
                       <SelectValue placeholder="Seleccione" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2044,7 +2044,7 @@ export function CharacterizationFormComplete({
                     value={formData.caracterizacion.distanciaCabeceraTiempo}
                     onValueChange={(value) => updateField("caracterizacion", "distanciaCabeceraTiempo", value)}
                   >
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger id="distanciaCabeceraTiempo" className="h-11">
                       <SelectValue placeholder="Seleccione" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2062,7 +2062,7 @@ export function CharacterizationFormComplete({
                     value={formData.caracterizacion.distanciaCapitalTiempo}
                     onValueChange={(value) => updateField("caracterizacion", "distanciaCapitalTiempo", value)}
                   >
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger id="distanciaCapitalTiempo" className="h-11">
                       <SelectValue placeholder="Seleccione" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2325,7 +2325,7 @@ export function CharacterizationFormComplete({
                     value={formData.areaProductiva.estadoCultivo}
                     onValueChange={(value) => updateField("areaProductiva", "estadoCultivo", value)}
                   >
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger id="estadoCultivo" className="h-11">
                       <SelectValue placeholder="Seleccione" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2700,7 +2700,7 @@ export function CharacterizationFormComplete({
                   value={formData.concepto.continuarProceso}
                   onValueChange={(value) => updateField("concepto", "continuarProceso", value)}
                 >
-                  <SelectTrigger className="h-11">
+                  <SelectTrigger id="continuarProceso" className="h-11">
                     <SelectValue placeholder="Seleccione" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2717,7 +2717,7 @@ export function CharacterizationFormComplete({
                   value={formData.concepto.vocacionAgricola}
                   onValueChange={(value) => updateField("concepto", "vocacionAgricola", value)}
                 >
-                  <SelectTrigger className="h-11">
+                  <SelectTrigger id="vocacionAgricola" className="h-11">
                     <SelectValue placeholder="Seleccione" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2735,7 +2735,7 @@ export function CharacterizationFormComplete({
                   value={formData.concepto.cultivoZonaCercana}
                   onValueChange={(value) => updateField("concepto", "cultivoZonaCercana", value)}
                 >
-                  <SelectTrigger className="h-11">
+                  <SelectTrigger id="cultivoZonaCercana" className="h-11">
                     <SelectValue placeholder="Seleccione" />
                   </SelectTrigger>
                   <SelectContent>

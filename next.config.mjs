@@ -21,10 +21,25 @@ const withPWA = withPWAInit({
         // DEBE ir antes de la regla genérica de imágenes: los tiles terminan en
         // .png/.jpg y si no, un paneo del mapa desaloja los iconos de la app.
         urlPattern: /^https:\/\/([a-z0-9-]+\.)?(tile\.openstreetmap\.org|basemaps\.cartocdn\.com|tile\.opentopomap\.org|server\.arcgisonline\.com|gibs\.earthdata\.nasa\.gov)\/.*/i,
-        handler: 'CacheFirst',
+        // StaleWhileRevalidate: sirve el tile cacheado de inmediato y lo
+        // revalida en segundo plano. Con CacheFirst, un tile corrupto una
+        // sola vez quedaba roto hasta expirar el caché (7 dias).
+        handler: 'StaleWhileRevalidate',
         options: {
-          cacheName: 'map-tiles-external',
-          expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 7 },
+          // v3: nombre nuevo a propósito — abandona el caché viejo (CacheFirst)
+          // para no arrastrar tiles "envenenados" (fallos transitorios
+          // guardados como si fueran válidos) de antes de este fix.
+          cacheName: 'map-tiles-external-v3',
+          expiration: { maxEntries: 800, maxAgeSeconds: 60 * 60 * 24 * 7 },
+          // Todos estos proveedores mandan Access-Control-Allow-Origin: *, y
+          // los TileLayer piden con crossOrigin:true (ver map-viewer.tsx) →
+          // respuesta REAL, no opaca. Por eso solo cacheamos 200 genuinos:
+          // antes, con respuestas opacas (siempre status 0 aunque el tile
+          // realmente hubiera fallado), un glitch transitorio de red podía
+          // quedar cacheado como si fuera válido y el tile se veía roto hasta
+          // que expirara el caché — la causa del "a veces carga, a veces no".
+          cacheableResponse: { statuses: [200] },
+          matchOptions: { ignoreVary: true },
         },
       },
       {
@@ -73,7 +88,7 @@ const csp = [
   `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
   `font-src 'self' data: https://fonts.gstatic.com`,
   `img-src 'self' data: blob: https://${supabaseHost} https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.tile.opentopomap.org https://server.arcgisonline.com https://gibs.earthdata.nasa.gov https://api.dicebear.com`,
-  `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://vitals.vercel-insights.com${isDev ? ' ws:' : ''}`,
+  `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://vitals.vercel-insights.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.tile.opentopomap.org https://server.arcgisonline.com https://gibs.earthdata.nasa.gov https://api.dicebear.com${isDev ? ' ws:' : ''}`,
   `worker-src 'self' blob:`,
   `media-src 'self' blob: data:`,
   `object-src 'none'`,
