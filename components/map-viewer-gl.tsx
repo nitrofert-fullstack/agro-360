@@ -58,6 +58,10 @@ function layerIdFor(key: LayerType): string {
   return `layer-${key}`
 }
 
+function isOverlayCategory(category: LayerConfig['category']): boolean {
+  return category === 'nasa' || category === 'clima'
+}
+
 export function MapViewerGL({
   initialCenter,
   initialZoom,
@@ -71,8 +75,19 @@ export function MapViewerGL({
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const [isMapReady, setIsMapReady] = useState(false)
-  const [activeLayer, setActiveLayer] = useState<LayerType>(controlledLayer ?? "cartoLight")
-  const activeLayerRef = useRef(activeLayer)
+  // Fondo (base/satelital): exactamente uno activo, opaco, reemplaza el
+  // anterior. Overlay (nasa/clima): opcional, semitransparente, se dibuja
+  // ENCIMA del fondo — nunca lo reemplaza. Antes ambos grupos compartían el
+  // mismo estado "una sola capa a la vez", así que elegir NDVI apagaba el
+  // mapa base entero y solo quedaban los parches de color de NDVI flotando
+  // sobre nada (el reporte de "veo puras manchas").
+  const [activeBackground, setActiveBackground] = useState<LayerType>(
+    (controlledLayer && !isOverlayCategory(buildLayers()[controlledLayer].category)) ? controlledLayer : "cartoLight"
+  )
+  const [activeOverlay, setActiveOverlay] = useState<LayerType | null>(
+    (controlledLayer && isOverlayCategory(buildLayers()[controlledLayer].category)) ? controlledLayer : null
+  )
+  const visibleRef = useRef<{ background: LayerType; overlay: LayerType | null }>({ background: activeBackground, overlay: activeOverlay })
   const [opacity, setOpacity] = useState(0.85)
   const [tilesLoading, setTilesLoading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -81,9 +96,18 @@ export function MapViewerGL({
     ? (['base', 'satelital', 'nasa', 'clima'] as const)
     : (['base', 'satelital', 'nasa'] as const)
 
+  // En modo minimal (panel externo con un solo toggle, ej. detalle de
+  // caracterización) el llamador controla una única capa exclusiva — igual
+  // que antes de este cambio, sin distinguir fondo/overlay.
   useEffect(() => {
-    if (controlledLayer) setActiveLayer(controlledLayer)
-  }, [controlledLayer])
+    if (!minimal || !controlledLayer) return
+    if (isOverlayCategory(layers[controlledLayer].category)) {
+      setActiveOverlay(controlledLayer)
+    } else {
+      setActiveBackground(controlledLayer)
+      setActiveOverlay(null)
+    }
+  }, [minimal, controlledLayer])
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -132,6 +156,8 @@ export function MapViewerGL({
           attribution: config.attribution,
           maxzoom: config.maxZoom || 19,
         })
+        const { background, overlay } = visibleRef.current
+        const visible = layerKey === background || layerKey === overlay
         map.addLayer({
           id: layerIdFor(layerKey),
           type: 'raster',
@@ -140,13 +166,14 @@ export function MapViewerGL({
           // visibility:'none' NO pide tiles a la red. Con opacity:0 la capa
           // sigue "visible" para MapLibre y sigue descargando tiles en
           // segundo plano — así se cargaban NDVI/clima/etc. de una vez
-          // aunque nunca se hubieran seleccionado. Solo la capa activa debe
-          // tener visibility:'visible'.
+          // aunque nunca se hubieran seleccionado.
           layout: {
-            visibility: layerKey === activeLayer ? 'visible' : 'none',
+            visibility: visible ? 'visible' : 'none',
           },
           paint: {
-            'raster-opacity': opacity,
+            // El fondo siempre opaco; el overlay usa la opacidad ajustable.
+            // (minimal usa el mismo estado `opacity` para lo único visible.)
+            'raster-opacity': layerKey === overlay || minimal ? opacity : 1,
           },
         })
       })
@@ -154,13 +181,19 @@ export function MapViewerGL({
     })
 
     // Indicador de carga de tiles: 'sourcedataloading'/'sourcedata' solo de
-    // la fuente de la capa activa (las demás están en visibility:none y no
-    // cargan nada, así que filtrar por sourceId evita falsos positivos).
+    // las fuentes realmente visibles (fondo + overlay) — el resto está en
+    // visibility:none y no carga nada, así que filtrar evita falsos
+    // positivos.
     map.on('sourcedataloading', (e) => {
-      if (e.sourceId === sourceIdFor(activeLayerRef.current)) setTilesLoading(true)
+      const { background, overlay } = visibleRef.current
+      if (e.sourceId === sourceIdFor(background) || (overlay && e.sourceId === sourceIdFor(overlay))) {
+        setTilesLoading(true)
+      }
     })
     map.on('sourcedata', (e) => {
-      if (e.sourceId === sourceIdFor(activeLayerRef.current) && map.isSourceLoaded(e.sourceId)) {
+      const { background, overlay } = visibleRef.current
+      const isRelevant = e.sourceId === sourceIdFor(background) || (overlay && e.sourceId === sourceIdFor(overlay))
+      if (isRelevant && map.isSourceLoaded(e.sourceId)) {
         setTilesLoading(false)
       }
     })
@@ -177,16 +210,22 @@ export function MapViewerGL({
       const config = layers[key]
       if (!config) return
 
+      const { background, overlay } = visibleRef.current
       tileFailCounts[key] = (tileFailCounts[key] || 0) + 1
-      if (tileFailCounts[key] >= TILE_FAIL_THRESHOLD && key === activeLayer) {
+      if (tileFailCounts[key] < TILE_FAIL_THRESHOLD) return
+
+      if (key === overlay) {
+        console.warn(`[map-viewer-gl] Capa "${config.name}" fallando repetidamente, se desactiva.`)
+        setActiveOverlay(null)
+      } else if (key === background) {
         if (config.category !== 'base') {
-          console.warn(`[map-viewer-gl] Capa "${config.name}" fallando repetidamente, se desactiva y se vuelve a mapa base.`)
-          setActiveLayer('cartoLight')
+          console.warn(`[map-viewer-gl] Capa "${config.name}" fallando repetidamente, se vuelve a mapa base.`)
+          setActiveBackground('cartoLight')
         } else {
           const next = BASE_FALLBACK_CHAIN.find(k => k !== key)
           if (next) {
             console.warn(`[map-viewer-gl] Capa base "${config.name}" fallando repetidamente, cambiando a "${layers[next].name}".`)
-            setActiveLayer(next)
+            setActiveBackground(next)
           }
         }
       }
@@ -201,28 +240,31 @@ export function MapViewerGL({
     }
   }, [])
 
-  // Sincroniza qué capa es visible (y su opacidad) cuando cambia
-  // activeLayer/opacity. Usa visibility, no solo opacity: una capa raster
-  // en visibility:'none' deja de pedir tiles a la red — así NDVI/clima/
-  // satelital/etc. solo descargan algo cuando el usuario realmente los
-  // selecciona, en vez de traerse todas las capas de una al abrir el mapa.
+  // Sincroniza qué capas son visibles (fondo + overlay) y su opacidad.
+  // Usa visibility, no solo opacity: una capa raster en visibility:'none'
+  // deja de pedir tiles a la red — así NDVI/clima/satelital/etc. solo
+  // descargan algo cuando el usuario realmente los selecciona, en vez de
+  // traerse todas las capas de una al abrir el mapa.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !isMapReady) return
-    activeLayerRef.current = activeLayer
+    visibleRef.current = { background: activeBackground, overlay: activeOverlay }
     const layers = buildLayers()
-    Object.keys(layers).forEach((key) => {
-      const id = layerIdFor(key as LayerType)
-      if (map.getLayer(id)) {
-        map.setLayoutProperty(id, 'visibility', key === activeLayer ? 'visible' : 'none')
-        map.setPaintProperty(id, 'raster-opacity', opacity)
-      }
+    Object.keys(layers).forEach((k) => {
+      const key = k as LayerType
+      const id = layerIdFor(key)
+      if (!map.getLayer(id)) return
+      const visible = key === activeBackground || key === activeOverlay
+      map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none')
+      map.setPaintProperty(id, 'raster-opacity', (key === activeOverlay || minimal) ? opacity : 1)
     })
-    // La fuente de la nueva capa activa puede no tener tiles del viewport
-    // actual todavía — mostrar el indicador hasta que 'sourcedata' confirme
-    // que ya cargó (o hasta que 'idle' si nunca dispara por estar en caché).
-    setTilesLoading(!map.isSourceLoaded(sourceIdFor(activeLayer)))
-  }, [activeLayer, opacity, isMapReady])
+    // Las fuentes recién visibles pueden no tener tiles del viewport actual
+    // todavía — mostrar el indicador hasta que 'sourcedata' confirme que ya
+    // cargaron.
+    const pending = [activeBackground, activeOverlay].filter((k): k is LayerType => !!k)
+      .some(k => !map.isSourceLoaded(sourceIdFor(k)))
+    setTilesLoading(pending)
+  }, [activeBackground, activeOverlay, opacity, isMapReady, minimal])
 
   // Marcadores clusterizados — MapLibre trae clustering nativo en su
   // GeoJSONSource (cluster:true), no hace falta leaflet.markercluster aquí.
@@ -438,13 +480,9 @@ export function MapViewerGL({
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
-          <p className="text-xs font-semibold text-foreground px-1">Capas del mapa</p>
-
           {([
             { key: 'base',      label: 'Base' },
             { key: 'satelital', label: 'Satelital' },
-            { key: 'nasa',      label: 'NASA' },
-            { key: 'clima',     label: 'Clima' },
           ] as { key: LayerConfig['category']; label: string }[])
             .filter(({ key }) => visibleCategories.includes(key as any))
             .map(({ key: cat, label }) => {
@@ -457,9 +495,9 @@ export function MapViewerGL({
                     {catLayers.map((key) => (
                       <button
                         key={key}
-                        onClick={() => setActiveLayer(key)}
+                        onClick={() => setActiveBackground(key)}
                         className={`w-full rounded-lg border px-3 py-2 text-left transition-all duration-150 ${
-                          activeLayer === key
+                          activeBackground === key
                             ? "border-primary bg-primary/10 text-primary"
                             : "border-border bg-secondary/40 text-foreground hover:border-primary/40 hover:bg-secondary"
                         }`}
@@ -473,16 +511,54 @@ export function MapViewerGL({
               )
             })}
 
-          <div className="pt-1 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground">Opacidad — {layers[activeLayer].name}</span>
-              <span className="text-[10px] font-medium text-foreground">{Math.round(opacity * 100)}%</span>
-            </div>
-            <input
-              type="range" min="0" max="1" step="0.1" value={opacity}
-              onChange={(e) => setOpacity(parseFloat(e.target.value))}
-              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-secondary accent-primary"
-            />
+          <div className="border-t border-border pt-3 space-y-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-1">
+              Capas encima del mapa (opcional)
+            </p>
+            {([
+              { key: 'nasa',  label: 'NASA' },
+              { key: 'clima', label: 'Clima' },
+            ] as { key: LayerConfig['category']; label: string }[])
+              .filter(({ key }) => visibleCategories.includes(key as any))
+              .map(({ key: cat, label }) => {
+                const catLayers = (Object.keys(layers) as LayerType[]).filter(k => layers[k].category === cat)
+                if (!catLayers.length) return null
+                return (
+                  <div key={cat}>
+                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">{label}</p>
+                    <div className="space-y-1">
+                      {catLayers.map((key) => (
+                        <button
+                          key={key}
+                          onClick={() => setActiveOverlay(activeOverlay === key ? null : key)}
+                          className={`w-full rounded-lg border px-3 py-2 text-left transition-all duration-150 ${
+                            activeOverlay === key
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border bg-secondary/40 text-foreground hover:border-primary/40 hover:bg-secondary"
+                          }`}
+                        >
+                          <span className="block text-xs font-medium leading-tight">{layers[key].name}</span>
+                          <span className="block text-[10px] leading-tight text-muted-foreground mt-0.5 line-clamp-1">{layers[key].description}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+
+            {activeOverlay && (
+              <div className="pt-1 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">Opacidad — {layers[activeOverlay].name}</span>
+                  <span className="text-[10px] font-medium text-foreground">{Math.round(opacity * 100)}%</span>
+                </div>
+                <input
+                  type="range" min="0" max="1" step="0.1" value={opacity}
+                  onChange={(e) => setOpacity(parseFloat(e.target.value))}
+                  className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-secondary accent-primary"
+                />
+              </div>
+            )}
           </div>
         </div>
       </aside>

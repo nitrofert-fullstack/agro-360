@@ -7,7 +7,7 @@
 export type LayerType = "ndvi" | "satellite" | "temperature" | "precipitation"
   | "osm" | "cartoLight" | "cartoDark" | "cartoVoyager"
   | "esriTopo" | "esriStreet" | "openTopo" | "esriNatGeo"
-  | "nasaTrueColor" | "nasaViirs" | "nasaEVI" | "nasaLST" | "nasaFire"
+  | "nasaTrueColor" | "nasaViirs" | "nasaEVI" | "nasaLST"
 
 export interface LayerConfig {
   name: string
@@ -129,10 +129,13 @@ export function buildLayers(): Record<LayerType, LayerConfig> {
     nasaViirs: {
       name: "VIIRS Color Real",
       description: "VIIRS SNPP color real diario",
-      url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${gibsDate}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpg`,
+      // Level9 (no Level8): confirmado por prueba directa — Level8 devuelve
+      // 400 en cualquier fecha/zoom para esta capa especifica; Level9 sirve
+      // tiles reales hasta zoom 9.
+      url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${gibsDate}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
       attribution: "NASA GIBS VIIRS SNPP",
       opacity: 1,
-      maxZoom: 8,
+      maxZoom: 9,
       category: 'satelital',
     },
     // ── NASA overlays ──────────────────────────────────────────────────────
@@ -163,15 +166,11 @@ export function buildLayers(): Record<LayerType, LayerConfig> {
       maxZoom: 7,
       category: 'nasa',
     },
-    nasaFire: {
-      name: "Incendios Activos",
-      description: "Anomalías térmicas VIIRS 375m",
-      url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_Thermal_Anomalies_375m_All/default/${gibsDate}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`,
-      attribution: "NASA GIBS VIIRS Fire",
-      opacity: 0.9,
-      maxZoom: 8,
-      category: 'nasa',
-    },
+    // "Incendios Activos" (VIIRS_SNPP_Thermal_Anomalies_375m_All) se quitó:
+    // Level8 es el único matrix set que no da 400, pero devuelve 404 en
+    // Colombia en cualquier fecha probada — NASA no parece pre-generar
+    // tiles vacíos para este producto, no es un problema de configuración
+    // nuestra que se pueda arreglar del lado del cliente.
     // ── Clima ──────────────────────────────────────────────────────────────
     temperature: {
       name: "Temperatura",
