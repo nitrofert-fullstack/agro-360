@@ -7,9 +7,10 @@ import { Loader2 } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { AppLayout } from "@/components/app-layout"
 import type { MapMarker } from "@/components/map-viewer"
+import { escapeHtml } from "@/lib/escape-html"
 
 const MapViewer = dynamic(
-  () => import("@/components/map-viewer").then((mod) => mod.MapViewer),
+  () => import("@/components/map-viewer-switch").then((mod) => mod.MapViewerSwitch),
   {
     ssr: false,
     loading: () => (
@@ -72,14 +73,14 @@ export default function MapaPage() {
 
           const popup = `
             <div style="min-width:180px;font-family:system-ui,sans-serif;">
-              <strong style="font-size:14px;">${predio.nombre_predio || 'Sin nombre'}</strong>
+              <strong style="font-size:14px;">${escapeHtml(predio.nombre_predio || 'Sin nombre')}</strong>
               <hr style="margin:4px 0;border-color:#e5e7eb;"/>
-              <p style="margin:2px 0;font-size:12px;"><b>Productor:</b> ${benefNombre}</p>
-              <p style="margin:2px 0;font-size:12px;"><b>Municipio:</b> ${predio.municipio || 'N/A'}</p>
-              ${predio.vereda ? `<p style="margin:2px 0;font-size:12px;"><b>Vereda:</b> ${predio.vereda}</p>` : ''}
-              ${predio.area_total_hectareas ? `<p style="margin:2px 0;font-size:12px;"><b>Área total:</b> ${predio.area_total_hectareas} ha</p>` : ''}
-              ${predio.area_productiva_hectareas ? `<p style="margin:2px 0;font-size:12px;"><b>Área productiva:</b> ${predio.area_productiva_hectareas} ha</p>` : ''}
-              ${temp ? `<p style="margin:2px 0;font-size:12px;"><b>Temperatura:</b> ${temp}°C</p>` : ''}
+              <p style="margin:2px 0;font-size:12px;"><b>Productor:</b> ${escapeHtml(benefNombre)}</p>
+              <p style="margin:2px 0;font-size:12px;"><b>Municipio:</b> ${escapeHtml(predio.municipio || 'N/A')}</p>
+              ${predio.vereda ? `<p style="margin:2px 0;font-size:12px;"><b>Vereda:</b> ${escapeHtml(predio.vereda)}</p>` : ''}
+              ${predio.area_total_hectareas ? `<p style="margin:2px 0;font-size:12px;"><b>Área total:</b> ${escapeHtml(predio.area_total_hectareas)} ha</p>` : ''}
+              ${predio.area_productiva_hectareas ? `<p style="margin:2px 0;font-size:12px;"><b>Área productiva:</b> ${escapeHtml(predio.area_productiva_hectareas)} ha</p>` : ''}
+              ${temp ? `<p style="margin:2px 0;font-size:12px;"><b>Temperatura:</b> ${escapeHtml(temp)}°C</p>` : ''}
             </div>
           `
 

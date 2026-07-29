@@ -40,7 +40,7 @@ import { staggerContainer, staggerItem, fadeUp } from "@/lib/animations"
 import { AppLayout } from "@/components/app-layout"
 
 const MapViewer = dynamic(
-  () => import("@/components/map-viewer").then((mod) => mod.MapViewer),
+  () => import("@/components/map-viewer-switch").then((mod) => mod.MapViewerSwitch),
   {
     ssr: false,
     loading: () => (

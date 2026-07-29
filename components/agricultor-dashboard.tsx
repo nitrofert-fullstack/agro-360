@@ -14,9 +14,10 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { staggerContainer, staggerItem } from "@/lib/animations"
+import { escapeHtml } from "@/lib/escape-html"
 
 const MapViewer = dynamic(
-  () => import("@/components/map-viewer").then((mod) => mod.MapViewer),
+  () => import("@/components/map-viewer-switch").then((mod) => mod.MapViewerSwitch),
   {
     ssr: false,
     loading: () => (
@@ -248,7 +249,7 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
                         id: p.id,
                         name: p.predio.nombre_predio || 'Mi predio',
                         position: [parseFloat(p.predio.latitud!), parseFloat(p.predio.longitud!)] as [number, number],
-                        popupContent: `<strong>${p.predio.nombre_predio || 'Mi predio'}</strong><br/>${p.predio.municipio || ''}${p.predio.vereda ? ` · ${p.predio.vereda}` : ''}`,
+                        popupContent: `<strong>${escapeHtml(p.predio.nombre_predio || 'Mi predio')}</strong><br/>${escapeHtml(p.predio.municipio || '')}${p.predio.vereda ? ` · ${escapeHtml(p.predio.vereda)}` : ''}`,
                         polygonCoords: p.predio.cultivos_existentes
                           ? undefined
                           : undefined,
