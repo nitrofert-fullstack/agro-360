@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { PanelLeft } from "lucide-react"
+import { PanelLeft, X, RotateCcw, Loader2, Satellite, CloudSun } from "lucide-react"
 import * as maplibregl from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { buildLayers, type LayerType, type LayerConfig } from "@/lib/map-layers"
@@ -62,6 +62,28 @@ function isOverlayCategory(category: LayerConfig['category']): boolean {
   return category === 'nasa' || category === 'clima'
 }
 
+interface SelectedPredio {
+  id: string
+  name: string
+  position: [number, number]
+  polygonCoords?: [number, number][]
+}
+
+interface NdviResult {
+  ndvi: number
+  interpretacion: string
+  color: string
+  fecha: string
+}
+
+interface WeatherResult {
+  temperature: number
+  humidity: number
+  description: string
+  windSpeed: number
+  feelsLike: number
+}
+
 export function MapViewerGL({
   initialCenter,
   initialZoom,
@@ -91,6 +113,17 @@ export function MapViewerGL({
   const [opacity, setOpacity] = useState(0.85)
   const [tilesLoading, setTilesLoading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  // Predio seleccionado (clic en marcador) — zoom al predio, botón "volver"
+  // a la vista inicial, y panel con NDVI puntual (MODIS) + clima (OpenWeather).
+  const [selectedPredio, setSelectedPredio] = useState<SelectedPredio | null>(null)
+  const [ndvi, setNdvi] = useState<NdviResult | null>(null)
+  const [ndviLoading, setNdviLoading] = useState(false)
+  const [ndviError, setNdviError] = useState<string | null>(null)
+  const [weather, setWeather] = useState<WeatherResult | null>(null)
+  const [weatherLoading, setWeatherLoading] = useState(false)
+  const [weatherError, setWeatherError] = useState<string | null>(null)
+  const initialViewRef = useRef<{ center: maplibregl.LngLat; zoom: number } | null>(null)
   const layers = buildLayers()
   const visibleCategories = canSee(role, 'all-layers')
     ? (['base', 'satelital', 'nasa', 'clima'] as const)
@@ -177,6 +210,7 @@ export function MapViewerGL({
           },
         })
       })
+      initialViewRef.current = { center: map.getCenter(), zoom: map.getZoom() }
       setIsMapReady(true)
     })
 
@@ -277,7 +311,12 @@ export function MapViewerGL({
       features: (markers ?? []).map((m) => ({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [m.position[1], m.position[0]] },
-        properties: { id: m.id ?? '', popupContent: m.popupContent, name: m.name ?? '' },
+        properties: {
+          id: m.id ?? '',
+          popupContent: m.popupContent,
+          name: m.name ?? '',
+          polygonCoords: m.polygonCoords ? JSON.stringify(m.polygonCoords) : '',
+        },
       })),
     }
 
@@ -351,11 +390,18 @@ export function MapViewerGL({
       const feature = e.features?.[0]
       if (!feature) return
       const geom = feature.geometry as GeoJSON.Point
-      const popupContent = String(feature.properties?.popupContent ?? '')
-      new maplibregl.Popup({ closeButton: true })
-        .setLngLat(geom.coordinates as [number, number])
-        .setHTML(popupContent)
-        .addTo(map)
+      const [lng, lat] = geom.coordinates as [number, number]
+      const rawPolygon = String(feature.properties?.polygonCoords ?? '')
+      let polygonCoords: [number, number][] | undefined
+      if (rawPolygon) {
+        try { polygonCoords = JSON.parse(rawPolygon) } catch { polygonCoords = undefined }
+      }
+      setSelectedPredio({
+        id: String(feature.properties?.id ?? ''),
+        name: String(feature.properties?.name ?? 'Predio'),
+        position: [lat, lng],
+        polygonCoords,
+      })
     })
 
     map.on('mouseenter', 'clusters', () => { map.getCanvas().style.cursor = 'pointer' })
@@ -406,6 +452,92 @@ export function MapViewerGL({
       map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 50 })
     }
   }, [markerPosition, polygonCoords, isMapReady])
+
+  // Selección de predio desde la lista de marcadores (admin): zoom al predio
+  // (bounds del polígono si existe, punto si no), resalta su límite en el
+  // color de salud NDVI una vez llega, y dispara NDVI puntual + clima.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !isMapReady) return
+
+    const SOURCE_ID = 'selected-predio-boundary'
+    const FILL_ID = 'selected-predio-fill'
+    const LINE_ID = 'selected-predio-line'
+
+    const removeBoundary = () => {
+      if (map.getLayer(FILL_ID)) map.removeLayer(FILL_ID)
+      if (map.getLayer(LINE_ID)) map.removeLayer(LINE_ID)
+      if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID)
+    }
+
+    if (!selectedPredio) {
+      removeBoundary()
+      return
+    }
+
+    const { position, polygonCoords: coords } = selectedPredio
+
+    if (coords && coords.length >= 3) {
+      const ring = [...coords.map(([lat, lng]) => [lng, lat]), [coords[0][1], coords[0][0]]]
+      const geojson: GeoJSON.Feature = { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring] } }
+      if (map.getSource(SOURCE_ID)) {
+        (map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource).setData(geojson)
+      } else {
+        map.addSource(SOURCE_ID, { type: 'geojson', data: geojson })
+        map.addLayer({ id: FILL_ID, type: 'fill', source: SOURCE_ID, paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.3 } })
+        map.addLayer({ id: LINE_ID, type: 'line', source: SOURCE_ID, paint: { 'line-color': '#3b82f6', 'line-width': 3 } })
+      }
+      const lngs = ring.map(c => c[0])
+      const lats = ring.map(c => c[1])
+      map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 80, maxZoom: 16, duration: 800 })
+    } else {
+      removeBoundary()
+      map.flyTo({ center: [position[1], position[0]], zoom: Math.max(map.getZoom(), 15), duration: 800 })
+    }
+
+    return () => { removeBoundary() }
+  }, [selectedPredio, isMapReady])
+
+  // Tinta el límite del predio seleccionado con el color de salud NDVI en
+  // cuanto llega (verde/amarillo/rojo según vigor vegetativo) — "NDVI solo
+  // sobre el predio delimitado" en vez de una capa que cubre todo el mapa.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !isMapReady || !ndvi) return
+    if (map.getLayer('selected-predio-fill')) map.setPaintProperty('selected-predio-fill', 'fill-color', ndvi.color)
+    if (map.getLayer('selected-predio-line')) map.setPaintProperty('selected-predio-line', 'line-color', ndvi.color)
+  }, [ndvi, isMapReady])
+
+  // Fetch de NDVI puntual (MODIS) + clima (OpenWeather) del predio seleccionado.
+  useEffect(() => {
+    if (!selectedPredio) {
+      setNdvi(null); setNdviError(null); setWeather(null); setWeatherError(null)
+      return
+    }
+    const [lat, lng] = selectedPredio.position
+
+    setNdviLoading(true); setNdviError(null); setNdvi(null)
+    fetch(`/api/ndvi?lat=${lat}&lng=${lng}`)
+      .then(r => r.json())
+      .then(d => { if (d.error) throw new Error(d.error); setNdvi(d) })
+      .catch(e => setNdviError(e instanceof Error ? e.message : 'Error al obtener NDVI'))
+      .finally(() => setNdviLoading(false))
+
+    setWeatherLoading(true); setWeatherError(null); setWeather(null)
+    fetch('/api/weather', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat, lng }) })
+      .then(r => r.json())
+      .then(d => { if (d.error) throw new Error(d.error); setWeather(d) })
+      .catch(e => setWeatherError(e instanceof Error ? e.message : 'Error al obtener clima'))
+      .finally(() => setWeatherLoading(false))
+  }, [selectedPredio])
+
+  const handleVolver = () => {
+    setSelectedPredio(null)
+    const map = mapRef.current
+    if (map && initialViewRef.current) {
+      map.flyTo({ center: initialViewRef.current.center, zoom: initialViewRef.current.zoom, duration: 800 })
+    }
+  }
 
   // ── Modo minimal: solo mapa, sin selector de capas ──
   if (minimal) {
@@ -571,6 +703,85 @@ export function MapViewerGL({
             position:absolute/fixed). h-full sí funciona con cualquier
             position, siempre que el padre (arriba) tenga alto definido. */}
         <div ref={mapContainerRef} className="h-full w-full" />
+
+        {selectedPredio && (
+          <button
+            onClick={handleVolver}
+            className="absolute top-3 right-3 z-[1001] flex items-center gap-1.5 rounded-full bg-card border border-border px-3 py-1.5 text-xs font-medium text-foreground shadow-md hover:border-primary/40 transition-colors"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Volver
+          </button>
+        )}
+
+        {selectedPredio && (
+          <div className="absolute bottom-3 left-3 right-3 md:left-auto md:right-3 md:w-80 z-[1001] rounded-xl border border-border bg-card shadow-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-gradient-to-r from-primary/10 to-transparent">
+              <h3 className="text-sm font-semibold text-foreground truncate">{selectedPredio.name}</h3>
+              <button onClick={handleVolver} aria-label="Cerrar" className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Medidor NDVI */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Satellite className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Índice NDVI</span>
+                </div>
+                {ndviLoading && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Consultando MODIS...
+                  </div>
+                )}
+                {ndviError && !ndviLoading && (
+                  <p className="text-xs text-destructive">{ndviError}</p>
+                )}
+                {ndvi && !ndviLoading && (
+                  <div className="space-y-1.5">
+                    <div className="h-2.5 w-full rounded-full bg-secondary overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${Math.max(0, Math.min(1, ndvi.ndvi)) * 100}%`, backgroundColor: ndvi.color }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold" style={{ color: ndvi.color }}>{ndvi.ndvi.toFixed(3)}</span>
+                      <span className="text-muted-foreground">{ndvi.interpretacion}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/70">Composite MODIS · {ndvi.fecha}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Clima */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <CloudSun className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Clima actual</span>
+                </div>
+                {weatherLoading && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Consultando OpenWeather...
+                  </div>
+                )}
+                {weatherError && !weatherLoading && (
+                  <p className="text-xs text-destructive">{weatherError}</p>
+                )}
+                {weather && !weatherLoading && (
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                    <div><span className="text-muted-foreground">Temperatura: </span><span className="font-medium text-foreground">{weather.temperature}°C</span></div>
+                    <div><span className="text-muted-foreground">Sensación: </span><span className="font-medium text-foreground">{weather.feelsLike}°C</span></div>
+                    <div><span className="text-muted-foreground">Humedad: </span><span className="font-medium text-foreground">{weather.humidity}%</span></div>
+                    <div><span className="text-muted-foreground">Viento: </span><span className="font-medium text-foreground">{weather.windSpeed} m/s</span></div>
+                    <div className="col-span-2"><span className="text-muted-foreground">Condición: </span><span className="font-medium text-foreground">{weather.description}</span></div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
