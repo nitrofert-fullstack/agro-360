@@ -299,7 +299,7 @@ export function MapViewerGL({
     // — se veía el número del cluster (capa de texto aparte) pero no el
     // círculo, y el clic tampoco registraba porque el círculo quedaba con
     // área visible 0 bajo la capa raster.
-    ;['selected-predio-fill', 'selected-predio-line', 'clusters', 'cluster-count', 'unclustered-point'].forEach((id) => {
+    ;['selected-predio-fill', 'selected-predio-line', 'clusters', 'cluster-count', 'unclustered-point', 'spider-lines', 'spider-points'].forEach((id) => {
       if (map.getLayer(id)) map.moveLayer(id)
     })
     // Las fuentes recién visibles pueden no tener tiles del viewport actual
@@ -382,23 +382,15 @@ export function MapViewerGL({
       },
     })
 
-    map.on('click', 'clusters', (e) => {
-      const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] })
-      const clusterId = features[0]?.properties?.cluster_id
-      const source = map.getSource('markers') as maplibregl.GeoJSONSource
-      if (clusterId == null) return
-      // v6 de maplibre-gl cambió getClusterExpansionZoom de callback a Promise
-      // (ver maplibre-gl.d.ts: `getClusterExpansionZoom(clusterId): Promise<number>`),
-      // a diferencia de la firma con callback que usa el ejemplo del plan.
-      source.getClusterExpansionZoom(clusterId).then((zoom) => {
-        const geom = features[0].geometry as GeoJSON.Point
-        map.easeTo({ center: geom.coordinates as [number, number], zoom: zoom ?? map.getZoom() + 1 })
-      }).catch(() => {})
-    })
-
-    map.on('click', 'unclustered-point', (e) => {
-      const feature = e.features?.[0]
-      if (!feature) return
+    // "Spiderfy": cuando un cluster ya está en su zoom máximo de agrupación
+    // (predios genuinamente muy cercanos entre sí, o compartiendo el mismo
+    // punto placeholder "aproximada") hacer zoom no los separa más — antes
+    // eso hacía que el clic en un cluster de "3" mandara a un solo punto y
+    // los otros quedaran invisibles/superpuestos, obligando a alejarse y
+    // buscarlos a mano. Se abanican en un círculo alrededor del cluster
+    // para que cada uno quede individualmente visible y clickeable, igual
+    // que spiderfyOnMaxZoom en el Leaflet de map-viewer.tsx.
+    const selectFromFeature = (feature: GeoJSON.Feature) => {
       const geom = feature.geometry as GeoJSON.Point
       const [lng, lat] = geom.coordinates as [number, number]
       const rawPolygon = String(feature.properties?.polygonCoords ?? '')
@@ -412,7 +404,104 @@ export function MapViewerGL({
         position: [lat, lng],
         polygonCoords,
       })
+    }
+
+    const clearSpider = () => {
+      if (map.getLayer('spider-points')) map.removeLayer('spider-points')
+      if (map.getLayer('spider-lines')) map.removeLayer('spider-lines')
+      if (map.getSource('spider-points-src')) map.removeSource('spider-points-src')
+      if (map.getSource('spider-lines-src')) map.removeSource('spider-lines-src')
+    }
+
+    const spiderfyCluster = (center: [number, number], leaves: GeoJSON.Feature[]) => {
+      clearSpider()
+      const centerPx = map.project(center)
+      const n = leaves.length
+      const radiusPx = Math.max(40, Math.min(90, 24 + n * 6))
+      const pointFeatures: GeoJSON.Feature[] = leaves.map((leaf, i) => {
+        const angle = (2 * Math.PI * i) / n - Math.PI / 2
+        const px = { x: centerPx.x + radiusPx * Math.cos(angle), y: centerPx.y + radiusPx * Math.sin(angle) }
+        const lngLat = map.unproject([px.x, px.y] as [number, number])
+        return {
+          type: 'Feature',
+          properties: leaf.properties,
+          geometry: { type: 'Point', coordinates: [lngLat.lng, lngLat.lat] },
+        }
+      })
+      const lineFeatures: GeoJSON.Feature = {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'MultiLineString',
+          coordinates: pointFeatures.map(f => [center, (f.geometry as GeoJSON.Point).coordinates]),
+        },
+      }
+      map.addSource('spider-lines-src', { type: 'geojson', data: lineFeatures })
+      map.addLayer({
+        id: 'spider-lines',
+        type: 'line',
+        source: 'spider-lines-src',
+        paint: { 'line-color': '#9ca3af', 'line-width': 1.5, 'line-dasharray': [2, 2] },
+      })
+      map.addSource('spider-points-src', { type: 'geojson', data: { type: 'FeatureCollection', features: pointFeatures } })
+      map.addLayer({
+        id: 'spider-points',
+        type: 'circle',
+        source: 'spider-points-src',
+        paint: {
+          'circle-color': brand,
+          'circle-radius': 8,
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff',
+        },
+      })
+      map.on('click', 'spider-points', (e) => {
+        const feature = e.features?.[0]
+        if (!feature) return
+        selectFromFeature(feature)
+        clearSpider()
+      })
+      map.on('mouseenter', 'spider-points', () => { map.getCanvas().style.cursor = 'pointer' })
+      map.on('mouseleave', 'spider-points', () => { map.getCanvas().style.cursor = '' })
+    }
+
+    map.on('click', 'clusters', (e) => {
+      const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] })
+      const clusterId = features[0]?.properties?.cluster_id
+      const source = map.getSource('markers') as maplibregl.GeoJSONSource
+      if (clusterId == null) return
+      clearSpider()
+      const geom = features[0].geometry as GeoJSON.Point
+      // v6 de maplibre-gl cambió getClusterExpansionZoom de callback a Promise
+      // (ver maplibre-gl.d.ts: `getClusterExpansionZoom(clusterId): Promise<number>`),
+      // a diferencia de la firma con callback que usa el ejemplo del plan.
+      source.getClusterExpansionZoom(clusterId).then((zoom) => {
+        const targetZoom = zoom ?? map.getZoom() + 1
+        // Si el zoom de expansión no supera el actual (o ya estamos en el
+        // límite del mapa), zoomear no va a separar más los puntos —
+        // abanicar en vez de quedar en un loop de zoom sin efecto.
+        if (targetZoom <= map.getZoom() + 0.15 || targetZoom >= map.getMaxZoom() - 0.25) {
+          source.getClusterLeaves(clusterId, 200, 0).then((leaves) => {
+            spiderfyCluster(geom.coordinates as [number, number], leaves)
+          }).catch(() => {})
+          return
+        }
+        map.easeTo({ center: geom.coordinates as [number, number], zoom: targetZoom })
+      }).catch(() => {})
     })
+
+    map.on('click', 'unclustered-point', (e) => {
+      const feature = e.features?.[0]
+      if (!feature) return
+      clearSpider()
+      selectFromFeature(feature)
+    })
+
+    // Cualquier movimiento del mapa invalida las posiciones calculadas del
+    // abanico (se proyectaron para un pixel/zoom específico) — se limpian
+    // para no dejar puntos "fantasma" desalineados.
+    map.on('zoomstart', clearSpider)
+    map.on('dragstart', clearSpider)
 
     map.on('mouseenter', 'clusters', () => { map.getCanvas().style.cursor = 'pointer' })
     map.on('mouseleave', 'clusters', () => { map.getCanvas().style.cursor = '' })
