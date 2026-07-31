@@ -292,6 +292,16 @@ export function MapViewerGL({
       map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none')
       map.setPaintProperty(id, 'raster-opacity', (key === activeOverlay || minimal) ? opacity : 1)
     })
+    // Forzar marcadores/clusters/límite del predio seleccionado siempre al
+    // tope: moveLayer() sin segundo argumento los sube al final de la pila
+    // de capas de MapLibre. Sin esto, alternar entre tipos de mapa podía
+    // dejar una capa raster (NASA/clima) pintando por encima de los círculos
+    // — se veía el número del cluster (capa de texto aparte) pero no el
+    // círculo, y el clic tampoco registraba porque el círculo quedaba con
+    // área visible 0 bajo la capa raster.
+    ;['selected-predio-fill', 'selected-predio-line', 'clusters', 'cluster-count', 'unclustered-point'].forEach((id) => {
+      if (map.getLayer(id)) map.moveLayer(id)
+    })
     // Las fuentes recién visibles pueden no tener tiles del viewport actual
     // todavía — mostrar el indicador hasta que 'sourcedata' confirme que ya
     // cargaron.
@@ -509,7 +519,12 @@ export function MapViewerGL({
   }, [ndvi, isMapReady])
 
   // Fetch de NDVI puntual (MODIS) + clima (OpenWeather) del predio seleccionado.
+  // `cancelled` evita que una respuesta tardía de un predio anterior
+  // sobrescriba el estado si el usuario ya seleccionó otro predio distinto
+  // mientras la petición previa seguía en vuelo.
   useEffect(() => {
+    let cancelled = false
+
     if (!selectedPredio) {
       setNdvi(null); setNdviError(null); setWeather(null); setWeatherError(null)
       return
@@ -519,16 +534,23 @@ export function MapViewerGL({
     setNdviLoading(true); setNdviError(null); setNdvi(null)
     fetch(`/api/ndvi?lat=${lat}&lng=${lng}`)
       .then(r => r.json())
-      .then(d => { if (d.error) throw new Error(d.error); setNdvi(d) })
-      .catch(e => setNdviError(e instanceof Error ? e.message : 'Error al obtener NDVI'))
-      .finally(() => setNdviLoading(false))
+      .then(d => {
+        if (cancelled) return
+        if (d.error) throw new Error(d.error)
+        if (typeof d.ndvi !== 'number' || !d.color) throw new Error('Respuesta de NDVI incompleta')
+        setNdvi(d)
+      })
+      .catch(e => { if (!cancelled) setNdviError(e instanceof Error ? e.message : 'Error al obtener NDVI') })
+      .finally(() => { if (!cancelled) setNdviLoading(false) })
 
     setWeatherLoading(true); setWeatherError(null); setWeather(null)
     fetch('/api/weather', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat, lng }) })
       .then(r => r.json())
-      .then(d => { if (d.error) throw new Error(d.error); setWeather(d) })
-      .catch(e => setWeatherError(e instanceof Error ? e.message : 'Error al obtener clima'))
-      .finally(() => setWeatherLoading(false))
+      .then(d => { if (cancelled) return; if (d.error) throw new Error(d.error); setWeather(d) })
+      .catch(e => { if (!cancelled) setWeatherError(e instanceof Error ? e.message : 'Error al obtener clima') })
+      .finally(() => { if (!cancelled) setWeatherLoading(false) })
+
+    return () => { cancelled = true }
   }, [selectedPredio])
 
   const handleVolver = () => {
@@ -755,7 +777,7 @@ export function MapViewerGL({
                 )}
               </div>
 
-              {/* Clima */}
+              {/* Clima — visible para todos los roles, incluido agricultor */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <CloudSun className="h-4 w-4 text-primary" />

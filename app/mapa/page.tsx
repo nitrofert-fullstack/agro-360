@@ -29,7 +29,9 @@ export default function MapaPage() {
   const { user, profile, loading: authLoading, isAuthenticated } = useAuth()
   const [mounted, setMounted] = useState(false)
   const [markers, setMarkers] = useState<MapMarker[]>([])
-  const [tipo, setTipo] = useState<'reales' | 'aproximadas' | 'todos'>('reales')
+  // Default 'todos': con 'reales' los predios sin GPS capturado quedaban
+  // ocultos sin aviso — ver mismo fix en components/admin-dashboard.tsx.
+  const [tipo, setTipo] = useState<'reales' | 'aproximadas' | 'todos'>('todos')
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -60,7 +62,7 @@ export default function MapaPage() {
 
         for (const c of data as any[]) {
           const predio = c.predio
-          if (!predio?.latitud || !predio?.longitud) continue
+          if (!predio?.id) continue
           if (seenPredios.has(predio.id)) continue
           seenPredios.add(predio.id)
 
@@ -93,10 +95,24 @@ export default function MapaPage() {
             }
           }
 
+          // Fallback: predios sin lat/lng guardado pero con polígono dibujado
+          // usan el centroide del polígono en vez de excluirse del todo.
+          let position: [number, number] | undefined
+          if (predio.latitud && predio.longitud) {
+            position = [predio.latitud, predio.longitud]
+          } else if (polygonCoords && polygonCoords.length >= 3) {
+            const [sumLat, sumLng] = polygonCoords.reduce(
+              ([lat, lng], [pLat, pLng]) => [lat + pLat, lng + pLng],
+              [0, 0]
+            )
+            position = [sumLat / polygonCoords.length, sumLng / polygonCoords.length]
+          }
+          if (!position) continue
+
           mapMarkers.push({
             id: predio.id,
             name: predio.nombre_predio || 'Sin nombre',
-            position: [predio.latitud, predio.longitud],
+            position,
             popupContent: popup,
             polygonCoords,
           })
