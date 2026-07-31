@@ -87,7 +87,7 @@ export async function GET(request: Request) {
       ) lc on true
       left join beneficiarios b on b.id = lc.id_beneficiario
       left join caracterizacion_predio cp on cp.id_predio = p.id
-      where p.latitud is not null and p.longitud is not null
+      where (p.latitud is not null and p.longitud is not null) or p.poligono is not null
       ${tipoClause}
       ${asesorFilter}
     `)

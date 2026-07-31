@@ -433,7 +433,10 @@ export function AdminDashboard() {
   const [isExporting, setIsExporting] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [pendingEstado, setPendingEstado] = useState<{ id: string; est: string } | null>(null)
-  const [mapaTipo, setMapaTipo] = useState<'reales' | 'aproximadas' | 'todos'>('reales')
+  // Default 'todos': con 'reales' los predios sin GPS capturado (punto por
+  // defecto) quedaban ocultos sin que el admin lo notara — parecía que
+  // faltaban predios cuando en realidad estaban filtrados silenciosamente.
+  const [mapaTipo, setMapaTipo] = useState<'reales' | 'aproximadas' | 'todos'>('todos')
   const chartColors = useResolvedCssVars([
     '--status-neutral', '--status-info', '--status-warning', '--status-success', '--status-danger', '--status-review',
   ])
@@ -799,7 +802,7 @@ export function AdminDashboard() {
         const seen = new Set<string>()
         for (const c of data as any[]) {
           const predio = c.predio
-          if (!predio?.latitud || !predio?.longitud) continue
+          if (!predio?.id) continue
           if (seen.has(predio.id)) continue
           seen.add(predio.id)
           const benefNombre = c.beneficiario
@@ -822,7 +825,20 @@ export function AdminDashboard() {
               polygonCoords = (typeof predio.poligono === 'string' ? JSON.parse(predio.poligono) : predio.poligono) as [number, number][]
             } catch { polygonCoords = undefined }
           }
-          markers.push({ id: predio.id, name: predio.nombre_predio || 'Sin nombre', position: [predio.latitud, predio.longitud], popupContent: popup, polygonCoords })
+          // Fallback: predios sin lat/lng guardado pero con polígono dibujado
+          // (antes se excluían del todo) usan el centroide del polígono.
+          let position: [number, number] | undefined
+          if (predio.latitud && predio.longitud) {
+            position = [predio.latitud, predio.longitud]
+          } else if (polygonCoords && polygonCoords.length >= 3) {
+            const [sumLat, sumLng] = polygonCoords.reduce(
+              ([lat, lng], [pLat, pLng]) => [lat + pLat, lng + pLng],
+              [0, 0]
+            )
+            position = [sumLat / polygonCoords.length, sumLng / polygonCoords.length]
+          }
+          if (!position) continue
+          markers.push({ id: predio.id, name: predio.nombre_predio || 'Sin nombre', position, popupContent: popup, polygonCoords })
         }
         setAdminMapMarkers(markers)
       } catch { /* silencioso */ }
