@@ -55,6 +55,20 @@ function toMapLibreTiles(config: LayerConfig): string[] {
   return [urlNoRetina]
 }
 
+// MapLibre GL usa csscolorparser para sus paint properties, que NO entiende
+// la sintaxis CSS Color 4 (oklch(), color(), etc. sin comas) — solo hex/rgb/
+// hsl clásicos. Leer --primary vía getComputedStyle devuelve el string tal
+// cual está declarado en globals.css (los navegadores no lo convierten a
+// rgb para custom properties), así que si el theme usa oklch() crudo (como
+// agro-360), ese color pasado a 'circle-color' es inválido para MapLibre y
+// los círculos de marcador/cluster no se pintan — sin ningún error visible,
+// simplemente no aparecen. Se detecta el formato y se cae a un verde fijo
+// si no es hex/rgb/hsl. Ver https://github.com/maplibre/maplibre-style-spec/discussions/70
+function getMapBrandColor(): string {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim()
+  return /^#|^rgb|^hsl/i.test(raw) ? raw : '#16a34a'
+}
+
 function sourceIdFor(key: LayerType): string {
   return `src-${key}`
 }
@@ -136,6 +150,7 @@ export function MapViewerGL({
 
   // Predio seleccionado (clic en marcador) — zoom al predio, botón "volver"
   // a la vista inicial, y panel con NDVI puntual (MODIS) + clima (OpenWeather).
+  // Visible para todos los roles, incluido agricultor.
   const [selectedPredio, setSelectedPredio] = useState<SelectedPredio | null>(null)
   const [ndvi, setNdvi] = useState<NdviResult | null>(null)
   const [ndviLoading, setNdviLoading] = useState(false)
@@ -320,10 +335,9 @@ export function MapViewerGL({
     // Forzar marcadores/clusters/límite del predio seleccionado siempre al
     // tope: moveLayer() sin segundo argumento los sube al final de la pila
     // de capas de MapLibre. Sin esto, alternar entre tipos de mapa podía
-    // dejar una capa raster (NASA/clima) pintando por encima de los círculos
-    // — se veía el número del cluster (capa de texto aparte) pero no el
-    // círculo, y el clic tampoco registraba porque el círculo quedaba con
-    // área visible 0 bajo la capa raster.
+    // dejar una capa raster pintando por encima de los círculos — se veía
+    // el número del cluster (capa de texto aparte) pero no el círculo, y el
+    // clic tampoco registraba porque el círculo quedaba con área 0 visible.
     ;['selected-predio-fill', 'selected-predio-line', 'clusters', 'cluster-count', 'unclustered-point', 'spider-lines', 'spider-points'].forEach((id) => {
       if (map.getLayer(id)) map.moveLayer(id)
     })
@@ -369,7 +383,7 @@ export function MapViewerGL({
       clusterMaxZoom: 17,
     })
 
-    const brand = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#16a34a'
+    const brand = getMapBrandColor()
 
     map.addLayer({
       id: 'clusters',
@@ -408,13 +422,13 @@ export function MapViewerGL({
     })
 
     // "Spiderfy": cuando un cluster ya está en su zoom máximo de agrupación
-    // (predios genuinamente muy cercanos entre sí, o compartiendo el mismo
-    // punto placeholder "aproximada") hacer zoom no los separa más — antes
-    // eso hacía que el clic en un cluster de "3" mandara a un solo punto y
-    // los otros quedaran invisibles/superpuestos, obligando a alejarse y
-    // buscarlos a mano. Se abanican en un círculo alrededor del cluster
-    // para que cada uno quede individualmente visible y clickeable, igual
-    // que spiderfyOnMaxZoom en el Leaflet de map-viewer.tsx.
+    // (predios genuinamente muy cercanos entre sí, ej. varias parcelas
+    // contiguas) hacer zoom no los separa más — antes eso hacía que el clic
+    // en un cluster de "3" mandara a un solo punto y los otros quedaran
+    // invisibles/superpuestos, obligando a alejarse y buscarlos a mano.
+    // Se abanican en un círculo alrededor del cluster para que cada uno
+    // quede individualmente visible y clickeable, igual que
+    // spiderfyOnMaxZoom en el Leaflet de map-viewer.tsx.
     const selectFromFeature = (feature: GeoJSON.Feature) => {
       const geom = feature.geometry as GeoJSON.Point
       const [lng, lat] = geom.coordinates as [number, number]
@@ -577,7 +591,7 @@ export function MapViewerGL({
     }
   }, [markerPosition, polygonCoords, isMapReady])
 
-  // Selección de predio desde la lista de marcadores (admin): zoom al predio
+  // Selección de predio desde la lista de marcadores: zoom al predio
   // (bounds del polígono si existe, punto si no), resalta su límite en el
   // color de salud NDVI una vez llega, y dispara NDVI puntual + clima.
   useEffect(() => {
@@ -633,7 +647,7 @@ export function MapViewerGL({
         if (clusterId == null) return
         const source = map.getSource('markers') as maplibregl.GeoJSONSource
         source.getClusterLeaves(clusterId, 200, 0).then((leaves) => {
-          const brand = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#16a34a'
+          const brand = getMapBrandColor()
           if (map.getLayer('spider-points')) map.removeLayer('spider-points')
           if (map.getLayer('spider-lines')) map.removeLayer('spider-lines')
           if (map.getSource('spider-points-src')) map.removeSource('spider-points-src')
@@ -1046,7 +1060,7 @@ export function MapViewerGL({
                 )}
               </div>
 
-              {/* Clima — visible para todos los roles, incluido agricultor */}
+              {/* Clima */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <CloudSun className="h-4 w-4 text-primary" />
