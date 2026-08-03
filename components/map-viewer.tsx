@@ -29,6 +29,7 @@ export interface MapMarker {
   id?: string
   polygonCoords?: [number, number][]
   name?: string
+  municipio?: string
 }
 
 interface NDVIRecord {

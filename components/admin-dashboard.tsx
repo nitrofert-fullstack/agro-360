@@ -838,7 +838,7 @@ export function AdminDashboard() {
             position = [sumLat / polygonCoords.length, sumLng / polygonCoords.length]
           }
           if (!position) continue
-          markers.push({ id: predio.id, name: predio.nombre_predio || 'Sin nombre', position, popupContent: popup, polygonCoords })
+          markers.push({ id: predio.id, name: predio.nombre_predio || 'Sin nombre', position, popupContent: popup, polygonCoords, municipio: predio.municipio || undefined })
         }
         setAdminMapMarkers(markers)
       } catch { /* silencioso */ }

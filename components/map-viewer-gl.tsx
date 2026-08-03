@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { PanelLeft, X, RotateCcw, Loader2, Satellite, CloudSun } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { PanelLeft, X, RotateCcw, Loader2, Satellite, CloudSun, Layers, MapPinned, ChevronDown, ShieldCheck, CircleDashed } from "lucide-react"
 import * as maplibregl from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { buildLayers, type LayerType, type LayerConfig } from "@/lib/map-layers"
@@ -127,6 +127,12 @@ export function MapViewerGL({
   const [opacity, setOpacity] = useState(0.85)
   const [tilesLoading, setTilesLoading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  // Sidebar con dos vistas: capas (la de siempre) o navegación por municipio
+  // — lista de municipios con conteo, expandible a los predios de cada uno
+  // (marcando cuáles tienen polígono delimitado), para ubicar un predio
+  // puntual sin depender de encontrarlo a ojo en el mapa.
+  const [sidebarTab, setSidebarTab] = useState<'layers' | 'municipios'>('layers')
+  const [expandedMunicipio, setExpandedMunicipio] = useState<string | null>(null)
 
   // Predio seleccionado (clic en marcador) — zoom al predio, botón "volver"
   // a la vista inicial, y panel con NDVI puntual (MODIS) + clima (OpenWeather).
@@ -669,6 +675,54 @@ export function MapViewerGL({
     }
   }
 
+  // Agrupa los marcadores por municipio (orden alfabético, "Sin municipio"
+  // al final) para el panel de navegación — mismo dato que ya trae cada
+  // MapMarker, solo se reorganiza para mostrarlo como lista.
+  const municipioGroups = useMemo(() => {
+    const groups = new Map<string, MapMarker[]>()
+    for (const m of markers ?? []) {
+      const key = m.municipio?.trim() || 'Sin municipio'
+      const list = groups.get(key)
+      if (list) list.push(m)
+      else groups.set(key, [m])
+    }
+    return [...groups.entries()].sort(([a], [b]) => {
+      if (a === 'Sin municipio') return 1
+      if (b === 'Sin municipio') return -1
+      return a.localeCompare(b)
+    })
+  }, [markers])
+
+  // Selecciona un predio directo desde el listado (sin pasar por un clic
+  // real sobre el mapa) — el efecto que ya escucha selectedPredio se
+  // encarga del zoom/fitBounds y de pintar el límite.
+  const selectFromMarker = (m: MapMarker) => {
+    setSelectedPredio({
+      id: m.id ?? '',
+      name: m.name ?? 'Predio',
+      position: m.position,
+      polygonCoords: m.polygonCoords,
+    })
+  }
+
+  // Encuadra el mapa a todos los predios de un municipio (bounds si hay
+  // varios, flyTo directo si hay uno solo) sin seleccionar ninguno todavía
+  // — el usuario elige el predio puntual del listado expandido.
+  const focusMunicipio = (predios: MapMarker[]) => {
+    const map = mapRef.current
+    if (!map || !predios.length) return
+    if (predios.length === 1) {
+      map.flyTo({ center: [predios[0].position[1], predios[0].position[0]], zoom: 14, duration: 800 })
+      return
+    }
+    const lats = predios.map(p => p.position[0])
+    const lngs = predios.map(p => p.position[1])
+    map.fitBounds(
+      [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+      { padding: 60, maxZoom: 15, duration: 800 }
+    )
+  }
+
   // ── Modo minimal: solo mapa, sin selector de capas ──
   if (minimal) {
     return (
@@ -741,6 +795,73 @@ export function MapViewerGL({
           )}
         </div>
 
+        {markers && markers.length > 0 && (
+          <div className="flex border-b border-border flex-shrink-0">
+            <button
+              onClick={() => setSidebarTab('layers')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${sidebarTab === 'layers' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              <Layers className="h-3.5 w-3.5" />
+              Capas
+            </button>
+            <button
+              onClick={() => setSidebarTab('municipios')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${sidebarTab === 'municipios' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              <MapPinned className="h-3.5 w-3.5" />
+              Municipios
+            </button>
+          </div>
+        )}
+
+        {sidebarTab === 'municipios' && markers && markers.length > 0 && (
+          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
+            {municipioGroups.map(([municipio, predios]) => {
+              const expanded = expandedMunicipio === municipio
+              return (
+                <div key={municipio} className="rounded-lg border border-border/60 overflow-hidden">
+                  <button
+                    onClick={() => {
+                      setExpandedMunicipio(expanded ? null : municipio)
+                      focusMunicipio(predios)
+                    }}
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left bg-secondary/40 hover:bg-secondary transition-colors"
+                  >
+                    <span className="text-sm font-medium text-foreground truncate">{municipio}</span>
+                    <span className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[10px] text-muted-foreground bg-background/60 rounded-full px-1.5 py-0.5">{predios.length}</span>
+                      <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                    </span>
+                  </button>
+                  {expanded && (
+                    <div className="divide-y divide-border/40">
+                      {predios.map((m) => (
+                        <button
+                          key={m.id}
+                          onClick={() => selectFromMarker(m)}
+                          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-primary/[0.06] transition-colors"
+                        >
+                          <span className="text-xs text-foreground truncate">{m.name || 'Sin nombre'}</span>
+                          {m.polygonCoords && m.polygonCoords.length >= 3 ? (
+                            <span className="flex items-center gap-1 shrink-0 text-[10px] text-primary">
+                              <ShieldCheck className="h-3 w-3" /> Delimitado
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 shrink-0 text-[10px] text-muted-foreground">
+                              <CircleDashed className="h-3 w-3" /> Sin delimitar
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {sidebarTab === 'layers' && (
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
           {([
             { key: 'base',      label: 'Base' },
@@ -823,6 +944,7 @@ export function MapViewerGL({
             )}
           </div>
         </div>
+        )}
       </aside>
 
       <div className="flex-1 relative min-w-0">

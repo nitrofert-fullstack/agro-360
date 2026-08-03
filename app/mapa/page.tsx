@@ -115,6 +115,7 @@ export default function MapaPage() {
             position,
             popupContent: popup,
             polygonCoords,
+            municipio: predio.municipio || undefined,
           })
         }
 
