@@ -607,11 +607,13 @@ export function MapViewerGL({
       }
       if (!map.getSource('predio-polygon')) {
         map.addSource('predio-polygon', { type: 'geojson', data: geojson })
+        // Sin relleno (fill-opacity: 0) — solo el borde. Un relleno verde
+        // encima tapa/desatura el NDVI que se ve dentro del polígono.
         map.addLayer({
           id: 'predio-polygon-fill',
           type: 'fill',
           source: 'predio-polygon',
-          paint: { 'fill-color': '#22c55e', 'fill-opacity': 0.3 },
+          paint: { 'fill-color': '#22c55e', 'fill-opacity': 0 },
         })
         map.addLayer({
           id: 'predio-polygon-line',
@@ -657,7 +659,12 @@ export function MapViewerGL({
         (map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource).setData(geojson)
       } else {
         map.addSource(SOURCE_ID, { type: 'geojson', data: geojson })
-        map.addLayer({ id: FILL_ID, type: 'fill', source: SOURCE_ID, paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.3 } })
+        // Sin relleno (fill-opacity: 0) — solo el borde. La capa se
+        // mantiene (en vez de quitarla) porque el efecto de abajo sigue
+        // pintando su 'fill-color' con el verde/amarillo/rojo de salud NDVI
+        // y otros efectos la usan como ancla de orden de capas; un relleno
+        // visible encima tapa/desatura el recorte de NDVI dentro del predio.
+        map.addLayer({ id: FILL_ID, type: 'fill', source: SOURCE_ID, paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0 } })
         map.addLayer({ id: LINE_ID, type: 'line', source: SOURCE_ID, paint: { 'line-color': '#3b82f6', 'line-width': 3 } })
       }
       const lngs = ring.map(c => c[0])
