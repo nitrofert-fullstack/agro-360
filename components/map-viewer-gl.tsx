@@ -44,6 +44,19 @@ const COLOMBIA_BOUNDS: [[number, number], [number, number]] = [
   [-66.8, 13.5], // noreste [lng, lat]
 ]
 
+// Punto centinela histórico (Bucaramanga, Santander) — igual que en
+// map-viewer.tsx — usado como fallback cuando un predio no tiene GPS
+// capturado ni polígono dibujado. Con miles de predios así, coinciden todos
+// en el mismo pixel: pintarlos como círculos individuales es solo ruido
+// (un cluster de "2k" superpuesto). Se excluyen del mapa por completo y se
+// resumen como aviso de texto en la lista de municipios.
+const DEFAULT_SENTINEL_POINT: [number, number] = [7.1254, -73.1198]
+function isSentinelMarker(m: MapMarker): boolean {
+  if (m.polygonCoords && m.polygonCoords.length >= 3) return false
+  return Math.abs(m.position[0] - DEFAULT_SENTINEL_POINT[0]) < 0.0005
+    && Math.abs(m.position[1] - DEFAULT_SENTINEL_POINT[1]) < 0.0005
+}
+
 // MapLibre no entiende el token {s} (subdominio round-robin) ni {r} (retina)
 // que usa Leaflet — esta función expande la URL de un LayerConfig al array
 // de URLs que espera un raster source de MapLibre.
@@ -144,9 +157,26 @@ export function MapViewerGL({
   // Sidebar con dos vistas: capas (la de siempre) o navegación por municipio
   // — lista de municipios con conteo, expandible a los predios de cada uno
   // (marcando cuáles tienen polígono delimitado), para ubicar un predio
-  // puntual sin depender de encontrarlo a ojo en el mapa.
-  const [sidebarTab, setSidebarTab] = useState<'layers' | 'municipios'>('layers')
+  // puntual sin depender de encontrarlo a ojo en el mapa. Empieza en
+  // "municipios" (no "capas") a propósito: con miles de predios, pintarlos
+  // todos de una deja el mapa saturado de círculos pegados entre sí —
+  // arranca limpio y el usuario navega a lo que le interesa.
+  const [sidebarTab, setSidebarTab] = useState<'layers' | 'municipios'>('municipios')
   const [expandedMunicipio, setExpandedMunicipio] = useState<string | null>(null)
+  // Escape hatch: quien de verdad quiera ver todos los puntos a la vez
+  // (a costa de que se amontonen) lo puede pedir explícitamente.
+  const [showAllMarkers, setShowAllMarkers] = useState(false)
+  // Solo se pintan en el mapa los predios del municipio expandido (o todos,
+  // si showAllMarkers) — el resto de la lista sigue disponible para navegar,
+  // simplemente no se renderiza como círculo hasta que el usuario lo pida.
+  const visibleMarkers = useMemo(() => {
+    const withRealPosition = (markers ?? []).filter((m) => !isSentinelMarker(m))
+    return showAllMarkers
+      ? withRealPosition
+      : expandedMunicipio
+        ? withRealPosition.filter((m) => (m.municipio?.trim() || 'Sin municipio') === expandedMunicipio)
+        : []
+  }, [markers, showAllMarkers, expandedMunicipio])
 
   // Predio seleccionado (clic en marcador) — zoom al predio, botón "volver"
   // a la vista inicial, y panel con NDVI puntual (MODIS) + clima (OpenWeather).
@@ -357,7 +387,7 @@ export function MapViewerGL({
 
     const geojson: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
-      features: (markers ?? []).map((m) => ({
+      features: visibleMarkers.map((m) => ({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [m.position[1], m.position[0]] },
         properties: {
@@ -546,7 +576,7 @@ export function MapViewerGL({
     map.on('mouseleave', 'clusters', () => { map.getCanvas().style.cursor = '' })
     map.on('mouseenter', 'unclustered-point', () => { map.getCanvas().style.cursor = 'pointer' })
     map.on('mouseleave', 'unclustered-point', () => { map.getCanvas().style.cursor = '' })
-  }, [markers, isMapReady])
+  }, [visibleMarkers, isMapReady])
 
   // Marcador de predio único + polígono de límite — caso "modal de admin" o
   // "detalle de caracterización" que pasan markerPosition/polygonCoords
@@ -732,12 +762,13 @@ export function MapViewerGL({
   // al final) para el panel de navegación — mismo dato que ya trae cada
   // MapMarker, solo se reorganiza para mostrarlo como lista.
   const municipioGroups = useMemo(() => {
-    const groups = new Map<string, MapMarker[]>()
+    const groups = new Map<string, { real: MapMarker[]; sentinelCount: number }>()
     for (const m of markers ?? []) {
       const key = m.municipio?.trim() || 'Sin municipio'
-      const list = groups.get(key)
-      if (list) list.push(m)
-      else groups.set(key, [m])
+      const entry = groups.get(key) ?? { real: [], sentinelCount: 0 }
+      if (isSentinelMarker(m)) entry.sentinelCount++
+      else entry.real.push(m)
+      groups.set(key, entry)
     }
     return [...groups.entries()].sort(([a], [b]) => {
       if (a === 'Sin municipio') return 1
@@ -869,26 +900,42 @@ export function MapViewerGL({
 
         {sidebarTab === 'municipios' && markers && markers.length > 0 && (
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
-            {municipioGroups.map(([municipio, predios]) => {
+            <label className="flex items-center gap-2 px-1 pb-2 text-xs text-muted-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showAllMarkers}
+                onChange={(e) => setShowAllMarkers(e.target.checked)}
+                className="h-3.5 w-3.5 accent-primary"
+              />
+              Mostrar todos los predios en el mapa (puede saturarse con muchos)
+            </label>
+            {municipioGroups.map(([municipio, group]) => {
               const expanded = expandedMunicipio === municipio
+              const total = group.real.length + group.sentinelCount
               return (
                 <div key={municipio} className="rounded-lg border border-border/60 overflow-hidden">
                   <button
                     onClick={() => {
                       setExpandedMunicipio(expanded ? null : municipio)
-                      focusMunicipio(predios)
+                      focusMunicipio(group.real)
                     }}
                     className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left bg-secondary/40 hover:bg-secondary transition-colors"
                   >
                     <span className="text-sm font-medium text-foreground truncate">{municipio}</span>
                     <span className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-[10px] text-muted-foreground bg-background/60 rounded-full px-1.5 py-0.5">{predios.length}</span>
+                      <span className="text-[10px] text-muted-foreground bg-background/60 rounded-full px-1.5 py-0.5">{total}</span>
                       <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
                     </span>
                   </button>
                   {expanded && (
                     <div className="divide-y divide-border/40">
-                      {predios.map((m) => (
+                      {group.sentinelCount > 0 && (
+                        <div className="px-3 py-2 text-[11px] text-muted-foreground bg-secondary/20 italic">
+                          {group.sentinelCount} {group.sentinelCount === 1 ? 'predio' : 'predios'} sin ubicación marcada
+                          (quedó{group.sentinelCount === 1 ? '' : 'n'} en el punto por defecto de la ciudad) — no se muestra{group.sentinelCount === 1 ? '' : 'n'} en el mapa.
+                        </div>
+                      )}
+                      {group.real.map((m) => (
                         <button
                           key={m.id}
                           onClick={() => selectFromMarker(m)}
