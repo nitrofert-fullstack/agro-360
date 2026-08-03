@@ -661,9 +661,12 @@ export function MapViewer({
 
     const selectPredio = (polygon: L.Polygon, m: MapMarker) => {
       if (selectedPolygonLayerRef.current && selectedPolygonLayerRef.current !== polygon) {
-        selectedPolygonLayerRef.current.setStyle({ color: "#3b82f6", fillColor: "#3b82f6", fillOpacity: 0.2, weight: 2 })
+        selectedPolygonLayerRef.current.setStyle({ color: "#3b82f6", fillColor: "#3b82f6", fillOpacity: 0, weight: 2 })
       }
-      polygon.setStyle({ color: "#22c55e", fillColor: "#22c55e", fillOpacity: 0.35, weight: 3 })
+      // Sin relleno (fillOpacity: 0) — solo el borde. El relleno tapaba la
+      // imagen NDVI real (ndviTileLayerRef, en su propio pane debajo de los
+      // vectores) que se carga para este mismo predio.
+      polygon.setStyle({ color: "#22c55e", fillColor: "#22c55e", fillOpacity: 0, weight: 3 })
       selectedPolygonLayerRef.current = polygon
       setSelectedPredio({ id: m.id!, name: m.name || 'Predio', coords: m.polygonCoords!, position: m.position })
       setNdviData([])
@@ -933,7 +936,7 @@ export function MapViewer({
     if (!ndviData.length || !selectedPolygonLayerRef.current) return
     const latest = ndviData[ndviData.length - 1]
     const color = ndviColor(latest.data.mean)
-    selectedPolygonLayerRef.current.setStyle({ color, fillColor: color, fillOpacity: 0.5, weight: 3 })
+    selectedPolygonLayerRef.current.setStyle({ color, fillColor: color, fillOpacity: 0, weight: 3 })
   }, [ndviData])
 
   const loadNDVIImagery = async (polyId: string, start: number, end: number) => {
@@ -1215,7 +1218,7 @@ export function MapViewer({
     setAgroPolyId(null)
     setNdviError(null)
     if (selectedPolygonLayerRef.current) {
-      selectedPolygonLayerRef.current.setStyle({ color: "#3b82f6", fillColor: "#3b82f6", fillOpacity: 0.2, weight: 2 })
+      selectedPolygonLayerRef.current.setStyle({ color: "#3b82f6", fillColor: "#3b82f6", fillOpacity: 0, weight: 2 })
       selectedPolygonLayerRef.current = null
     }
     if (ndviTileLayerRef.current && mapInstanceRef.current) {
