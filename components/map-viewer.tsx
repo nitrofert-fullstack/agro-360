@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import { PanelLeft } from "lucide-react"
 import L from "leaflet"
+import "leaflet/dist/leaflet.css"
+import "leaflet.markercluster/dist/MarkerCluster.css"
+import "leaflet.markercluster/dist/MarkerCluster.Default.css"
 import { buildLayers, type LayerType, type LayerConfig } from "@/lib/map-layers"
 
 type DrawMode = "none" | "circle" | "rectangle" | "polygon"
@@ -89,13 +92,20 @@ export function canSee(role: string | undefined, feature: 'ndvi-nasa' | 'ndvi-ag
   return matrix[feature]?.includes(role) ?? false
 }
 
-// Santander bounds - these will be created dynamically after Leaflet loads
-const SANTANDER_CENTER: [number, number] = [7.1254, -73.1198]
-const SANTANDER_BOUNDS_COORDS = {
-  south: 5.7,
-  west: -74.5,
-  north: 8.2,
-  east: -72.4
+// Punto centinela histórico (Bucaramanga, Santander) usado como fallback cuando
+// un predio no tiene coordenadas GPS reales capturadas. Se conserva el valor
+// numérico por compatibilidad con datos existentes y con la detección de
+// "sin ubicación real" en app/api/admin/mapa — NO representa una restricción
+// geográfica: la herramienta cubre todo Colombia.
+const DEFAULT_SENTINEL_POINT: [number, number] = [7.1254, -73.1198]
+// Bounds amplios de todo el territorio colombiano (continental + insular) para
+// evitar que la navegación del mapa se salga del país. No restringe a un
+// departamento específico.
+const COLOMBIA_BOUNDS_COORDS = {
+  south: -4.5,
+  west: -82,
+  north: 13.5,
+  east: -66.8,
 }
 
 // Custom NDVI color palette
@@ -379,8 +389,8 @@ export function MapViewer({
     } else {
       const Leaflet = leafletRef.current
       if (Leaflet) {
-        bounds = Leaflet.latLngBounds(SANTANDER_CENTER, SANTANDER_CENTER)
-        center = Leaflet.latLng(SANTANDER_CENTER)
+        bounds = Leaflet.latLngBounds(DEFAULT_SENTINEL_POINT, DEFAULT_SENTINEL_POINT)
+        center = Leaflet.latLng(DEFAULT_SENTINEL_POINT)
       } else {
         bounds = { getSouthWest: () => ({ lat: 7.1254, lng: -73.1198 }), getNorthEast: () => ({ lat: 7.1254, lng: -73.1198 }) } as L.LatLngBounds
         center = { lat: 7.1254, lng: -73.1198 } as L.LatLng
@@ -418,41 +428,35 @@ export function MapViewer({
 
     const initMap = async () => {
       const L = await import("leaflet")
-      await import("leaflet/dist/leaflet.css")
       // Clustering: agrupa marcadores cercanos → fluido con miles de predios
       await import("leaflet.markercluster")
-      await import("leaflet.markercluster/dist/MarkerCluster.css")
-      await import("leaflet.markercluster/dist/MarkerCluster.Default.css")
       
       // Check if effect was cancelled or map already initialized during async import
       if (isCancelled || mapInstanceRef.current) return
       
       leafletRef.current = L.default
 
-      const SANTANDER_BOUNDS = L.default.latLngBounds(
-        L.default.latLng(SANTANDER_BOUNDS_COORDS.south, SANTANDER_BOUNDS_COORDS.west),
-        L.default.latLng(SANTANDER_BOUNDS_COORDS.north, SANTANDER_BOUNDS_COORDS.east)
+      const COLOMBIA_BOUNDS = L.default.latLngBounds(
+        L.default.latLng(COLOMBIA_BOUNDS_COORDS.south, COLOMBIA_BOUNDS_COORDS.west),
+        L.default.latLng(COLOMBIA_BOUNDS_COORDS.north, COLOMBIA_BOUNDS_COORDS.east)
       )
 
-      const mapCenter = initialCenter || SANTANDER_CENTER
-      const mapZoom = initialZoom || 8
-      
+      // Centro de Colombia (aprox. Bogotá) para la vista de exploración general
+      const mapCenter = initialCenter || [4.5709, -74.2973]
+      const mapZoom = initialZoom || 5
+
       const map = L.default.map(mapRef.current!, {
         center: mapCenter,
         zoom: mapZoom,
         zoomControl: false,
-        maxBounds: SANTANDER_BOUNDS,
-        maxBoundsViscosity: 1.0,
-        minZoom: 7,
+        maxBounds: COLOMBIA_BOUNDS,
+        maxBoundsViscosity: 0.8,
+        minZoom: 5,
         maxZoom: 18,
         preferCanvas: true, // renderiza vectores/marcadores en canvas (mucho más rápido que DOM)
-        wheelDebounceTime: 80,
-        wheelPxPerZoomLevel: 100,
+        wheelDebounceTime: 80, // agrupa scrolls rápidos del mouse en un solo zoom, en vez de disparar uno por evento
+        wheelPxPerZoomLevel: 100, // evita saltos de zoom exagerados con una sola rueda de mouse
       })
-      
-      if (!initialCenter) {
-        map.fitBounds(SANTANDER_BOUNDS)
-      }
       L.default.control.zoom({ position: "bottomright" }).addTo(map)
   
   // Add predio marker if provided
@@ -490,40 +494,6 @@ export function MapViewer({
           : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
         { attribution: "CartoDB", maxZoom: 19 }
       ).addTo(map)
-
-      L.default.rectangle(SANTANDER_BOUNDS, {
-        color: "#22c55e",
-        weight: 2,
-        fill: false,
-        dashArray: "5, 5",
-      }).addTo(map)
-
-      const customIcon = L.default.divIcon({
-        className: "custom-marker",
-        html: `<div style="
-          width: 20px;
-          height: 20px;
-          background: linear-gradient(135deg, #22c55e, #16a34a);
-          border-radius: 50%;
-          border: 3px solid white;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-        "></div>`,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
-      })
-
-      // Solo mostrar marcador de referencia de Bucaramanga en modo exploración general
-      if (!markerPosition && (!markers || markers.length === 0)) {
-        L.default.marker(SANTANDER_CENTER, { icon: customIcon })
-          .addTo(map)
-          .bindPopup(
-            `<div style="text-align: center; padding: 8px;">
-              <strong style="font-size: 14px;">Bucaramanga</strong><br/>
-              <span style="color: #666;">Santander, Colombia</span><br/>
-              <span style="font-size: 11px;">7.1254 N, 73.1198 W</span>
-            </div>`
-          )
-      }
 
       const drawnItems = new L.default.FeatureGroup()
       map.addLayer(drawnItems)
@@ -633,6 +603,9 @@ export function MapViewer({
               console.warn(`[map-viewer] Capa "${config.name}" fallando repetidamente, se desactiva y se vuelve a mapa base.`)
               setActiveLayer('cartoLight')
             } else {
+              // La capa base activa es la que está fallando: probamos la
+              // siguiente base confiable de la cadena en vez de quedarnos
+              // sin nada (antes, si Carto fallaba, no había respaldo).
               const next = BASE_FALLBACK_CHAIN.find(k => k !== key)
               if (next) {
                 console.warn(`[map-viewer] Capa base "${config.name}" fallando repetidamente, cambiando a "${layers[next].name}".`)
@@ -1505,7 +1478,7 @@ export function MapViewer({
                             </div>
                           )}
                           {ndviImageryStatus === 'error' && (
-                            <div className="rounded border border-red-500/30 bg-red-500/10 p-2 text-[10px] text-red-700 dark:text-red-400">
+                            <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-[10px] text-destructive">
                               Error al cargar imagen. Intenta de nuevo.
                             </div>
                           )}
