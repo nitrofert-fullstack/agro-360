@@ -65,8 +65,16 @@ const withPWA = withPWAInit({
         urlPattern: /\/api\/(agro-tile|weather-tile).*/i,
         handler: 'CacheFirst',
         options: {
-          cacheName: 'map-tiles',
+          cacheName: 'map-tiles-v2',
           expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 }, // 1h
+          // Sin esto, un 502/500 transitorio de nuestra propia ruta (ej. el
+          // fetch a OpenWeatherMap falla una vez) queda cacheado como si
+          // fuera un tile válido — ese tile se ve roto hasta que expire el
+          // caché (hasta 1h), sin reintentar nunca. Mismo bug que ya se
+          // arregló para los tiles externos (ver regla de arriba) pero que
+          // nunca se aplicó aquí. v2: nombre nuevo para no arrastrar tiles
+          // ya envenenados cacheados antes de este fix.
+          cacheableResponse: { statuses: [200] },
         },
       },
       {

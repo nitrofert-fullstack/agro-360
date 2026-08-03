@@ -44,12 +44,25 @@ export async function GET(request: NextRequest) {
 
   const tileUrl = `https://tile.openweathermap.org/map/${type}/${z}/${x}/${y}.png?appid=${apiKey}`
 
+  const fetchTile = () => fetch(tileUrl, {
+    headers: { 'User-Agent': 'AgroSantander360/1.0' },
+    signal: AbortSignal.timeout(8000),
+  })
+
   try {
-    const response = await fetch(tileUrl, {
-      headers: {
-        'User-Agent': 'AgroSantander360/1.0',
-      },
-    })
+    let response: Response
+    try {
+      response = await fetchTile()
+    } catch {
+      // Un solo reintento: la mayoría de fallos de red a OpenWeather son
+      // blips transitorios (timeout corto, conexión reseteada), no una
+      // caída real del proveedor — y con precipitación activa por defecto
+      // en el mapa completo, el volumen de tiles pedidos subió bastante,
+      // así que un fallo aislado ya no es tan raro. El SW ademas ahora solo
+      // cachea 200s (ver next.config.mjs), así que un 502 real de todos
+      // modos no queda pegado — esto solo evita mostrarlo sin necesidad.
+      response = await fetchTile()
+    }
 
     if (!response.ok) {
       return new NextResponse(null, { status: response.status })
