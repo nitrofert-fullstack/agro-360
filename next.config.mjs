@@ -96,7 +96,11 @@ const csp = [
   `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
   `font-src 'self' data: https://fonts.gstatic.com`,
   `img-src 'self' data: blob: https://${supabaseHost} https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.tile.opentopomap.org https://server.arcgisonline.com https://gibs.earthdata.nasa.gov https://api.dicebear.com`,
-  `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://vitals.vercel-insights.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.tile.opentopomap.org https://server.arcgisonline.com https://gibs.earthdata.nasa.gov https://api.dicebear.com${isDev ? ' ws:' : ''}`,
+  // data: en connect-src: MapLibre GL carga sus fuentes 'image' (usadas para
+  // el recorte de NDVI al polígono del predio, ver map-viewer-gl.tsx) con
+  // fetch() sobre una data: URL generada en el propio canvas — sin esto el
+  // navegador la bloquea como violación de CSP y el recorte nunca aparece.
+  `connect-src 'self' data: https://${supabaseHost} wss://${supabaseHost} https://vitals.vercel-insights.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.tile.opentopomap.org https://server.arcgisonline.com https://gibs.earthdata.nasa.gov https://api.dicebear.com${isDev ? ' ws:' : ''}`,
   `worker-src 'self' blob:`,
   `media-src 'self' blob: data:`,
   `object-src 'none'`,

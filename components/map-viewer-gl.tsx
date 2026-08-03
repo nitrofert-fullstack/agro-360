@@ -230,6 +230,11 @@ export function MapViewerGL({
       maxZoom: 18,
       maxBounds: COLOMBIA_BOUNDS,
       attributionControl: false,
+      // Necesario para poder leer el canvas con drawImage() (recorte de NDVI
+      // al polígono del predio, ver efecto más abajo) — sin esto el buffer
+      // de WebGL se limpia justo después de cada frame y drawImage() copia
+      // un canvas en blanco.
+      canvasContextAttributes: { preserveDrawingBuffer: true },
     })
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right')
     map.addControl(new maplibregl.AttributionControl({ compact: true }))
@@ -714,6 +719,123 @@ export function MapViewerGL({
     if (map.getLayer('selected-predio-fill')) map.setPaintProperty('selected-predio-fill', 'fill-color', ndvi.color)
     if (map.getLayer('selected-predio-line')) map.setPaintProperty('selected-predio-line', 'line-color', ndvi.color)
   }, [ndvi, isMapReady])
+
+  // Recorta la capa NDVI (imagen NASA, no el tinte plano de arriba) a la
+  // forma exacta del polígono delimitado — en vez de una capa raster que
+  // cubre todo el viewport. MapLibre no tiene "clip a geometría" nativo
+  // para rasters, así que se aprovecha que ya renderiza el NDVI correctamente
+  // proyectado en su propio canvas: se copia ese canvas con drawImage(),
+  // recortado en espacio de pantalla con ctx.clip() al path del polígono
+  // (proyectado con map.project()), y el resultado se vuelve a insertar
+  // como fuente 'image' georreferenciada por sus 4 esquinas — así sigue
+  // paneando/zoomeando en el sitio correcto igual que cualquier otra capa.
+  // Requiere preserveDrawingBuffer:true en el mapa (ver constructor arriba).
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !isMapReady) return
+
+    const NDVI_LAYER_ID = layerIdFor('ndvi')
+    const CLIP_LAYER_ID = 'ndvi-clip'
+    const CLIP_SOURCE_ID = 'ndvi-clip-src'
+
+    const removeClip = () => {
+      if (map.getLayer(CLIP_LAYER_ID)) map.removeLayer(CLIP_LAYER_ID)
+      if (map.getSource(CLIP_SOURCE_ID)) map.removeSource(CLIP_SOURCE_ID)
+    }
+
+    const activePolygon = (selectedPredio?.polygonCoords && selectedPredio.polygonCoords.length >= 3)
+      ? selectedPredio.polygonCoords
+      : (polygonCoords && polygonCoords.length >= 3 ? polygonCoords : null)
+
+    // Sin polígono para recortar, o el overlay activo no es NDVI: capa NDVI
+    // normal (todo el viewport, comportamiento de antes) y sin recorte.
+    if (!activePolygon || activeOverlay !== 'ndvi') {
+      removeClip()
+      if (map.getLayer(NDVI_LAYER_ID)) {
+        map.setLayoutProperty(NDVI_LAYER_ID, 'visibility', activeOverlay === 'ndvi' ? 'visible' : 'none')
+      }
+      return
+    }
+
+    let cancelled = false
+
+    const buildClip = () => {
+      if (cancelled || !map.getLayer(NDVI_LAYER_ID)) return
+      // Sin tiles cargados todavía el canvas del mapa no tiene la imagen NDVI
+      // pintada — recortar ahora capturaría un lienzo vacío/a medias.
+      if (!map.isSourceLoaded(sourceIdFor('ndvi'))) return
+
+      const ring = activePolygon.map(([lat, lng]) => [lng, lat] as [number, number])
+      const pixelRing = ring.map((c) => map.project(c))
+      const xs = pixelRing.map(p => p.x)
+      const ys = pixelRing.map(p => p.y)
+      const minX = Math.min(...xs), maxX = Math.max(...xs)
+      const minY = Math.min(...ys), maxY = Math.max(...ys)
+      const width = Math.ceil(maxX - minX)
+      const height = Math.ceil(maxY - minY)
+      if (width < 2 || height < 2) return
+
+      const dpr = window.devicePixelRatio || 1
+      const canvas = document.createElement('canvas')
+      canvas.width = width * dpr
+      canvas.height = height * dpr
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      ctx.scale(dpr, dpr)
+
+      ctx.beginPath()
+      pixelRing.forEach((p, i) => {
+        const x = p.x - minX
+        const y = p.y - minY
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      })
+      ctx.closePath()
+      ctx.clip()
+
+      try {
+        ctx.drawImage(map.getCanvas(), minX * dpr, minY * dpr, width * dpr, height * dpr, 0, 0, width, height)
+      } catch {
+        // Canvas "tainted" (tile sin CORS) o buffer aún no listo — se
+        // reintenta en el próximo 'moveend'/reintento de tiles, sin romper
+        // nada mientras tanto (queda la capa NDVI normal visible).
+        return
+      }
+
+      map.setLayoutProperty(NDVI_LAYER_ID, 'visibility', 'none')
+
+      const corner = (x: number, y: number): [number, number] => {
+        const ll = map.unproject([x, y])
+        return [ll.lng, ll.lat]
+      }
+      const coordinates: [[number, number], [number, number], [number, number], [number, number]] = [
+        corner(minX, minY),
+        corner(maxX, minY),
+        corner(maxX, maxY),
+        corner(minX, maxY),
+      ]
+
+      removeClip()
+      map.addSource(CLIP_SOURCE_ID, { type: 'image', url: canvas.toDataURL(), coordinates })
+      // beforeId: insertarla justo debajo del límite/marcadores del predio
+      // (que ya se fuerzan al tope en el efecto de sincronía de capas) — sin
+      // esto, al agregarse después quedaría por encima y los tapa.
+      const anchor = ['selected-predio-fill', 'clusters', 'unclustered-point'].find(id => map.getLayer(id))
+      map.addLayer({ id: CLIP_LAYER_ID, type: 'raster', source: CLIP_SOURCE_ID, paint: { 'raster-opacity': 1 } }, anchor)
+    }
+
+    map.once('idle', buildClip)
+    map.on('moveend', buildClip)
+
+    return () => {
+      cancelled = true
+      map.off('moveend', buildClip)
+      removeClip()
+      if (map.getLayer(NDVI_LAYER_ID)) {
+        map.setLayoutProperty(NDVI_LAYER_ID, 'visibility', activeOverlay === 'ndvi' ? 'visible' : 'none')
+      }
+    }
+  }, [selectedPredio, polygonCoords, activeOverlay, isMapReady])
 
   // Fetch de NDVI puntual (MODIS) + clima (OpenWeather) del predio seleccionado.
   // `cancelled` evita que una respuesta tardía de un predio anterior
