@@ -616,7 +616,46 @@ export function MapViewerGL({
       map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 80, maxZoom: 16, duration: 800 })
     } else {
       removeBoundary()
-      map.flyTo({ center: [position[1], position[0]], zoom: Math.max(map.getZoom(), 15), duration: 800 })
+      const center: [number, number] = [position[1], position[0]]
+      map.flyTo({ center, zoom: Math.max(map.getZoom(), 15), duration: 800 })
+
+      // Predios sin polígono suelen compartir la coordenada placeholder
+      // "aproximada" con otros — zoomear ahí puede seguir aterrizando sobre
+      // un cluster (no se separan solo con zoom) y el punto individual del
+      // predio elegido nunca se pinta. Al terminar el vuelo, si seguimos
+      // sobre un cluster en ese punto, lo abanicamos igual que un clic real
+      // para que el marcador quede visible.
+      map.once('idle', () => {
+        if (!map.getLayer('clusters')) return
+        const px = map.project(center)
+        const features = map.queryRenderedFeatures(px, { layers: ['clusters'] })
+        const clusterId = features[0]?.properties?.cluster_id
+        if (clusterId == null) return
+        const source = map.getSource('markers') as maplibregl.GeoJSONSource
+        source.getClusterLeaves(clusterId, 200, 0).then((leaves) => {
+          const brand = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#16a34a'
+          if (map.getLayer('spider-points')) map.removeLayer('spider-points')
+          if (map.getLayer('spider-lines')) map.removeLayer('spider-lines')
+          if (map.getSource('spider-points-src')) map.removeSource('spider-points-src')
+          if (map.getSource('spider-lines-src')) map.removeSource('spider-lines-src')
+          const centerPx = map.project(center)
+          const n = leaves.length
+          const radiusPx = Math.max(40, Math.min(90, 24 + n * 6))
+          const pointFeatures: GeoJSON.Feature[] = leaves.map((leaf, i) => {
+            const angle = (2 * Math.PI * i) / n - Math.PI / 2
+            const p = { x: centerPx.x + radiusPx * Math.cos(angle), y: centerPx.y + radiusPx * Math.sin(angle) }
+            const lngLat = map.unproject([p.x, p.y] as [number, number])
+            return { type: 'Feature', properties: leaf.properties, geometry: { type: 'Point', coordinates: [lngLat.lng, lngLat.lat] } }
+          })
+          map.addSource('spider-lines-src', {
+            type: 'geojson',
+            data: { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: pointFeatures.map(f => [center, (f.geometry as GeoJSON.Point).coordinates]) } },
+          })
+          map.addLayer({ id: 'spider-lines', type: 'line', source: 'spider-lines-src', paint: { 'line-color': '#9ca3af', 'line-width': 1.5, 'line-dasharray': [2, 2] } })
+          map.addSource('spider-points-src', { type: 'geojson', data: { type: 'FeatureCollection', features: pointFeatures } })
+          map.addLayer({ id: 'spider-points', type: 'circle', source: 'spider-points-src', paint: { 'circle-color': brand, 'circle-radius': 8, 'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff' } })
+        }).catch(() => {})
+      })
     }
 
     return () => { removeBoundary() }

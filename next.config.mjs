@@ -53,6 +53,14 @@ const withPWA = withPWAInit({
         handler: 'NetworkOnly',
       },
       {
+        // Panel admin: siempre datos frescos, nunca offline. Va ANTES de la
+        // regla genérica /api/.* — evita que NetworkFirst con caché de 5min
+        // sirva un listado de predios viejo/incompleto (el bug de "a veces
+        // aparecen los círculos, a veces no" en el mapa admin).
+        urlPattern: /\/api\/admin\/.*/i,
+        handler: 'NetworkOnly',
+      },
+      {
         // Cachear tiles de mapa (agro-tile y weather-tile) — va ANTES de la regla genérica /api/.*
         urlPattern: /\/api\/(agro-tile|weather-tile).*/i,
         handler: 'CacheFirst',
