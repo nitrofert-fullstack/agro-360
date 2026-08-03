@@ -30,6 +30,10 @@ export interface MapViewerGLProps {
   markers?: MapMarker[]
   minimal?: boolean
   controlledLayer?: LayerType
+  // Overlay adicional en modo minimal (ej. NDVI sobre satelital para la
+  // miniatura de un predio) — independiente de controlledLayer, que solo
+  // fija el fondo. Antes minimal solo aceptaba UNA capa exclusiva.
+  controlledOverlay?: LayerType
   role?: 'admin' | 'asesor' | 'analista' | 'agricultor' | 'campesino'
 }
 
@@ -92,6 +96,7 @@ export function MapViewerGL({
   markers,
   minimal = false,
   controlledLayer,
+  controlledOverlay,
   role,
 }: MapViewerGLProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -103,11 +108,20 @@ export function MapViewerGL({
   // mismo estado "una sola capa a la vez", así que elegir NDVI apagaba el
   // mapa base entero y solo quedaban los parches de color de NDVI flotando
   // sobre nada (el reporte de "veo puras manchas").
+  // Satelital por defecto (no un mapa de líneas genérico) para que la vista
+  // de un predio se sienta como "foto real del terreno" — el usuario sigue
+  // pudiendo cambiarla a mano en el mapa completo.
   const [activeBackground, setActiveBackground] = useState<LayerType>(
-    (controlledLayer && !isOverlayCategory(buildLayers()[controlledLayer].category)) ? controlledLayer : "cartoLight"
+    (controlledLayer && !isOverlayCategory(buildLayers()[controlledLayer].category)) ? controlledLayer : "satellite"
   )
+  // Precipitación siempre activa por defecto en el mapa completo — "genial
+  // ver dónde está lloviendo en tiempo real" — el resto de overlays (NDVI,
+  // temperatura) el usuario los prende/apaga a mano como antes. En modo
+  // minimal, controlledOverlay manda (ej. NDVI fijo sobre la miniatura del
+  // predio) en vez de precipitación.
   const [activeOverlay, setActiveOverlay] = useState<LayerType | null>(
-    (controlledLayer && isOverlayCategory(buildLayers()[controlledLayer].category)) ? controlledLayer : null
+    controlledOverlay ??
+    ((controlledLayer && isOverlayCategory(buildLayers()[controlledLayer].category)) ? controlledLayer : (minimal ? null : "precipitation"))
   )
   const visibleRef = useRef<{ background: LayerType; overlay: LayerType | null }>({ background: activeBackground, overlay: activeOverlay })
   const [opacity, setOpacity] = useState(0.85)
@@ -129,18 +143,23 @@ export function MapViewerGL({
     ? (['base', 'satelital', 'nasa', 'clima'] as const)
     : (['base', 'satelital', 'nasa'] as const)
 
-  // En modo minimal (panel externo con un solo toggle, ej. detalle de
-  // caracterización) el llamador controla una única capa exclusiva — igual
-  // que antes de este cambio, sin distinguir fondo/overlay.
+  // En modo minimal (panel externo, ej. miniatura de un predio) el llamador
+  // controla fondo (controlledLayer) y overlay (controlledOverlay) de forma
+  // independiente — antes una sola prop mandaba a cualquiera de los dos de
+  // forma excluyente, así que no se podía fijar satelital + NDVI a la vez.
   useEffect(() => {
-    if (!minimal || !controlledLayer) return
-    if (isOverlayCategory(layers[controlledLayer].category)) {
-      setActiveOverlay(controlledLayer)
-    } else {
-      setActiveBackground(controlledLayer)
-      setActiveOverlay(null)
+    if (!minimal) return
+    if (controlledLayer) {
+      if (isOverlayCategory(layers[controlledLayer].category)) {
+        setActiveOverlay(controlledLayer)
+      } else {
+        setActiveBackground(controlledLayer)
+      }
     }
-  }, [minimal, controlledLayer])
+    if (controlledOverlay) {
+      setActiveOverlay(controlledOverlay)
+    }
+  }, [minimal, controlledLayer, controlledOverlay])
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return

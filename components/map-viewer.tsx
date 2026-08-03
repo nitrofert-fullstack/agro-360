@@ -70,6 +70,7 @@ export interface MapViewerProps {
   markers?: MapMarker[]
   minimal?: boolean       // oculta todos los paneles flotantes — solo mapa limpio
   controlledLayer?: LayerType  // capa controlada desde fuera (para minimal)
+  controlledOverlay?: LayerType  // overlay adicional en minimal (solo lo usa MapViewerGL)
   role?: 'admin' | 'asesor' | 'analista' | 'agricultor' | 'campesino'
 }
 

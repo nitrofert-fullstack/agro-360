@@ -50,10 +50,16 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json()
 
+    // .main es la categoría en inglés (Rain, Clouds, Clear...); .description
+    // ya viene traducida por el parámetro lang=es de la URL ("lluvia
+    // moderada", "cielo despejado"...) — antes se mostraba "Rain" tal cual.
+    const rawDescription: string = data.weather[0].description ?? data.weather[0].main
+    const description = rawDescription.charAt(0).toUpperCase() + rawDescription.slice(1)
+
     const weatherData: WeatherData = {
       temperature: Math.round(data.main.temp),
       humidity: data.main.humidity,
-      description: data.weather[0].main,
+      description,
       windSpeed: Math.round(data.wind.speed * 10) / 10,
       feelsLike: Math.round(data.main.feels_like),
     }

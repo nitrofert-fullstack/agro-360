@@ -2777,6 +2777,8 @@ export function AdminDashboard() {
               <MapViewer
                 role="admin"
                 minimal
+                controlledLayer="satellite"
+                controlledOverlay="ndvi"
                 initialCenter={[selectedCaracterizacion.predio.latitud, selectedCaracterizacion.predio.longitud]}
                 initialZoom={14}
                 markerPosition={[selectedCaracterizacion.predio.latitud, selectedCaracterizacion.predio.longitud]}
