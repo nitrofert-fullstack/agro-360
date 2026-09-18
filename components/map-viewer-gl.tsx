@@ -583,6 +583,123 @@ export function MapViewerGL({
     map.on('mouseleave', 'unclustered-point', () => { map.getCanvas().style.cursor = '' })
   }, [visibleMarkers, isMapReady])
 
+  // Polígonos de todos los predios delimitados + etiqueta con el nombre.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !isMapReady) return
+
+    const SOURCE = 'all-predios-polygons'
+    const FILL = 'all-predios-fill'
+    const LINE = 'all-predios-line'
+    const LABEL = 'all-predios-label'
+
+    const polyFeatures: GeoJSON.Feature[] = []
+    const labelFeatures: GeoJSON.Feature[] = []
+    for (const m of visibleMarkers) {
+      if (!m.polygonCoords || m.polygonCoords.length < 3) continue
+      const coords = m.polygonCoords
+      const ring = [
+        ...coords.map(([lat, lng]) => [lng, lat] as [number, number]),
+        [coords[0][1], coords[0][0]] as [number, number],
+      ]
+      const lngs = ring.map((c) => c[0])
+      const lats = ring.map((c) => c[1])
+      const cx = (Math.min(...lngs) + Math.max(...lngs)) / 2
+      const cy = (Math.min(...lats) + Math.max(...lats)) / 2
+      polyFeatures.push({
+        type: 'Feature',
+        properties: { name: m.name || 'Predio', id: m.id ?? '' },
+        geometry: { type: 'Polygon', coordinates: [ring] },
+      })
+      labelFeatures.push({
+        type: 'Feature',
+        properties: { name: m.name || 'Predio', id: m.id ?? '' },
+        geometry: { type: 'Point', coordinates: [cx, cy] },
+      })
+    }
+
+    const polyData: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: polyFeatures }
+    const labelData: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: labelFeatures }
+
+    const ensure = () => {
+      if (!map.getSource(SOURCE)) {
+        map.addSource(SOURCE, { type: 'geojson', data: polyData })
+        map.addLayer({
+          id: FILL,
+          type: 'fill',
+          source: SOURCE,
+          paint: { 'fill-color': '#16a34a', 'fill-opacity': 0.12 },
+        })
+        map.addLayer({
+          id: LINE,
+          type: 'line',
+          source: SOURCE,
+          paint: { 'line-color': '#15803d', 'line-width': 2 },
+        })
+      } else {
+        ;(map.getSource(SOURCE) as maplibregl.GeoJSONSource).setData(polyData)
+      }
+
+      if (!map.getSource(`${SOURCE}-labels`)) {
+        map.addSource(`${SOURCE}-labels`, { type: 'geojson', data: labelData })
+        map.addLayer({
+          id: LABEL,
+          type: 'symbol',
+          source: `${SOURCE}-labels`,
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-size': 11,
+            'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+            'text-anchor': 'center',
+            'text-max-width': 10,
+            'text-allow-overlap': false,
+            'text-padding': 2,
+          },
+          paint: {
+            'text-color': '#14532d',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 1.5,
+          },
+        })
+      } else {
+        ;(map.getSource(`${SOURCE}-labels`) as maplibregl.GeoJSONSource).setData(labelData)
+      }
+
+      // Mantener debajo de clusters / selección
+      ;[FILL, LINE, LABEL].forEach((id) => {
+        if (map.getLayer(id) && map.getLayer('clusters')) {
+          try { map.moveLayer(id, 'clusters') } catch { /* ok */ }
+        }
+      })
+    }
+
+    ensure()
+
+    const onClick = (e: maplibregl.MapLayerMouseEvent) => {
+      const f = e.features?.[0]
+      if (!f) return
+      const id = String(f.properties?.id ?? '')
+      const name = String(f.properties?.name ?? 'Predio')
+      const marker = visibleMarkers.find((m) => m.id === id)
+      if (marker) {
+        setSelectedPredio({
+          id,
+          name,
+          position: marker.position,
+          polygonCoords: marker.polygonCoords,
+        })
+      }
+    }
+
+    map.on('click', FILL, onClick)
+    map.on('mouseenter', FILL, () => { map.getCanvas().style.cursor = 'pointer' })
+    map.on('mouseleave', FILL, () => { map.getCanvas().style.cursor = '' })
+
+    return () => {
+      map.off('click', FILL, onClick)
+    }
+  }, [visibleMarkers, isMapReady])
+
   // Marcador de predio único + polígono de límite — caso "modal de admin" o
   // "detalle de caracterización" que pasan markerPosition/polygonCoords
   // directos en vez de un array markers[].
@@ -607,8 +724,6 @@ export function MapViewerGL({
       }
       if (!map.getSource('predio-polygon')) {
         map.addSource('predio-polygon', { type: 'geojson', data: geojson })
-        // Sin relleno (fill-opacity: 0) — solo el borde. Un relleno verde
-        // encima tapa/desatura el NDVI que se ve dentro del polígono.
         map.addLayer({
           id: 'predio-polygon-fill',
           type: 'fill',
@@ -1205,36 +1320,35 @@ export function MapViewerGL({
             </div>
 
             <div className="p-4 space-y-4">
-              {/* Medidor NDVI */}
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Satellite className="h-4 w-4 text-primary" />
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Índice NDVI</span>
+              {/* Medidor NDVI — oculto si falla */}
+              {(ndviLoading || ndvi) && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Satellite className="h-4 w-4 text-primary" />
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Índice NDVI</span>
+                  </div>
+                  {ndviLoading && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Consultando MODIS...
+                    </div>
+                  )}
+                  {ndvi && !ndviLoading && (
+                    <div className="space-y-1.5">
+                      <div className="h-2.5 w-full rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${Math.max(0, Math.min(1, ndvi.ndvi)) * 100}%`, backgroundColor: ndvi.color }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold" style={{ color: ndvi.color }}>{ndvi.ndvi.toFixed(3)}</span>
+                        <span className="text-muted-foreground">{ndvi.interpretacion}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground/70">Composite MODIS · {ndvi.fecha}</p>
+                    </div>
+                  )}
                 </div>
-                {ndviLoading && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Consultando MODIS...
-                  </div>
-                )}
-                {ndviError && !ndviLoading && (
-                  <p className="text-xs text-destructive">{ndviError}</p>
-                )}
-                {ndvi && !ndviLoading && (
-                  <div className="space-y-1.5">
-                    <div className="h-2.5 w-full rounded-full bg-secondary overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${Math.max(0, Math.min(1, ndvi.ndvi)) * 100}%`, backgroundColor: ndvi.color }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold" style={{ color: ndvi.color }}>{ndvi.ndvi.toFixed(3)}</span>
-                      <span className="text-muted-foreground">{ndvi.interpretacion}</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground/70">Composite MODIS · {ndvi.fecha}</p>
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* Clima */}
               <div>

@@ -59,6 +59,16 @@ const PredioInsights = dynamic(
   { ssr: false }
 )
 
+const MetricasZonaStrip = dynamic(
+  () => import("@/components/metricas-zona-strip").then((mod) => mod.MetricasZonaStrip),
+  { ssr: false }
+)
+
+const IndicadoresZona = dynamic(
+  () => import("@/components/indicadores-zona").then((mod) => mod.IndicadoresZona),
+  { ssr: false }
+)
+
 function parsePoligono(raw: any): [number, number][] | undefined {
   if (!raw) return undefined
   try {
@@ -720,30 +730,69 @@ function ServerDetailView({
           </motion.div>
         </motion.div>
 
-        {/* Mapa + Panel lateral */}
-        {(hasCoords || canManageStatus) && (
+        {/* Mapa + Panel lateral: insights (clima/NDVI/suelo) siempre que haya
+            municipio o coordenadas; gestión de estado solo roles panel. */}
+        {(hasCoords || canManageStatus || predio?.municipio || predio?.departamento) && (
           <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_360px]">
-            {/* Mapa */}
             {hasCoords && (
               <MapCard lat={lat!} lng={lng!} predio={predio} />
             )}
 
-            {/* Panel lateral: Insights + Gestión estado */}
-            {(hasCoords || canManageStatus) && (
-              <Card className="border-l-4 border-l-primary bg-card/80 border-border/60 flex flex-col" style={{boxShadow:'var(--shadow-md)'}}>
+            <Card className="border-l-4 border-l-primary bg-card/80 border-border/60 flex flex-col" style={{boxShadow:'var(--shadow-md)'}}>
                 <CardHeader className="pb-2 pt-4 px-4 shrink-0">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Shield className="h-4 w-4 text-primary" />
-                    Análisis y Gestión
+                    {canManageStatus ? "Análisis y Gestión" : "Suelo, clima y cultivos"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {(predio?.municipio || predio?.departamento) && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Suelo típico de la zona
+                      </p>
+                      <MetricasZonaStrip
+                        municipio={predio?.municipio}
+                        departamento={predio?.departamento}
+                        cultivo={
+                          Array.isArray(predio?.cultivos_existentes)
+                            ? predio.cultivos_existentes[0]
+                            : typeof predio?.cultivos_existentes === "string"
+                              ? predio.cultivos_existentes
+                              : undefined
+                        }
+                        max={5}
+                      />
+                    </div>
+                  )}
                   {hasCoords && (
                     <PredioInsights
                       lat={lat!}
                       lng={lng!}
                       areaTotalHa={predio?.area_total_hectareas}
                       areaProductivaHa={predio?.area_productiva_hectareas}
+                      municipio={predio?.municipio}
+                      departamento={predio?.departamento}
+                      cultivo={
+                        Array.isArray(predio?.cultivos_existentes)
+                          ? predio.cultivos_existentes[0]
+                          : typeof predio?.cultivos_existentes === "string"
+                            ? predio.cultivos_existentes
+                            : undefined
+                      }
+                    />
+                  )}
+                  {!hasCoords && (predio?.municipio || predio?.departamento) && (
+                    <IndicadoresZona
+                      municipio={predio?.municipio}
+                      departamento={predio?.departamento}
+                      cultivo={
+                        Array.isArray(predio?.cultivos_existentes)
+                          ? predio.cultivos_existentes[0]
+                          : typeof predio?.cultivos_existentes === "string"
+                            ? predio.cultivos_existentes
+                            : undefined
+                      }
                     />
                   )}
                   {canManageStatus && (
@@ -759,7 +808,6 @@ function ServerDetailView({
                   )}
                 </CardContent>
               </Card>
-            )}
           </div>
         )}
 

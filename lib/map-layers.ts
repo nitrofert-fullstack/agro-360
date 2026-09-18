@@ -22,8 +22,10 @@ export interface LayerConfig {
 }
 
 function getGibsDate(): string {
+  // MODIS NDVI 8-day: retroceder ~16 días evita pedir una composición
+  // todavía no publicada (tiles 404/vacíos que parecen "NDVI no carga").
   const date = new Date()
-  date.setDate(date.getDate() - 8)
+  date.setDate(date.getDate() - 16)
   return date.toISOString().split("T")[0]
 }
 

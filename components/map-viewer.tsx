@@ -1366,8 +1366,8 @@ export function MapViewer({
               {showNdviPanel && (
                 <div className="px-3 pb-3 space-y-3">
 
-                  {/* ── NDVI NASA ── */}
-                  {canSee(role, 'ndvi-nasa') && (
+                  {/* ── NDVI NASA — oculto si falla ── */}
+                  {canSee(role, 'ndvi-nasa') && (modisNdviLoading || modisNdvi) && (
                     <div className="rounded-lg border border-border bg-secondary/30 p-3">
                       <p className="mb-2 text-[10px] font-medium text-muted-foreground">ÍNDICE NDVI · NASA MODIS (16 días)</p>
                       {modisNdviLoading && (
@@ -1377,14 +1377,6 @@ export function MapViewer({
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                           </svg>
                           <span className="text-xs">Cargando NDVI...</span>
-                        </div>
-                      )}
-                      {modisNdviError && !modisNdviLoading && (
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <svg className="h-4 w-4 text-yellow-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                          </svg>
-                          No disponible para esta ubicación
                         </div>
                       )}
                       {modisNdvi && !modisNdviLoading && (
@@ -1440,13 +1432,6 @@ export function MapViewer({
                               <><svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Consultando...</>
                             ) : 'Ver historial NDVI'}
                           </button>
-                          {ndviError && !ndviLoading && (
-                            <p className="text-[10px] text-yellow-700 dark:text-yellow-400">
-                              {ndviError.includes('503') || ndviError.includes('API key') || ndviError.includes('configurada')
-                                ? 'Agromonitoring no configurado. Contacte al admin.'
-                                : ndviError}
-                            </p>
-                          )}
                           {!ndviLoading && ndviData.length > 0 && (
                             <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                               {ndviData.map((r) => {
@@ -1475,16 +1460,7 @@ export function MapViewer({
                               Cargando imagen satelital...
                             </div>
                           )}
-                          {ndviImageryStatus === 'no-images' && (
-                            <div className="rounded border border-yellow-500/30 bg-yellow-500/10 p-2 text-[10px] text-yellow-700 dark:text-yellow-400">
-                              Sin imágenes en este período. Prueba 1-2 años.
-                            </div>
-                          )}
-                          {ndviImageryStatus === 'error' && (
-                            <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-[10px] text-destructive">
-                              Error al cargar imagen. Intenta de nuevo.
-                            </div>
-                          )}
+                          {/* no-images / error: silencio — sin banner */}
 
                           {/* Selector de banda + leyenda — solo cuando hay imagen cargada */}
                           {ndviImageryStatus === 'loaded' && Object.keys(availableBands).length > 0 && (

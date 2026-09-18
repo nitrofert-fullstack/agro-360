@@ -15,6 +15,8 @@ import {
 import Link from "next/link"
 import { staggerContainer, staggerItem } from "@/lib/animations"
 import { escapeHtml } from "@/lib/escape-html"
+import { MetricasZonaStrip } from "@/components/metricas-zona-strip"
+import { IndicadoresZona } from "@/components/indicadores-zona"
 
 const MapViewer = dynamic(
   () => import("@/components/map-viewer-switch").then((mod) => mod.MapViewerSwitch),
@@ -213,6 +215,49 @@ export function AgricultorDashboard({ userEmail, userName, userNumDoc }: { userE
             </Card>
           ))}
         </motion.div>
+
+        {/* Suelo + cultivos del predio principal (municipio del primero) */}
+        {predios[0]?.predio && (predios[0].predio.municipio || predios[0].predio.departamento) && (
+          <motion.div variants={staggerItem}>
+            <Card className="border-l-4 border-l-amber-500/80 bg-card/80 border-border/60" style={{ boxShadow: "var(--shadow-sm)" }}>
+              <CardHeader className="pb-2 pt-4 px-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Sprout className="h-4 w-4 text-amber-600" />
+                      Suelo y cultivos de tu zona
+                    </CardTitle>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {predios[0].predio.nombre_predio || "Tu predio"} ·{" "}
+                      {[predios[0].predio.municipio, predios[0].predio.departamento].filter(Boolean).join(", ")}
+                    </p>
+                  </div>
+                  <MetricasZonaStrip
+                    municipio={predios[0].predio.municipio}
+                    departamento={predios[0].predio.departamento}
+                    cultivo={
+                      typeof predios[0].predio.cultivos_existentes === "string"
+                        ? predios[0].predio.cultivos_existentes
+                        : undefined
+                    }
+                    max={5}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                <IndicadoresZona
+                  municipio={predios[0].predio.municipio}
+                  departamento={predios[0].predio.departamento}
+                  cultivo={
+                    typeof predios[0].predio.cultivos_existentes === "string"
+                      ? predios[0].predio.cultivos_existentes
+                      : undefined
+                  }
+                />
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Toggle vista */}
         <motion.div variants={staggerItem} className="flex gap-2">
