@@ -27,6 +27,8 @@ export async function GET(request: Request) {
     const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '50')), 100)
     const search = (searchParams.get('search') || '').trim()
     const estado = (searchParams.get('estado') || '').trim()
+    const departamento = (searchParams.get('departamento') || '').trim()
+    const municipio = (searchParams.get('municipio') || '').trim()
     const skip   = (page - 1) * limit
 
     // ── Filtro por asesor ───────────────────────────────────────────────────
@@ -110,6 +112,14 @@ export async function GET(request: Request) {
     if (allowedVisitaIds) where.id_visita = { in: allowedVisitaIds }
     if (sinAsesorIds)     where.id_visita = { in: sinAsesorIds }
     if (filterEstado)     where.estado    = { equals: filterEstado, mode: 'insensitive' }
+
+    // Filtros geográficos (predio)
+    if (departamento || municipio) {
+      where.predios = {
+        ...(departamento ? { departamento: { equals: departamento, mode: 'insensitive' } } : {}),
+        ...(municipio ? { municipio: { equals: municipio, mode: 'insensitive' } } : {}),
+      }
+    }
 
     if (searchBenefIds !== undefined && searchPredioIds !== undefined) {
       const orClauses: Prisma.caracterizacionesWhereInput[] = []

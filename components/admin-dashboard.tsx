@@ -421,6 +421,8 @@ export function AdminDashboard() {
   const [deleteTarget, setDeleteTarget] = useState<CaracterizacionDB | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [filterEstado, setFilterEstado] = useState<string>("todos")
+  const [filterDepartamento, setFilterDepartamento] = useState<string>("")
+  const [filterMunicipio, setFilterMunicipio] = useState<string>("")
   const [searchQuery, setSearchQuery] = useState("")
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
@@ -480,11 +482,15 @@ export function AdminDashboard() {
     page: reqPage = 1,
     search = '',
     estado = 'todos',
+    departamento = '',
+    municipio = '',
     append = false,
   }: {
     page?: number
     search?: string
     estado?: string
+    departamento?: string
+    municipio?: string
     append?: boolean
   } = {}) => {
     if (append) {
@@ -496,6 +502,8 @@ export function AdminDashboard() {
       const params = new URLSearchParams({ page: String(reqPage), limit: '50' })
       if (search) params.set('search', search)
       if (estado && estado !== 'todos') params.set('estado', estado)
+      if (departamento) params.set('departamento', departamento)
+      if (municipio) params.set('municipio', municipio)
 
       const res = await fetch(`/api/admin/caracterizaciones?${params}`)
       const json = await res.json()
@@ -719,7 +727,7 @@ export function AdminDashboard() {
       if (!res.ok) throw new Error(data.error || 'Error desconocido')
       toast.success(data.mensaje)
       setSelectedNewAsesorId("")
-      await loadData({ page: 1, search: searchQuery, estado: filterEstado, append: false })
+      await loadData({ page: 1, search: searchQuery, estado: filterEstado, departamento: filterDepartamento, municipio: filterMunicipio, append: false })
       // Actualizar el registro seleccionado en el diálogo
       if (selectedCaracterizacion?.visita?.id === visitaId) {
         const res2 = await fetch(`/api/admin/caracterizaciones?limit=1`)
@@ -846,21 +854,35 @@ export function AdminDashboard() {
     load()
   }, [activeSection, mapaTipo])
 
-  // Debounce: reload from server when search or estado filter changes
+  // Debounce: reload from server when search or filters change
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false
       return
     }
     const timer = setTimeout(() => {
-      loadData({ page: 1, search: searchQuery, estado: filterEstado, append: false })
+      loadData({
+        page: 1,
+        search: searchQuery,
+        estado: filterEstado,
+        departamento: filterDepartamento,
+        municipio: filterMunicipio,
+        append: false,
+      })
     }, 300)
     return () => clearTimeout(timer)
-  }, [searchQuery, filterEstado])
+  }, [searchQuery, filterEstado, filterDepartamento, filterMunicipio])
 
   const loadMore = () => {
     if (!isLoadingMore && hasMore) {
-      loadData({ page: page + 1, search: searchQuery, estado: filterEstado, append: true })
+      loadData({
+        page: page + 1,
+        search: searchQuery,
+        estado: filterEstado,
+        departamento: filterDepartamento,
+        municipio: filterMunicipio,
+        append: true,
+      })
     }
   }
 
@@ -895,7 +917,7 @@ export function AdminDashboard() {
         prev ? { ...prev, estado: nuevoEstado, observaciones: observaciones || prev.observaciones } : prev
       )
       // Recargar la lista en segundo plano
-      loadData({ page: 1, search: searchQuery, estado: filterEstado, append: false })
+      loadData({ page: 1, search: searchQuery, estado: filterEstado, departamento: filterDepartamento, municipio: filterMunicipio, append: false })
     } catch (err) {
       console.error('Error updating estado:', err)
       toast.error('Error al actualizar el estado')
@@ -931,7 +953,7 @@ export function AdminDashboard() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Error al eliminar')
       toast.success('Caracterización eliminada correctamente')
-      await loadData({ page: 1, search: searchQuery, estado: filterEstado, append: false })
+      await loadData({ page: 1, search: searchQuery, estado: filterEstado, departamento: filterDepartamento, municipio: filterMunicipio, append: false })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al eliminar')
     } finally {
@@ -1127,18 +1149,18 @@ export function AdminDashboard() {
               </div>
               {/* Filters */}
               <div className="mb-6 flex flex-col gap-3">
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                      placeholder="Buscar nombre, predio, municipio, asesor..."
+                      placeholder="Buscar nombre, documento, predio, asesor..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9 w-full"
                     />
                   </div>
                   <Select value={filterEstado} onValueChange={setFilterEstado}>
-                    <SelectTrigger className="w-28 shrink-0 sm:w-36">
+                    <SelectTrigger className="w-full shrink-0 sm:w-36">
                       <Filter className="mr-1.5 h-3.5 w-3.5 shrink-0" />
                       <SelectValue placeholder="Estado" />
                     </SelectTrigger>
@@ -1150,6 +1172,51 @@ export function AdminDashboard() {
                       <SelectItem value="APROBADO">Viable</SelectItem>
                       <SelectItem value="CANCELADO">No Viable</SelectItem>
                       <SelectItem value="sin_asesor" className={isAdmin ? '' : 'hidden'}>Sin Asesor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Select
+                    value={filterDepartamento || "__todos__"}
+                    onValueChange={(v) => {
+                      setFilterDepartamento(v === "__todos__" ? "" : v)
+                      setFilterMunicipio("")
+                    }}
+                  >
+                    <SelectTrigger className="w-full sm:w-48">
+                      <SelectValue placeholder="Departamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__todos__">Todos los departamentos</SelectItem>
+                      {(dashStats?.porDepartamento || [])
+                        .map((d) => d.departamento)
+                        .filter(Boolean)
+                        .sort((a, b) => a.localeCompare(b, "es"))
+                        .map((d) => (
+                          <SelectItem key={d} value={d}>
+                            {d}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={filterMunicipio || "__todos__"}
+                    onValueChange={(v) => setFilterMunicipio(v === "__todos__" ? "" : v)}
+                  >
+                    <SelectTrigger className="w-full sm:w-48">
+                      <SelectValue placeholder="Municipio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__todos__">Todos los municipios</SelectItem>
+                      {(dashStats?.porMunicipio || [])
+                        .map((m) => m.municipio)
+                        .filter(Boolean)
+                        .sort((a, b) => a.localeCompare(b, "es"))
+                        .map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {m}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1315,14 +1382,14 @@ export function AdminDashboard() {
                           <Button
                             variant="outline" size="sm"
                             disabled={page === 1 || isLoading}
-                            onClick={() => loadData({ page: page - 1, search: searchQuery, estado: filterEstado })}
+                            onClick={() => loadData({ page: page - 1, search: searchQuery, estado: filterEstado, departamento: filterDepartamento, municipio: filterMunicipio })}
                           >
                             <ChevronLeft className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="outline" size="sm"
                             disabled={page >= totalPages || isLoading}
-                            onClick={() => loadData({ page: page + 1, search: searchQuery, estado: filterEstado })}
+                            onClick={() => loadData({ page: page + 1, search: searchQuery, estado: filterEstado, departamento: filterDepartamento, municipio: filterMunicipio })}
                           >
                             <ChevronRight className="h-4 w-4" />
                           </Button>
@@ -1360,7 +1427,7 @@ export function AdminDashboard() {
                         const data = await res.json()
                         if (!res.ok) throw new Error(data.error)
                         toast.success(data.mensaje)
-                        loadData({ page: 1, search: searchQuery, estado: filterEstado })
+                        loadData({ page: 1, search: searchQuery, estado: filterEstado, departamento: filterDepartamento, municipio: filterMunicipio })
                       } catch (err) {
                         toast.error(err instanceof Error ? err.message : 'Error al reasignar')
                       } finally {
@@ -2130,7 +2197,7 @@ export function AdminDashboard() {
                           <AsesorSelector
                             visitaId={selectedCaracterizacion.visita?.id}
                             currentAsesorNombre={selectedCaracterizacion.visita?.nombre_tecnico}
-                            onChanged={() => { loadData({ page, search: searchQuery, estado: filterEstado }); setShowDetail(false) }}
+                            onChanged={() => { loadData({ page, search: searchQuery, estado: filterEstado, departamento: filterDepartamento, municipio: filterMunicipio }); setShowDetail(false) }}
                           />
                         )}
                       </div>
@@ -2692,7 +2759,7 @@ export function AdminDashboard() {
                             .update({ observaciones, updated_at: new Date().toISOString() })
                             .eq('id', selectedCaracterizacion.id)
                           toast.success('Observaciones guardadas')
-                          await loadData({ page: 1, search: searchQuery, estado: filterEstado })
+                          await loadData({ page: 1, search: searchQuery, estado: filterEstado, departamento: filterDepartamento, municipio: filterMunicipio })
                         } catch {
                           toast.error('Error al guardar observaciones')
                         }
