@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!supabase) {
-      setState(prev => ({ ...prev, loading: false, error: 'Supabase not configured' }))
+      setState((prev: any) => ({ ...prev, loading: false, error: 'Supabase not configured' }))
       return
     }
 
@@ -80,14 +80,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Si el refresh token guardado es inválido, limpiarlo y arrancar sin sesión
           if (error.message?.includes('Refresh Token') || (error as { code?: string }).code === 'refresh_token_not_found') {
             await supabase.auth.signOut()
-            setState(prev => ({ ...prev, user: null, session: null, loading: false }))
+            setState((prev: any) => ({ ...prev, user: null, session: null, loading: false }))
             return
           }
           throw error
         }
 
         // Parar el loading INMEDIATAMENTE — getSession() lee de localStorage sin red
-        setState(prev => ({
+        setState((prev: any) => ({
           ...prev,
           user: session?.user ?? null,
           session,
@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           fetchProfile(session.user)
         }
       } catch (err) {
-        setState(prev => ({
+        setState((prev: any) => ({
           ...prev,
           error: err instanceof Error ? err.message : 'Error obteniendo sesión',
           loading: false,
@@ -116,12 +116,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (event === 'TOKEN_REFRESHED' && !session) {
           supabase.auth.signOut()
           setProfile(null)
-          setState(prev => ({ ...prev, user: null, session: null, loading: false }))
+          setState((prev: any) => ({ ...prev, user: null, session: null, loading: false }))
           return
         }
 
         // Actualizar estado INMEDIATAMENTE sin bloquear en fetchProfile
-        setState(prev => ({
+        setState((prev: any) => ({
           ...prev,
           user: session?.user ?? null,
           session,
@@ -152,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               if (error && (error.message?.includes('Refresh Token') || (error as { code?: string }).code === 'refresh_token_not_found')) {
                 await supabase.auth.signOut()
                 setProfile(null)
-                setState(prev => ({ ...prev, user: null, session: null, loading: false }))
+                setState((prev: any) => ({ ...prev, user: null, session: null, loading: false }))
               }
             }
           }
@@ -163,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (msg.includes('refresh_token_not_found') || msg.includes('Refresh Token')) {
             await supabase.auth.signOut()
             setProfile(null)
-            setState(prev => ({ ...prev, user: null, session: null, loading: false }))
+            setState((prev: any) => ({ ...prev, user: null, session: null, loading: false }))
           } else {
             console.warn('[auth] visibilitychange refresh error:', msg)
           }
@@ -181,7 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!supabase) return { data: null, error: 'Supabase not configured' }
-    setState(prev => ({ ...prev, loading: true, error: null }))
+    setState((prev: any) => ({ ...prev, loading: true, error: null }))
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
@@ -189,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       const raw = err instanceof Error ? err.message : 'Error al iniciar sesión'
       const msg = translateAuthError(raw)
-      setState(prev => ({ ...prev, error: msg, loading: false }))
+      setState((prev: any) => ({ ...prev, error: msg, loading: false }))
       return { data: null, error: msg }
     }
   }, [supabase])
@@ -200,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     metadata: { nombre_completo: string; telefono?: string }
   ) => {
     if (!supabase) return { data: null, error: 'Supabase not configured' }
-    setState(prev => ({ ...prev, loading: true, error: null }))
+    setState((prev: any) => ({ ...prev, loading: true, error: null }))
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -219,7 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { data, error: null }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error al registrarse'
-      setState(prev => ({ ...prev, error: msg, loading: false }))
+      setState((prev: any) => ({ ...prev, error: msg, loading: false }))
       return { data: null, error: msg }
     }
   }, [supabase])
@@ -228,7 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!supabase) return { error: 'Supabase not configured' }
     // Limpiar estado local INMEDIATAMENTE — no esperar respuesta del servidor
     setProfile(null)
-    setState(prev => ({ ...prev, user: null, session: null, loading: false }))
+    setState((prev: any) => ({ ...prev, user: null, session: null, loading: false }))
     try { localStorage.removeItem('auth_session_backup') } catch { /* ignorar */ }
     // Invalidar sesión en el servidor (best-effort: si falla, el estado local ya está limpio)
     try {
